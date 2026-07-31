@@ -1,4 +1,20 @@
-# Engelsoft Nodarion
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="custom_components/nodarion/brand/dark_logo.png">
+    <source media="(prefers-color-scheme: light)" srcset="custom_components/nodarion/brand/logo.png">
+    <img src="custom_components/nodarion/brand/logo.png" alt="Engelsoft Nodarion" width="600">
+  </picture>
+</p>
+
+<h1 align="center">Engelsoft Nodarion für Home Assistant</h1>
+
+<p align="center">
+  <a href="https://github.com/engelsofta/nodarion/releases/latest"><img src="https://img.shields.io/github/v/release/engelsofta/nodarion?label=Version&color=d4a33f" alt="Aktuelle Version"></a>
+  <a href="https://www.home-assistant.io/"><img src="https://img.shields.io/badge/Home%20Assistant-Custom-41BDF5?logo=homeassistant&logoColor=white" alt="Home Assistant Custom Integration"></a>
+  <a href="https://hacs.xyz/"><img src="https://img.shields.io/badge/HACS-Custom-ED7D31" alt="HACS Custom Repository"></a>
+  <a href="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml/badge.svg" alt="HACS-Validierung"></a>
+  <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
+</p>
 
 Eine lokale Home-Assistant-Custom-Integration, die ein einstellbares IPv4-Netz
 scannt und pro gefundenem Teilnehmer einen Konnektivitäts-Binärsensor anlegt.
