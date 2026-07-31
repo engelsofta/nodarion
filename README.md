@@ -35,6 +35,21 @@ Konnektivitäts-Binärsensor an.
 
 ## Einblicke
 
+### Teilnehmerübersicht
+
+Die zentrale Gerätetabelle führt Erreichbarkeit, Gerätestatus,
+Mesh-Zugangspunkt, AdGuard-DNS-Aktivität, Internetfreigabe und persönliche
+Überwachungsfunktionen in einer gemeinsamen Ansicht zusammen.
+
+![Teilnehmerübersicht in Engelsoft Nodarion](docs/images/teilnehmeruebersicht.png)
+
+### AdGuard DNS-Live
+
+DNS-Anfragen werden live mit Verlauf, Client-Zuordnung, Antworttyp,
+Bearbeitungsdauer und direkter Blockiermöglichkeit dargestellt.
+
+![AdGuard DNS-Live in Engelsoft Nodarion](docs/images/dns-live.png)
+
 ### KI-Netzwerkanalyse
 
 Die optionale KI-Auswertung fasst Netzwerkzustand, Auffälligkeiten,
