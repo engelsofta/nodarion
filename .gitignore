@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Local build artifacts
+dist/
+RELEASE_NOTES_v1.15.1.md
+RELEASE_NOTES_v1.15.2.md
+
+# Local backup copies
+custom_components/old/
+custom_components/* - Kopie/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,14 @@
+{
+  "domain": "nodarion",
+  "name": "Engelsoft Nodarion",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/engelsofta/nodarion",
+  "issue_tracker": "https://github.com/engelsofta/nodarion/issues",
+  "dependencies": ["frontend", "http"],
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "requirements": ["fritzconnection==1.15.1"],
+  "single_config_entry": true,
+  "version": "1.15.3"
+}
