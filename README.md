@@ -33,9 +33,41 @@ Nodarion arbeitet als lokale Home-Assistant-Custom-Integration, scannt ein
 einstellbares IPv4-Netz und legt pro gefundenem Teilnehmer einen
 Konnektivitäts-Binärsensor an.
 
+## Einblicke
+
+### Teilnehmerübersicht
+
+Die zentrale Gerätetabelle führt Erreichbarkeit, Gerätestatus,
+Mesh-Zugangspunkt, AdGuard-DNS-Aktivität, Internetfreigabe und persönliche
+Überwachungsfunktionen in einer gemeinsamen Ansicht zusammen.
+
+![Teilnehmerübersicht in Engelsoft Nodarion](docs/images/teilnehmeruebersicht.png)
+
+### AdGuard DNS-Live
+
+DNS-Anfragen werden live mit Verlauf, Client-Zuordnung, Antworttyp,
+Bearbeitungsdauer und direkter Blockiermöglichkeit dargestellt.
+
+![AdGuard DNS-Live in Engelsoft Nodarion](docs/images/dns-live.png)
+
+### KI-Netzwerkanalyse
+
+Die optionale KI-Auswertung fasst Netzwerkzustand, Auffälligkeiten,
+Veränderungen und Empfehlungen in einer übersichtlichen Tagesbewertung
+zusammen.
+
+![KI-Netzwerkanalyse in Engelsoft Nodarion](docs/images/ki-netzwerkanalyse.png)
+
 ## Installation
 
 ### HACS
+
+<a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=engelsofta&repository=nodarion&category=integration">
+  <img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Nodarion als benutzerdefiniertes HACS-Repository hinzufügen">
+</a>
+
+Mit dem Button lässt sich Nodarion direkt als benutzerdefiniertes Repository
+in HACS hinterlegen. Alternativ funktioniert die Einrichtung manuell:
 
 1. In HACS **Integrationen** öffnen.
 2. Im Menü **Benutzerdefinierte Repositories** auswählen.
