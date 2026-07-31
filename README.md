@@ -16,8 +16,22 @@
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
 </p>
 
-Eine lokale Home-Assistant-Custom-Integration, die ein einstellbares IPv4-Netz
-scannt und pro gefundenem Teilnehmer einen Konnektivitäts-Binärsensor anlegt.
+> **Ein Netzwerk, ein Gesamtbild:** Nodarion führt aktive Ping-/TCP-Scans,
+> FRITZ!Box- und Mesh-Daten sowie die DNS-Aktivitäten aus AdGuard Home pro
+> Teilnehmer zusammen. Statt drei voneinander getrennten Datenquellen entsteht
+> eine gemeinsame, verständliche Sicht auf Geräte, Verbindungen und
+> Auffälligkeiten – inklusive lokaler Regeln und optionaler KI-Analyse.
+
+Diese Kombination aus Netzwerkscanner, Router-Integration und DNS-Auswertung
+ist für Home Assistant außergewöhnlich und macht Nodarion zu einer besonders
+umfassenden Lösung für die Überwachung des Heimnetzes. Die Integration erkennt
+nicht nur, **ob** ein Gerät erreichbar ist, sondern hilft auch zu verstehen,
+**wo** es verbunden ist, **wie** es kommuniziert und **ob** sein Verhalten
+auffällig erscheint.
+
+Nodarion arbeitet als lokale Home-Assistant-Custom-Integration, scannt ein
+einstellbares IPv4-Netz und legt pro gefundenem Teilnehmer einen
+Konnektivitäts-Binärsensor an.
 
 ## Installation
 
