@@ -101,6 +101,6 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
                 "trust_external_script": False,
             }
         },
-        require_admin=False,
+        require_admin=True,
     )
     hass.data[panel_marker] = True
