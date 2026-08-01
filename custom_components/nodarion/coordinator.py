@@ -168,7 +168,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         self._fritz_hosts_cache: dict[str, NetworkHost] = {}
         self._adguard_cache: dict[str, Any] = {}
         self._next_fritz_scan = 0.0
-        self._fritz_unavailable_since: float | None = None
+        self._hostname_fallback_since: dict[str, float] = {}
         self._next_adguard_scan = 0.0
         self._wan_access_by_ip: dict[str, str] = {}
         self._wan_retry_after: dict[str, float] = {}
@@ -226,7 +226,6 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 perf_counter() + FRITZ_SCAN_INTERVAL_SECONDS
             )
             if self.fritz_scanner.available:
-                self._fritz_unavailable_since = None
                 self._fritz_hosts_cache = scanned_fritz_hosts
                 if (
                     self.monitor.rules.get("onboarding_auto_range")
@@ -243,8 +242,6 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                         "onboarding_start": self.fritz_scanner.dhcp_start,
                         "onboarding_end": self.fritz_scanner.dhcp_end,
                     })
-            elif self._fritz_unavailable_since is None:
-                self._fritz_unavailable_since = perf_counter()
         if (
             self.fritz_scanner is not None
             and self.fritz_scanner.available
@@ -306,17 +303,22 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             old = previous.get(key)
             if old is None:
                 continue
-            fritz_name_grace_active = (
-                self.fritz_scanner is not None
-                and self._fritz_unavailable_since is not None
-                and perf_counter() - self._fritz_unavailable_since
-                < FRITZ_HOSTNAME_GRACE_SECONDS
-            )
             scanner_fell_back_to_ip = (
                 (not host.hostname or _is_ip_hostname(host.hostname))
                 and old.hostname
                 and not _is_ip_hostname(old.hostname)
             )
+            if self.fritz_scanner is not None and scanner_fell_back_to_ip:
+                fallback_since = self._hostname_fallback_since.setdefault(
+                    key, now_monotonic
+                )
+                fritz_name_grace_active = (
+                    now_monotonic - fallback_since
+                    < FRITZ_HOSTNAME_GRACE_SECONDS
+                )
+            else:
+                self._hostname_fallback_since.pop(key, None)
+                fritz_name_grace_active = False
             stable_hostname = (
                 old.hostname
                 if fritz_name_grace_active and scanner_fell_back_to_ip
