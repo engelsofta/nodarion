@@ -1,9 +1,5 @@
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="custom_components/nodarion/brand/dark_logo.png">
-    <source media="(prefers-color-scheme: light)" srcset="custom_components/nodarion/brand/logo.png">
-    <img src="custom_components/nodarion/brand/logo.png" alt="Engelsoft Nodarion" width="600">
-  </picture>
+  <img src="custom_components/nodarion/brand/logo.png" alt="Engelsoft Nodarion" width="600">
 </div>
 
 <h1 align="center">Engelsoft Nodarion für Home Assistant</h1>
