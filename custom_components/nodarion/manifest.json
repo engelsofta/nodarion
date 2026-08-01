@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/engelsofta/nodarion/issues",
   "requirements": ["fritzconnection==1.15.1"],
   "single_config_entry": true,
-  "version": "1.16.2"
+  "version": "1.16.3"
 }
