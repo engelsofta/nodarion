@@ -11,6 +11,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -32,6 +33,25 @@ async def async_setup_entry(
     vendor_lookup: MacVendorLookup = hass.data[DOMAIN]["vendor_lookup"]
     known: set[str] = set()
 
+    presence_unique_id = f"{entry.entry_id}_nobody_home"
+    presence_entity_id = "binary_sensor.nodarion_anwesenheit"
+    entity_registry = er.async_get(hass)
+    registered_entity_id = entity_registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, presence_unique_id
+    )
+    if (
+        registered_entity_id
+        and registered_entity_id != presence_entity_id
+        and entity_registry.async_get(presence_entity_id) is None
+    ):
+        entity_registry.async_update_entity(
+            registered_entity_id, new_entity_id=presence_entity_id
+        )
+
+    async_add_entities([
+        PresenceSummaryEntity(coordinator, entry.entry_id),
+    ])
+
     @callback
     def async_add_new_entities() -> None:
         new = [
@@ -46,6 +66,74 @@ async def async_setup_entry(
 
     entry.async_on_unload(coordinator.async_add_listener(async_add_new_entities))
     async_add_new_entities()
+
+
+class PresenceSummaryEntity(
+    CoordinatorEntity[NetworkCoordinator], BinarySensorEntity
+):
+    """Aggregate presence state for all presence-controlled devices."""
+
+    _attr_device_class = BinarySensorDeviceClass.OCCUPANCY
+    _attr_has_entity_name = True
+    _attr_name = "Anwesenheit"
+    _attr_icon = "mdi:home-account"
+
+    def __init__(
+        self, coordinator: NetworkCoordinator, entry_id: str
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_nobody_home"
+        self.entity_id = "binary_sensor.nodarion_anwesenheit"
+
+    @property
+    def is_on(self) -> bool:
+        """Return true when at least one configured device is home."""
+        keys = self.coordinator.monitor.presence_devices
+        return any(
+            self.coordinator.data.get(key)
+            and self.coordinator.data[key].online
+            for key in keys
+        )
+
+    @property
+    def available(self) -> bool:
+        """Expose the sensor only while it is enabled in Nodarion."""
+        return (
+            self.coordinator.last_update_success
+            and bool(
+                self.coordinator.monitor.rules.get(
+                    "presence_sensor_enabled", False
+                )
+            )
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the members used for the aggregate state."""
+        keys = self.coordinator.monitor.presence_devices
+        home = [
+            self.coordinator.data[key].display_name
+            for key in keys
+            if key in self.coordinator.data
+            and self.coordinator.data[key].online
+        ]
+        away = [
+            self.coordinator.data[key].display_name
+            for key in keys
+            if key in self.coordinator.data
+            and not self.coordinator.data[key].online
+        ]
+        return {
+            "nodarion_presence_summary": True,
+            "enabled": bool(
+                self.coordinator.monitor.rules.get(
+                    "presence_sensor_enabled", False
+                )
+            ),
+            "home": sorted(home),
+            "away": sorted(away),
+            "presence_devices": len(keys),
+        }
 
 
 @callback

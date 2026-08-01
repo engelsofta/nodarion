@@ -22,6 +22,7 @@ DEFAULT_RULES: dict[str, Any] = {
     "enabled": True,
     "learning_days": 7,
     "presence_timeout_minutes": 5,
+    "presence_sensor_enabled": False,
     "onboarding_enabled": True,
     "onboarding_auto_range": True,
     "onboarding_start": "192.168.178.200",
@@ -114,6 +115,16 @@ class NetworkMonitor:
         self.events = list(data.get("events", []))[-MAX_EVENTS:]
         self.alerts = list(data.get("alerts", []))[-MAX_ALERTS:]
         self.rules.update(data.get("rules", {}))
+        rules_migrated = False
+        if (
+            "presence_sensor_enabled" not in data.get("rules", {})
+            and "absence_sensor_enabled" in data.get("rules", {})
+        ):
+            self.rules["presence_sensor_enabled"] = bool(
+                data["rules"]["absence_sensor_enabled"]
+            )
+            rules_migrated = True
+        self.rules.pop("absence_sensor_enabled", None)
         self.known_hosts = set(data.get("known_hosts", []))
         self.host_inventory = {
             key: dict(value)
@@ -135,7 +146,7 @@ class NetworkMonitor:
         self.ai_last_run_date = data.get("ai_last_run_date")
         self.ai_last_error = data.get("ai_last_error")
         migrated = self._restore_monitored_inventory_from_history()
-        if not data or migrated:
+        if not data or migrated or rules_migrated:
             await self._async_save()
 
     async def async_set_host(
@@ -203,6 +214,7 @@ class NetworkMonitor:
             "onboarding_auto_range",
             "onboarding_auto_monitor",
             "onboarding_notify",
+            "presence_sensor_enabled",
         ):
             if key in values:
                 self.rules[key] = bool(values[key])
@@ -920,6 +932,18 @@ class NetworkMonitor:
     ) -> bool:
         if self._active_alert(alert_type, host.key):
             return False
+        # Acknowledging a persistent offline condition must not create the
+        # same warning again on every scan.  Keep it suppressed until the
+        # participant has actually recovered; _resolve_alert records that
+        # recovery and allows a later, genuinely new outage to alert again.
+        if alert_type == "important_offline":
+            latest = self._latest_alert(alert_type, host.key)
+            if (
+                latest
+                and latest.get("acknowledged")
+                and not latest.get("resolved_at")
+            ):
+                return False
         self._alert_sequence += 1
         alert = {
             "id": f"alert_{self._alert_sequence}",
@@ -965,9 +989,19 @@ class NetworkMonitor:
             None,
         )
 
+    def _latest_alert(self, alert_type: str, key: str) -> dict[str, Any] | None:
+        return next(
+            (
+                alert
+                for alert in reversed(self.alerts)
+                if alert.get("type") == alert_type and alert.get("key") == key
+            ),
+            None,
+        )
+
     def _resolve_alert(self, alert_type: str, key: str, now: datetime) -> bool:
-        alert = self._active_alert(alert_type, key)
-        if not alert:
+        alert = self._latest_alert(alert_type, key)
+        if not alert or alert.get("resolved_at"):
             return False
         alert["active"] = False
         alert["resolved_at"] = now.isoformat()

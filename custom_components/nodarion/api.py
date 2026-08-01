@@ -162,6 +162,9 @@ class NodarionView(HomeAssistantView):
                 bool(data.get("notify")),
                 bool(data.get("presence")),
             )
+        coordinator = self._coordinator(request)
+        if coordinator is not None:
+            coordinator.async_update_listeners()
         return self.json(self._frontend_state(request, manager))
 
     async def _adguard_action(
