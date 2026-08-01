@@ -4,7 +4,7 @@ DOMAIN = "nodarion"
 PLATFORMS = ["binary_sensor"]
 PANEL_URL = "nodarion"
 PANEL_TITLE = "Engelsoft Nodarion"
-INTEGRATION_VERSION = "1.16.3"
+INTEGRATION_VERSION = "1.16.4"
 FRONTEND_VERSION = "1.20.6"
 
 CONF_FRITZ_ENABLED = "fritz_enabled"
@@ -44,6 +44,6 @@ DEFAULT_REMOVE_AFTER_DAYS = 7
 # Optional data sources are deliberately slower than active host detection.
 # Their metadata changes far less often and their APIs are comparatively heavy.
 FRITZ_SCAN_INTERVAL_SECONDS = 60
-FRITZ_HOSTNAME_GRACE_SECONDS = 15 * 60
+FRITZ_HOSTNAME_GRACE_SECONDS = 2 * 60 * 60
 ADGUARD_SCAN_INTERVAL_SECONDS = 600
 FRITZ_DEVICE_INFO_INTERVAL_SECONDS = 3600
