@@ -1,0 +1,50 @@
+name: Build HACS release asset
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to package
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Check out release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Verify release version
+        shell: bash
+        run: |
+          manifest_version="$(jq -r '.version' custom_components/nodarion/manifest.json)"
+          release_version="${RELEASE_TAG#v}"
+          if [[ "$manifest_version" != "$release_version" ]]; then
+            echo "manifest version $manifest_version does not match release $RELEASE_TAG"
+            exit 1
+          fi
+
+      - name: Build nodarion.zip
+        shell: bash
+        run: |
+          zip -r nodarion.zip custom_components/nodarion \
+            -x '*/__pycache__/*' '*.pyc' '*.pyo'
+          unzip -t nodarion.zip
+          unzip -l nodarion.zip | grep 'custom_components/nodarion/manifest.json'
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release upload "$RELEASE_TAG" nodarion.zip --clobber
