@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="custom_components/nodarion/brand/logo.png" alt="Engelsoft Nodarion" width="600">
+  <img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/custom_components/nodarion/brand/logo.png" alt="Engelsoft Nodarion" width="600">
 </div>
 
 <h1 align="center">Engelsoft Nodarion für Home Assistant</h1>
@@ -37,14 +37,14 @@ Die zentrale Gerätetabelle führt Erreichbarkeit, Gerätestatus,
 Mesh-Zugangspunkt, AdGuard-DNS-Aktivität, Internetfreigabe und persönliche
 Überwachungsfunktionen in einer gemeinsamen Ansicht zusammen.
 
-![Teilnehmerübersicht in Engelsoft Nodarion](docs/images/teilnehmeruebersicht.png)
+![Teilnehmerübersicht in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
 
 ### AdGuard DNS-Live
 
 DNS-Anfragen werden live mit Verlauf, Client-Zuordnung, Antworttyp,
 Bearbeitungsdauer und direkter Blockiermöglichkeit dargestellt.
 
-![AdGuard DNS-Live in Engelsoft Nodarion](docs/images/dns-live.png)
+![AdGuard DNS-Live in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
 
 ### KI-Netzwerkanalyse
 
@@ -52,7 +52,7 @@ Die optionale KI-Auswertung fasst Netzwerkzustand, Auffälligkeiten,
 Veränderungen und Empfehlungen in einer übersichtlichen Tagesbewertung
 zusammen.
 
-![KI-Netzwerkanalyse in Engelsoft Nodarion](docs/images/ki-netzwerkanalyse.png)
+![KI-Netzwerkanalyse in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/ki-netzwerkanalyse.png)
 
 ## Installation
 
@@ -79,6 +79,14 @@ in HACS hinterlegen. Alternativ funktioniert die Einrichtung manuell:
 3. Unter **Einstellungen → Geräte & Dienste → Integration hinzufügen** nach
    **Engelsoft Nodarion** suchen.
 4. Das lokale Netz als CIDR eintragen, zum Beispiel `192.168.178.0/24`.
+
+## FRITZ!Box-Gastzugang
+
+Nodarion liest den Gastzugang lokal und ausschließlich lesend über TR-064 aus. Die Übersicht zeigt Status, WLAN-Name, gemeldete Sicherheitseinstellungen und aktuell verbundene Gäste. Gastgeräte erhalten in der Teilnehmerliste eine Kennzeichnung und können dort gefiltert werden. Verbindungen und Trennungen erscheinen im Live-Log; optional warnt die Überwachung bei neuen Gästen, Aktivität zur Ruhezeit oder ungewöhnlich langer Verbindung.
+
+Über den Schalter **Gastnetz anzeigen und überwachen** in den Überwachungseinstellungen lässt sich die Funktion vollständig ausblenden. Dann erscheinen Gastzugang, Gastgeräte, zugehörige Protokolle und Warnungen nirgends in Nodarion.
+
+Der Verbindungsbeginn und der Warnverlauf werden im Home-Assistant-Speicher gesichert. Ein Neustart setzt die laufende Beobachtungsdauer daher nicht zurück.
 
 ## Verhalten
 

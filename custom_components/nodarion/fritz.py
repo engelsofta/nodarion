@@ -10,6 +10,7 @@ from typing import Any
 
 from fritzconnection.lib.fritzhosts import FritzHosts
 from fritzconnection.lib.fritztopology import FritzMeshTopology
+from fritzconnection.lib.fritzwlan import FritzGuestWLAN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import format_mac
 
@@ -45,10 +46,16 @@ class FritzBoxScanner:
                 list[dict[str, Any]],
                 dict[str, dict[str, Any]],
                 dict[str, str],
+                dict[str, Any],
             ]
         ] | None = None
         self.dhcp_start: str | None = None
         self.dhcp_end: str | None = None
+        self.guest_info: dict[str, Any] = {
+            "available": False,
+            "enabled": False,
+            "clients": 0,
+        }
 
     async def async_scan(self) -> dict[str, NetworkHost]:
         """Return active FRITZ!Box hosts without blocking Home Assistant."""
@@ -56,6 +63,7 @@ class FritzBoxScanner:
             list[dict[str, Any]],
             dict[str, dict[str, Any]],
             dict[str, str],
+            dict[str, Any],
         ] | None = None
         if self._scan_future is not None and self._scan_future.done():
             try:
@@ -69,14 +77,14 @@ class FritzBoxScanner:
             return {}
 
         if completed_data is not None:
-            raw_hosts, topology_data, router_info = completed_data
+            raw_hosts, topology_data, router_info, guest_info = completed_data
         else:
             self._scan_future = self.hass.async_add_executor_job(
                 self._get_fritz_data
             )
             try:
                 async with asyncio.timeout(30):
-                    raw_hosts, topology_data, router_info = await asyncio.shield(
+                    raw_hosts, topology_data, router_info, guest_info = await asyncio.shield(
                         self._scan_future
                     )
             except TimeoutError:
@@ -94,13 +102,15 @@ class FritzBoxScanner:
         self.available = True
         self.dhcp_start = router_info.get("dhcp_start")
         self.dhcp_end = router_info.get("dhcp_end")
+        self.guest_info = guest_info
         hosts: dict[str, NetworkHost] = {}
         for item in raw_hosts:
             ip = str(item.get("ip") or "").strip()
+            is_guest = self._as_bool(item.get("guest"))
             if not ip or ip in self.excluded:
                 continue
             try:
-                if ipaddress.ip_address(ip) not in self.network:
+                if ipaddress.ip_address(ip) not in self.network and not is_guest:
                     continue
             except ValueError:
                 continue
@@ -121,10 +131,16 @@ class FritzBoxScanner:
                     or self._normalize_connection_type(item.get("interface_type"))
                 ),
                 wifi_band=details.get("wifi_band"),
-                link_rate_mbps=details.get("link_rate_mbps"),
+                link_rate_mbps=(
+                    details.get("link_rate_mbps")
+                    or self._as_non_negative_float(item.get("guest_speed"))
+                ),
                 link_rate_rx_mbps=details.get("link_rate_rx_mbps"),
                 link_rate_tx_mbps=details.get("link_rate_tx_mbps"),
-                signal_strength_percent=details.get("signal_strength_percent"),
+                signal_strength_percent=(
+                    details.get("signal_strength_percent")
+                    or self._as_percentage(item.get("guest_signal"))
+                ),
                 signal_strength_dbm=details.get("signal_strength_dbm"),
                 address_source=self._clean_string(item.get("address_source")),
                 lease_time_remaining=self._as_non_negative_int(
@@ -132,6 +148,7 @@ class FritzBoxScanner:
                 ),
                 fritzbox_model=router_info.get("model"),
                 fritzos_version=router_info.get("version"),
+                guest_network=is_guest,
             )
         return hosts
 
@@ -160,7 +177,10 @@ class FritzBoxScanner:
     def _get_fritz_data(
         self,
     ) -> tuple[
-        list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, str]
+        list[dict[str, Any]],
+        dict[str, dict[str, Any]],
+        dict[str, str],
+        dict[str, Any],
     ]:
         hosts = FritzHosts(
             address=self.address,
@@ -169,6 +189,7 @@ class FritzBoxScanner:
             timeout=5.0,
         )
         active_hosts = hosts.get_active_hosts()
+        guest_info = self._get_guest_data(hosts, active_hosts)
         if (
             monotonic() - self._router_info_checked
             >= FRITZ_DEVICE_INFO_INTERVAL_SECONDS
@@ -236,7 +257,181 @@ class FritzBoxScanner:
                             )
         except Exception as err:
             _LOGGER.debug("FRITZ!Box mesh topology unavailable: %s", err)
-        return active_hosts, topology_data, router_info
+        return active_hosts, topology_data, router_info, guest_info
+
+    def _get_guest_data(
+        self, hosts: FritzHosts, active_hosts: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Annotate active hosts and return read-only guest WLAN status."""
+        guest_info: dict[str, Any] = {
+            "available": False,
+            "enabled": False,
+            "clients": 0,
+        }
+        guest_macs: set[str] = set()
+        guest_ips: set[str] = set()
+        try:
+            attributes = hosts.get_hosts_attributes()
+        except Exception as err:
+            _LOGGER.debug("FRITZ!Box extended host list unavailable: %s", err)
+        else:
+            for item in attributes:
+                if not self._as_bool(
+                    self._item_value(item, "X_AVM-DE_Guest", "guest")
+                ):
+                    continue
+                mac = self._format_mac(
+                    self._item_value(item, "MACAddress", "mac")
+                )
+                ip = self._clean_string(
+                    self._item_value(item, "IPAddress", "ip")
+                )
+                if mac:
+                    guest_macs.add(mac)
+                if ip:
+                    guest_ips.add(ip)
+                if not self._as_bool(
+                    self._item_value(item, "Active", "active", "status")
+                ):
+                    continue
+                if not any(
+                    (mac and self._format_mac(host.get("mac")) == mac)
+                    or (ip and str(host.get("ip") or "") == ip)
+                    for host in active_hosts
+                ):
+                    active_hosts.append(
+                        {
+                            "ip": ip,
+                            "mac": mac,
+                            "name": self._item_value(
+                                item, "HostName", "name"
+                            ),
+                            "status": True,
+                            "interface_type": self._item_value(
+                                item, "InterfaceType", "interface_type"
+                            ),
+                            "guest": True,
+                        }
+                    )
+
+        try:
+            guest = FritzGuestWLAN(fc=hosts.fc)
+            guest_clients = guest.get_hosts_info()
+            enabled = self._as_bool(guest.is_enabled)
+            guest_info.update(
+                {
+                    "available": True,
+                    "enabled": enabled,
+                    "ssid": guest.ssid,
+                    "encryption": guest.beacontype,
+                    "hidden": self._as_bool(guest.is_hidden),
+                }
+            )
+            for item in guest_clients:
+                if not self._as_bool(item.get("status")):
+                    continue
+                mac = self._format_mac(item.get("mac"))
+                ip = self._clean_string(item.get("ip"))
+                if mac:
+                    guest_macs.add(mac)
+                if ip:
+                    guest_ips.add(ip)
+                existing = next(
+                    (
+                        host
+                        for host in active_hosts
+                        if (mac and self._format_mac(host.get("mac")) == mac)
+                        or (ip and str(host.get("ip") or "") == ip)
+                    ),
+                    None,
+                )
+                if existing is None:
+                    existing = {
+                        "ip": ip,
+                        "mac": mac,
+                        "name": item.get("name"),
+                        "status": True,
+                        "interface_type": "WLAN",
+                    }
+                    active_hosts.append(existing)
+                existing.update(
+                    {
+                        "guest": True,
+                        "guest_signal": item.get("signal"),
+                        "guest_speed": item.get("speed"),
+                    }
+                )
+
+            service = str(getattr(guest, "service", "") or "")
+            service_name = (
+                service
+                if service.startswith("WLANConfiguration")
+                else f"WLANConfiguration{service}"
+            )
+            if service:
+                extension = hosts.fc.call_action(
+                    service_name, "X_AVM-DE_GetWLANExtInfo"
+                )
+                guest_info.update(
+                    {
+                        "ap_type": extension.get("NewX_AVM-DE_APType"),
+                        "frequency_band": extension.get(
+                            "NewX_AVM-DE_FrequencyBand"
+                        ),
+                        "timeout_active": self._as_bool(
+                            extension.get("NewX_AVM-DE_TimeoutActive")
+                        ),
+                        "timeout_minutes": self._as_non_negative_int(
+                            extension.get("NewX_AVM-DE_Timeout")
+                        ),
+                        "time_remaining_seconds": self._as_non_negative_int(
+                            extension.get("NewX_AVM-DE_TimeRemain")
+                        ),
+                        "no_forced_off": self._as_bool(
+                            extension.get("NewX_AVM-DE_NoForcedOff")
+                        ),
+                        "user_isolation": self._as_bool(
+                            extension.get("NewX_AVM-DE_UserIsolation")
+                        ),
+                        "encryption_mode": extension.get(
+                            "NewX_AVM-DE_EncryptionMode"
+                        ),
+                        "last_changed": extension.get(
+                            "NewX_AVM-DE_LastChangedStamp"
+                        ),
+                    }
+                )
+        except Exception as err:
+            _LOGGER.debug("FRITZ!Box guest WLAN details unavailable: %s", err)
+
+        for item in active_hosts:
+            mac = self._format_mac(item.get("mac"))
+            ip = str(item.get("ip") or "").strip()
+            if (mac and mac in guest_macs) or (ip and ip in guest_ips):
+                item["guest"] = True
+        guest_info["clients"] = sum(
+            self._as_bool(item.get("guest")) for item in active_hosts
+        )
+        return guest_info
+
+    @staticmethod
+    def _item_value(item: dict[str, Any], *keys: str) -> Any:
+        """Read a field independent of FRITZ!OS key spelling."""
+        normalized = {
+            "".join(character.lower() for character in str(key) if character.isalnum()): value
+            for key, value in item.items()
+        }
+        for key in keys:
+            lookup = "".join(
+                character.lower() for character in key if character.isalnum()
+            )
+            if lookup in normalized:
+                return normalized[lookup]
+        return None
+
+    @staticmethod
+    def _as_bool(value: Any) -> bool:
+        return str(value).strip().lower() in {"1", "true", "yes", "on", "active"}
 
     @staticmethod
     def _get_router_info(fc: Any) -> dict[str, str]:
@@ -490,6 +685,22 @@ class FritzBoxScanner:
         except (TypeError, ValueError):
             return None
         return result if result >= 0 else None
+
+    @staticmethod
+    def _as_non_negative_float(value: Any) -> float | None:
+        try:
+            result = float(value)
+        except (TypeError, ValueError):
+            return None
+        return round(result, 1) if result >= 0 else None
+
+    @staticmethod
+    def _as_percentage(value: Any) -> int | None:
+        try:
+            result = int(value)
+        except (TypeError, ValueError):
+            return None
+        return max(0, min(100, result))
 
 
     @staticmethod
