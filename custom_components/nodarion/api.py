@@ -186,7 +186,7 @@ class NodarionView(HomeAssistantView):
         try:
             if action == "adguard_set_domain_policy":
                 result = await scanner.async_set_domain_policy(
-                    data.get("domain"), data.get("policy")
+                    data.get("domain"), data.get("policy"), data.get("client")
                 )
             elif action == "adguard_add_rule":
                 result = await scanner.async_add_custom_rule(data.get("rule"))
@@ -231,6 +231,11 @@ class NodarionView(HomeAssistantView):
             "frontend": FRONTEND_VERSION,
         }
         coordinator = cls._coordinator(request)
+        response["guest_access"] = (
+            dict(coordinator.fritz_scanner.guest_info)
+            if coordinator is not None and coordinator.fritz_scanner is not None
+            else {"available": False, "enabled": False, "clients": 0}
+        )
         participants = []
         if coordinator is not None and coordinator.data:
             for host in coordinator.data.values():

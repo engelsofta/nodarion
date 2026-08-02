@@ -289,6 +289,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                     lease_time_remaining=fritz_host.lease_time_remaining,
                     fritzbox_model=fritz_host.fritzbox_model,
                     fritzos_version=fritz_host.fritzos_version,
+                    guest_network=fritz_host.guest_network,
                 )
 
         if (
@@ -357,7 +358,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 )
             except ValueError:
                 in_network = False
-            if not in_network or old.ip in self.scanner.excluded:
+            if (not in_network and not old.guest_network) or old.ip in self.scanner.excluded:
                 continue
             missed = (
                 max(self.offline_after, old.missed_scans + 1)
@@ -563,6 +564,13 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         now = perf_counter()
         for key, host in tuple(hosts.items()):
             state = self._wan_access_by_ip.get(host.ip)
+            if host.guest_network:
+                hosts[key] = replace(
+                    host,
+                    wan_access=state,
+                    internet_approval_required=False,
+                )
+                continue
             inventory = self.monitor.host_inventory.get(key, {})
             previous_mac = inventory.get("mac")
             if (

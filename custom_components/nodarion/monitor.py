@@ -37,6 +37,10 @@ DEFAULT_RULES: dict[str, Any] = {
     "offline_minutes": 10,
     "identity_changes": True,
     "notify_alerts": False,
+    "guest_monitoring_enabled": True,
+    "guest_new_enabled": True,
+    "guest_quiet_enabled": True,
+    "guest_max_hours": 8,
     "ai_analysis_enabled": False,
     "ai_analysis_time": "03:15",
     "ai_privacy": "anonymized",
@@ -96,6 +100,7 @@ class NetworkMonitor:
         self.first_seen: dict[str, str] = {}
         self.offline_since: dict[str, str] = {}
         self.transitions: dict[str, list[str]] = {}
+        self.guest_since: dict[str, str] = {}
         self.started_at = _now().isoformat()
         self._alert_sequence = 0
         self.internet_guard_initialized = False
@@ -136,6 +141,7 @@ class NetworkMonitor:
         self.transitions = {
             key: list(values) for key, values in data.get("transitions", {}).items()
         }
+        self.guest_since = dict(data.get("guest_since", {}))
         self.started_at = data.get("started_at") or self.started_at
         self._alert_sequence = int(data.get("alert_sequence", len(self.alerts)))
         self.internet_guard_initialized = bool(
@@ -215,6 +221,9 @@ class NetworkMonitor:
             "onboarding_auto_monitor",
             "onboarding_notify",
             "presence_sensor_enabled",
+            "guest_monitoring_enabled",
+            "guest_new_enabled",
+            "guest_quiet_enabled",
         ):
             if key in values:
                 self.rules[key] = bool(values[key])
@@ -224,6 +233,7 @@ class NetworkMonitor:
             "new_device_minutes": (1, 1440),
             "flap_limit": (2, 100),
             "offline_minutes": (1, 10080),
+            "guest_max_hours": (1, 168),
         }.items():
             if key in values:
                 self.rules[key] = max(minimum, min(maximum, int(values[key])))
@@ -252,6 +262,15 @@ class NetworkMonitor:
             pass
         if values.get("ai_privacy") in {"anonymized", "domains"}:
             self.rules["ai_privacy"] = values["ai_privacy"]
+        if not self.rules.get("guest_monitoring_enabled", True):
+            resolved_at = _now().isoformat()
+            for alert in self.alerts:
+                if alert.get("type") not in {"guest_new", "guest_quiet", "guest_long"}:
+                    continue
+                if alert.get("active"):
+                    alert["active"] = False
+                    alert["resolved_at"] = resolved_at
+            self.guest_since.clear()
         await self._async_save()
 
     def async_maybe_schedule_ai_analysis(
@@ -523,6 +542,7 @@ class NetworkMonitor:
         now = _now()
         changed = False
         learning = self._is_learning(now)
+        guest_monitoring = self.rules.get("guest_monitoring_enabled", True)
         previous_by_mac = {
             host.mac: (key, host)
             for key, host in previous.items()
@@ -579,17 +599,100 @@ class NetworkMonitor:
                             title="Nodarion: Neues Gerät",
                             notification_id=f"{DOMAIN}_onboarding_{key}",
                         )
-                self._add_event(
-                    "discovered",
-                    host,
-                    f"{host.display_name} entdeckt",
-                    service=self._service_for(host),
-                )
+                if guest_monitoring or not host.guest_network:
+                    self._add_event(
+                        "discovered",
+                        host,
+                        f"{host.display_name} entdeckt",
+                        service=self._service_for(host),
+                    )
                 if learning and not self.internet_guard_initialized:
                     self.known_hosts.add(key)
                 changed = True
-            elif old.online != host.online:
+            elif old.online != host.online and (
+                guest_monitoring or not host.guest_network
+            ):
                 changed = self._process_status_change(old, host, now) or changed
+
+            if not guest_monitoring and host.guest_network:
+                if self.guest_since.pop(key, None) is not None:
+                    changed = True
+                for alert_type in ("guest_new", "guest_quiet", "guest_long"):
+                    changed = self._resolve_alert(alert_type, key, now) or changed
+            guest_active = guest_monitoring and host.online and host.guest_network
+            guest_was_active = bool(
+                guest_monitoring
+                and old is not None
+                and old.online
+                and old.guest_network
+            )
+            if guest_active and not guest_was_active:
+                self.guest_since[key] = now.isoformat()
+                self._add_event(
+                    "guest_joined",
+                    host,
+                    f"{host.display_name} ist dem Gastnetz beigetreten",
+                    service="FRITZ!Box Gastzugang",
+                )
+                if self.rules["enabled"]:
+                    if self.rules.get("guest_new_enabled", True):
+                        self._add_alert(
+                            "guest_new",
+                            "warning",
+                            host,
+                            "Neues Gerät ist im Gastzugang aktiv.",
+                            now,
+                            service="FRITZ!Box Gastzugang",
+                        )
+                    if (
+                        self.rules.get("guest_quiet_enabled", True)
+                        and self._in_quiet_hours(now)
+                    ):
+                        self._add_alert(
+                            "guest_quiet",
+                            "warning",
+                            host,
+                            "Gastgerät wurde während der Ruhezeit aktiv.",
+                            now,
+                            service="FRITZ!Box Gastzugang",
+                        )
+                changed = True
+            elif guest_was_active and not guest_active:
+                self._add_event(
+                    "guest_left",
+                    host,
+                    f"{host.display_name} hat das Gastnetz verlassen",
+                    service="FRITZ!Box Gastzugang",
+                )
+                self.guest_since.pop(key, None)
+                for alert_type in ("guest_new", "guest_quiet", "guest_long"):
+                    changed = self._resolve_alert(alert_type, key, now) or changed
+                changed = True
+            elif guest_active:
+                if key not in self.guest_since:
+                    self.guest_since[key] = now.isoformat()
+                    changed = True
+                since = _parse(self.guest_since[key])
+                if (
+                    self.rules["enabled"]
+                    and since is not None
+                    and now - since
+                    >= timedelta(hours=int(self.rules.get("guest_max_hours", 8)))
+                ):
+                    changed = (
+                        self._add_alert(
+                            "guest_long",
+                            "warning",
+                            host,
+                            (
+                                "Gastgerät ist seit mindestens "
+                                f"{self.rules.get('guest_max_hours', 8)} Stunden verbunden."
+                            ),
+                            now,
+                            service="FRITZ!Box Gastzugang",
+                        )
+                        or changed
+                    )
 
             if (
                 old is not None
@@ -655,7 +758,11 @@ class NetworkMonitor:
                 if key not in self.known_hosts:
                     self.known_hosts.add(key)
                     changed = True
-            elif host.online and key not in self.known_hosts:
+            elif (
+                host.online
+                and not host.guest_network
+                and key not in self.known_hosts
+            ):
                 first_seen = _parse(self.first_seen.get(key)) or now
                 if now - first_seen >= timedelta(
                     minutes=self.rules["new_device_minutes"]
@@ -723,6 +830,7 @@ class NetworkMonitor:
                 internet_approval_required=bool(
                     item.get("internet_approval_required", False)
                 ),
+                guest_network=bool(item.get("guest_network", False)),
             )
         return restored
 
@@ -751,6 +859,7 @@ class NetworkMonitor:
             self.offline_since.pop(key, None)
             self.known_hosts.discard(key)
             self.transitions.pop(key, None)
+            self.guest_since.pop(key, None)
         if changed:
             await self._async_save()
 
@@ -771,6 +880,7 @@ class NetworkMonitor:
             "fritzos_version": host.fritzos_version,
             "wan_access": host.wan_access,
             "internet_approval_required": host.internet_approval_required,
+            "guest_network": host.guest_network,
         }
 
     def _restore_monitored_inventory_from_history(self) -> bool:
@@ -829,6 +939,7 @@ class NetworkMonitor:
             if (
                 self.rules["enabled"]
                 and self.rules["quiet_hours_enabled"]
+                and not host.guest_network
                 and self._in_quiet_hours(now)
             ):
                 self._add_alert(
@@ -896,6 +1007,7 @@ class NetworkMonitor:
             "alerts": list(reversed(self.alerts)),
             "rules": dict(self.rules),
             "known_hosts": sorted(self.known_hosts),
+            "guest_since": dict(self.guest_since),
             "learning": {
                 "active": now < learning_end,
                 "ends_at": learning_end.isoformat(),
@@ -1084,6 +1196,7 @@ class NetworkMonitor:
                 "first_seen": self.first_seen,
                 "offline_since": self.offline_since,
                 "transitions": self.transitions,
+                "guest_since": self.guest_since,
                 "started_at": self.started_at,
                 "alert_sequence": self._alert_sequence,
                 "internet_guard_initialized": self.internet_guard_initialized,

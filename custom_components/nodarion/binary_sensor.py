@@ -256,6 +256,7 @@ class NetworkHostEntity(
             "lease_time_remaining": host.lease_time_remaining,
             "fritzbox_model": host.fritzbox_model,
             "fritzos_version": host.fritzos_version,
+            "guest_network": host.guest_network,
             "dns_queries": host.dns_queries,
             "dns_blocked": host.dns_blocked,
             "dns_blocked_ratio": host.dns_blocked_ratio,

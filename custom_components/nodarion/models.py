@@ -63,6 +63,7 @@ class NetworkHost:
     adguard_bypass_suspected: bool = False
     wan_access: str | None = None
     internet_approval_required: bool = False
+    guest_network: bool = False
 
     @property
     def display_name(self) -> str:

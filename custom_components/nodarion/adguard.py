@@ -169,14 +169,17 @@ class AdGuardScanner:
         return await self.async_configuration()
 
     async def async_set_domain_policy(
-        self, domain: str, policy: str
+        self, domain: str, policy: str, client: str | None = None
     ) -> dict[str, Any]:
         """Block or allow a domain using an exact custom AdGuard rule."""
         normalized = self.validate_domain(domain)
         if policy not in {"block", "allow"}:
             raise ValueError("Unsupported domain policy")
-        block_rule = f"||{normalized}^"
-        allow_rule = f"@@||{normalized}^"
+        client_modifier = ""
+        if client:
+            client_modifier = f"$client={ipaddress.ip_address(str(client).strip())}"
+        block_rule = f"||{normalized}^{client_modifier}"
+        allow_rule = f"@@||{normalized}^{client_modifier}"
         selected = block_rule if policy == "block" else allow_rule
         opposite = allow_rule if policy == "block" else block_rule
         async with self._configuration_lock:
@@ -415,6 +418,19 @@ class AdGuardScanner:
                 continue
             question = item.get("question") or {}
             answers = item.get("answer") or []
+            reason = str(item.get("reason") or "")
+            cached = bool(item.get("cached"))
+            upstream = str(item.get("upstream") or "").strip()
+            if cached:
+                dns_server = "Cache"
+            elif upstream:
+                dns_server = upstream
+            elif self._is_blocked(reason):
+                dns_server = "AdGuard-Filter"
+            elif reason in {"Rewrite", "RewriteEtcHosts", "RewriteRule"}:
+                dns_server = "Lokale Antwort"
+            else:
+                dns_server = "AdGuard Home"
             rows.append(
                 {
                     "time": item.get("time"),
@@ -424,8 +440,11 @@ class AdGuardScanner:
                     ).rstrip("."),
                     "query_type": str(question.get("type") or ""),
                     "protocol": str(item.get("client_proto") or ""),
+                    "dns_server": dns_server,
+                    "cached": cached,
+                    "upstream": upstream,
                     "status": str(item.get("status") or ""),
-                    "reason": str(item.get("reason") or ""),
+                    "reason": reason,
                     "elapsed_ms": item.get("elapsedMs"),
                     "answer": [
                         str(answer.get("value") or "")
@@ -433,7 +452,7 @@ class AdGuardScanner:
                         if isinstance(answer, dict) and answer.get("value")
                     ][:3],
                     "blocked": self._is_blocked(
-                        str(item.get("reason") or "")
+                        reason
                     ),
                 }
             )
