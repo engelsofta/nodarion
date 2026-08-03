@@ -1065,6 +1065,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         .rule-group.detection-settings { background:rgba(182,140,255,.04); border-color:rgba(182,140,255,.14); }
         .rule-group.notification-settings { background:rgba(80,215,255,.035); border-color:rgba(80,215,255,.13); }
+        .notify-target-section { display:grid; gap:8px; padding:10px 3px 4px; border-top:1px solid var(--ns-line); }
+        .notify-target-section > label { display:grid; gap:3px; color:var(--ns-text); font-size:13px; font-weight:750; }
+        .notify-target-section > label small { color:var(--ns-muted); font-size:10px; font-weight:500; }
+        .notify-target-list { display:grid; gap:6px; max-height:190px; overflow:auto; padding-right:3px; }
+        .notify-target { display:flex; align-items:center; gap:10px; padding:9px 10px; border:1px solid var(--ns-line); border-radius:10px; background:rgba(255,255,255,.025); cursor:pointer; }
+        .notify-target input { flex:0 0 auto; width:20px; height:20px; min-height:20px; }
+        .notify-target span { display:grid; gap:2px; min-width:0; }
+        .notify-target strong { overflow:hidden; color:var(--ns-text); font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+        .notify-target small, .notify-target-empty { color:var(--ns-muted); font-size:10px; overflow-wrap:anywhere; }
+        .notify-target-empty { padding:10px; border:1px dashed var(--ns-line); border-radius:10px; }
+        .notify-event-hint { display:flex; align-items:flex-start; gap:8px; margin-top:4px; padding:9px 10px; border-radius:10px; color:var(--ns-muted); background:rgba(80,215,255,.055); font-size:10px; line-height:1.4; }
+        .notify-event-hint ha-icon { flex:0 0 auto; --mdc-icon-size:17px; color:var(--ns-cyan); }
+        .notify-event-hint code, .notify-target-empty code { color:var(--ns-text); }
         .rule-group.ai-config-settings { background:rgba(182,140,255,.045); border-color:rgba(182,140,255,.17); }
         .rule-group.ai-config-settings .rule { grid-template-columns:minmax(0,1fr) 190px; }
         .rule-group.ai-config-settings .settings-select summary { white-space:nowrap; }
@@ -2344,7 +2357,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           devices:["Geräteüberwachung", "Neue Geräte werden erst nach der Bestätigungszeit gemeldet. Kurze oder fehlerhafte Erkennungen lösen dadurch nicht sofort eine Warnung aus.", "Für Geräte mit Stern gilt die Offline-Frist. Nach deren Ablauf erscheint eine Warnung, sofern das Gerät weiterhin nicht erreichbar ist."],
           onboarding:["Geräte-Einrichtung", "Der Einrichtungsbereich kennzeichnet Geräte im angegebenen DHCP-Adressbereich als Neu. Nach der Vergabe einer festen Adresse außerhalb dieses Bereichs gelten sie als zugeordnet.", "Bei automatischer Übernahme liest Nodarion Start und Ende direkt aus der FRITZ!Box. Optional können neue Geräte sofort überwacht oder zusätzlich in Home Assistant gemeldet werden."],
           quiet:["Ruhezeiten", "Während der Ruhezeit kann das Aktivwerden eines Geräts als Auffälligkeit gemeldet werden. Zeiträume über Mitternacht, beispielsweise 23:00 bis 06:00 Uhr, werden automatisch korrekt behandelt.", "Ist die Prüfung deaktiviert, beeinflusst die Ruhezeit weder Erkennung noch Anwesenheitssteuerung."],
-          notifications:["Benachrichtigungen und Prüfungen", "Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln gewarnt wird.", "Die Identitätsprüfung erkennt eine andere, nicht randomisierte MAC-Adresse am gleichen IP-Platz. HA-Benachrichtigungen übertragen neue Auffälligkeiten zusätzlich in das Benachrichtigungssystem von Home Assistant."],
+          notifications:["Benachrichtigungen und Prüfungen", "Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln gewarnt wird.", "Die HA-Glocke zeigt Meldungen direkt in Home Assistant. Ausgewählte Benachrichtigungsziele senden Warnungen zusätzlich etwa an die Companion App oder einen eingerichteten Telegram Bot.", "Unabhängig von diesen Schaltern erzeugt jede neue Warnung das Home-Assistant-Ereignis nodarion_alert. Damit lassen sich eigene Automationen und weitere Eskalationswege bauen."],
           ai:["KI-Analyse", "Die tägliche Auswertung fasst Netzwerkzustand, Änderungen und Auffälligkeiten nach dem gewählten Zeitpunkt zusammen. Eine manuelle Analyse bleibt im KI-Reiter jederzeit möglich.", "Mit anonymisiertem DNS-Datenschutz werden keine lesbaren Domainnamen an die KI übergeben. Domainnamen mitsenden ermöglicht detailliertere Bewertungen, gibt aber entsprechend mehr Informationen weiter."],
           cleanup:["Bereinigung", "Offline-Teilnehmer löschen entfernt alle derzeit offline geführten Geräte samt gespeicherter Markierungen und Überwachungseinstellungen.", "Diese Aktion ist bewusst nicht Teil des normalen Speicherns und wird erst nach einer zusätzlichen Bestätigung ausgeführt."],
         }[helpButton.dataset.settingsHelp];
@@ -2393,6 +2406,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
             ? input.checked
             : input.type === "number" ? Number(input.value) : input.value;
         });
+        rules.notify_targets = [...settingsView.querySelectorAll(
+          ".watch-settings-panel [data-notify-target]:checked"
+        )].map((input) => input.dataset.notifyTarget);
         this._saveRuleSettings(watchSave, rules, "watch");
         return;
       }
@@ -3434,11 +3450,25 @@ class EngelsoftNodarionPanel extends HTMLElement {
       offline_minutes: 10,
       identity_changes: true,
       notify_alerts: false,
+      notify_targets: [],
+      notify_warning: true,
+      notify_critical: true,
       ai_analysis_enabled: false,
       ai_analysis_time: "03:15",
       ai_privacy: "anonymized",
       ...(this._monitor.rules || {}),
     };
+    const selectedNotifyTargets = new Set(rules.notify_targets || []);
+    const notifyEntities = Object.values(this._hass?.states || {})
+      .filter((state) => state.entity_id.startsWith("notify."))
+      .sort((a, b) => String(a.attributes?.friendly_name || a.entity_id)
+        .localeCompare(String(b.attributes?.friendly_name || b.entity_id), "de"));
+    const notifyTargetHtml = notifyEntities.length
+      ? notifyEntities.map((state) => {
+        const name = state.attributes?.friendly_name || state.entity_id;
+        return `<label class="notify-target"><input type="checkbox" data-notify-target="${esc(state.entity_id)}" ${selectedNotifyTargets.has(state.entity_id) ? "checked" : ""}><span><strong>${esc(name)}</strong><small>${esc(state.entity_id)}</small></span></label>`;
+      }).join("")
+      : `<div class="notify-target-empty">Noch kein <code>notify.*</code>-Ziel in Home Assistant vorhanden.</div>`;
     const learning = this._monitor.learning || {};
     const learningEnd = learning.ends_at
       ? new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(learning.ends_at))
@@ -3624,7 +3654,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <h3>Benachrichtigungen und Prüfungen<button class="settings-help-button" type="button" data-settings-help="notifications" title="Benachrichtigungen erklären" aria-label="Hilfe zu Benachrichtigungen und Prüfungen">?</button></h3>
               <div class="rule"><label>Statuswechsel pro Stunde<small>Ab dieser Anzahl als instabil melden</small></label><input type="number" min="2" max="100" data-rule="flap_limit" value="${Number(rules.flap_limit)}"></div>
               <div class="rule"><label>Identitätswechsel melden<small>Andere MAC-Adresse am gleichen IP-Platz</small></label><input type="checkbox" data-rule="identity_changes" ${checked(rules.identity_changes)}></div>
-              <div class="rule"><label>HA-Benachrichtigungen<small>Neue Auffälligkeiten zusätzlich in Home Assistant melden</small></label><input type="checkbox" data-rule="notify_alerts" ${checked(rules.notify_alerts)}></div>
+              <div class="rule"><label>HA-Glocke<small>Neue Auffälligkeiten als dauerhafte Meldung in Home Assistant anzeigen</small></label><input type="checkbox" data-rule="notify_alerts" ${checked(rules.notify_alerts)}></div>
+              <div class="rule"><label>Warnungen senden<small>Normale Warnungen an die ausgewählten Ziele senden</small></label><input type="checkbox" data-rule="notify_warning" ${checked(rules.notify_warning)}></div>
+              <div class="rule"><label>Kritische Meldungen senden<small>Kritische Ausfälle an die ausgewählten Ziele senden</small></label><input type="checkbox" data-rule="notify_critical" ${checked(rules.notify_critical)}></div>
+              <div class="notify-target-section"><label>Benachrichtigungsziele<small>Companion App, Telegram und andere in HA eingerichtete Ziele</small></label><div class="notify-target-list">${notifyTargetHtml}</div></div>
+              <div class="notify-event-hint"><ha-icon icon="mdi:transit-connection-variant"></ha-icon><span>Für eigene Automationen wird immer das Ereignis <code>nodarion_alert</code> ausgelöst.</span></div>
             </section>
             <section class="rule-group ai-config-settings">
               <h3>KI-Analyse<button class="settings-help-button" type="button" data-settings-help="ai" title="KI-Analyse erklären" aria-label="Hilfe zur KI-Analyse">?</button></h3>
