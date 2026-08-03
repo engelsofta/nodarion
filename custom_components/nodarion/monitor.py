@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 import ipaddress
 import json
+import logging
 from typing import Any
 
 from homeassistant.components import persistent_notification
@@ -18,6 +19,7 @@ STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.monitor"
 MAX_EVENTS = 250
 MAX_ALERTS = 100
+_LOGGER = logging.getLogger(__name__)
 DEFAULT_RULES: dict[str, Any] = {
     "enabled": True,
     "learning_days": 7,
@@ -37,6 +39,9 @@ DEFAULT_RULES: dict[str, Any] = {
     "offline_minutes": 10,
     "identity_changes": True,
     "notify_alerts": False,
+    "notify_targets": [],
+    "notify_warning": True,
+    "notify_critical": True,
     "guest_monitoring_enabled": True,
     "guest_new_enabled": True,
     "guest_quiet_enabled": True,
@@ -215,6 +220,8 @@ class NetworkMonitor:
             "quiet_hours_enabled",
             "identity_changes",
             "notify_alerts",
+            "notify_warning",
+            "notify_critical",
             "ai_analysis_enabled",
             "onboarding_enabled",
             "onboarding_auto_range",
@@ -262,6 +269,19 @@ class NetworkMonitor:
             pass
         if values.get("ai_privacy") in {"anonymized", "domains"}:
             self.rules["ai_privacy"] = values["ai_privacy"]
+        if "notify_targets" in values:
+            targets = values["notify_targets"]
+            if not isinstance(targets, list):
+                raise TypeError("notify_targets must be a list")
+            self.rules["notify_targets"] = sorted(
+                {
+                    target.strip()
+                    for target in targets
+                    if isinstance(target, str)
+                    and target.strip().startswith("notify.")
+                    and len(target.strip()) <= 255
+                }
+            )
         if not self.rules.get("guest_monitoring_enabled", True):
             resolved_at = _now().isoformat()
             for alert in self.alerts:
@@ -1079,6 +1099,20 @@ class NetworkMonitor:
             alert_type=alert_type,
             service=details.get("service", "Nodarion-Überwachung"),
         )
+        event_data = {
+            "alert_id": alert["id"],
+            "type": alert_type,
+            "severity": severity,
+            "device_key": host.key,
+            "device_name": host.display_name,
+            "ip_address": host.ip,
+            "mac_address": host.mac,
+            "access_point": host.access_point,
+            "message": message,
+            "timestamp": alert["timestamp"],
+            "service": details.get("service", "Nodarion-Überwachung"),
+        }
+        self.hass.bus.async_fire(f"{DOMAIN}_alert", event_data)
         if self.rules["notify_alerts"]:
             persistent_notification.async_create(
                 self.hass,
@@ -1086,7 +1120,45 @@ class NetworkMonitor:
                 title="Nodarion Netzwerküberwachung",
                 notification_id=f"{DOMAIN}_{alert['id']}",
             )
+        targets = self.rules.get("notify_targets", [])
+        if targets and self.rules.get(f"notify_{severity}", False):
+            self.hass.async_create_task(
+                self._async_send_alert(targets, event_data)
+            )
         return True
+
+    async def _async_send_alert(
+        self, targets: list[str], event_data: dict[str, Any]
+    ) -> None:
+        """Deliver one alert through Home Assistant notify entities."""
+        title = (
+            "Nodarion: Kritische Netzwerkwarnung"
+            if event_data["severity"] == "critical"
+            else "Nodarion: Netzwerkwarnung"
+        )
+        message = (
+            f"{event_data['device_name']} ({event_data['ip_address']}): "
+            f"{event_data['message']}"
+        )
+        for target in targets:
+            if self.hass.states.get(target) is None:
+                _LOGGER.warning("Nodarion notify target %s is not available", target)
+                continue
+            try:
+                await self.hass.services.async_call(
+                    "notify",
+                    "send_message",
+                    {
+                        "title": title,
+                        "message": message,
+                    },
+                    blocking=False,
+                    target={"entity_id": target},
+                )
+            except Exception:
+                _LOGGER.exception(
+                    "Nodarion could not send an alert to %s", target
+                )
 
     def _active_alert(self, alert_type: str, key: str) -> dict[str, Any] | None:
         return next(

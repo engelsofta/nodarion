@@ -122,6 +122,8 @@ Der Verbindungsbeginn und der Warnverlauf werden im Home-Assistant-Speicher gesi
 - Einstellbare Lernphase, Bestätigungszeit und Grenzwerte direkt in der
   Nodarion-Oberfläche
 - Persistente Warnungshistorie mit optionalen Home-Assistant-Benachrichtigungen
+- Mehrere auswählbare Home-Assistant-Benachrichtigungsziele, beispielsweise
+  Companion App oder Telegram Bot, getrennt für Warnungen und kritische Meldungen
 - Optionale tägliche KI-Netzwerkanalyse über die bevorzugte
   Home-Assistant-AI-Task-Entität mit Bewertung, Empfehlungen und Tagesvergleich
 - Über **Jetzt scannen** kann aus der Oberfläche ein Scan angefordert werden.
@@ -143,6 +145,19 @@ Der Verbindungsbeginn und der Warnverlauf werden im Home-Assistant-Speicher gesi
 - Der automatisch verwaltete HA-Gerätename wird bei einer Änderung des
   Hostnamens aktualisiert. Ein vom Benutzer gesetzter HA-Name bleibt erhalten.
 - Die IP-Adresse dient als stabile Identität des überwachten Platzes.
+
+## Benachrichtigungen und Automationen
+
+Unter **Einstellungen → Benachrichtigungen und Prüfungen** können alle in Home
+Assistant vorhandenen `notify.*`-Entitäten ausgewählt werden. Nodarion sendet
+neue Warnungen über `notify.send_message`; die Zugangsdaten für Telegram und
+andere Dienste bleiben dadurch vollständig in Home Assistant.
+
+Zusätzlich löst jede neu angelegte Warnung das Ereignis `nodarion_alert` aus.
+Die Ereignisdaten enthalten unter anderem `type`, `severity`, `device_name`,
+`ip_address`, `mac_address`, `access_point` und `message`. Eigene Automationen
+können damit unabhängig von den in Nodarion ausgewählten Zielen weitere Aktionen
+ausführen.
 
 ## Hinweise
 
