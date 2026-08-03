@@ -38,10 +38,16 @@ jobs:
       - name: Build nodarion.zip
         shell: bash
         run: |
-          zip -r nodarion.zip custom_components/nodarion \
-            -x '*/__pycache__/*' '*.pyc' '*.pyo'
+          (
+            cd custom_components/nodarion
+            zip -r "$GITHUB_WORKSPACE/nodarion.zip" . \
+              -x '*/__pycache__/*' '*.pyc' '*.pyo'
+          )
           unzip -t nodarion.zip
-          unzip -l nodarion.zip | grep 'custom_components/nodarion/manifest.json'
+          extract_dir="$(mktemp -d)"
+          unzip -q nodarion.zip -d "$extract_dir"
+          test -f "$extract_dir/manifest.json"
+          test ! -d "$extract_dir/custom_components"
 
       - name: Upload release asset
         env:
