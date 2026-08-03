@@ -214,6 +214,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
   set hass(value) {
     this._hass = value;
     if (!this._built) this._build();
+    const darkMode = value?.themes?.darkMode;
+    this.dataset.theme = darkMode === undefined
+      ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : (darkMode ? "dark" : "light");
     const signature = this._entities()
       .map((entity) => `${entity.entity_id}:${entity.state}:${entity.last_changed}:${JSON.stringify(entity.attributes)}`)
       .join("|");
@@ -1269,6 +1273,346 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         ::selection { color:#2b2115; background:#f0a13b; }
 
+        /* Light theme follows Home Assistant's active light/dark setting. */
+        :host([data-theme="light"]) {
+          --ns-bg:#f6f3ee;
+          --ns-panel:rgba(255,255,255,.78);
+          --ns-line:rgba(91,72,48,.14);
+          --ns-green:#a85b17;
+          --ns-cyan:#8d5a1f;
+          --ns-red:#c43f3f;
+          color-scheme:light;
+          color:#29241f;
+          background:
+            radial-gradient(ellipse at 54% 42%,rgba(229,164,80,.18),transparent 31rem),
+            radial-gradient(ellipse at 16% 76%,rgba(184,136,78,.10),transparent 28rem),
+            linear-gradient(135deg,rgba(255,255,255,.8),transparent 48%),
+            var(--ns-bg);
+        }
+        :host([data-theme="light"]) .shell::before {
+          opacity:.18;
+          background-image:radial-gradient(rgba(92,69,43,.20) .45px,transparent .45px);
+          mix-blend-mode:multiply;
+        }
+        :host([data-theme="light"]) header { border-bottom-color:rgba(91,72,48,.10); }
+        :host([data-theme="light"]) h1,
+        :host([data-theme="light"]) .metric-value,
+        :host([data-theme="light"]) .device-count strong,
+        :host([data-theme="light"]) .entity-link,
+        :host([data-theme="light"]) .detail-stack strong,
+        :host([data-theme="light"]) .connection-name,
+        :host([data-theme="light"]) .log-device,
+        :host([data-theme="light"]) .log-device-filter,
+        :host([data-theme="light"]) .dns-host-link,
+        :host([data-theme="light"]) .alert-name,
+        :host([data-theme="light"]) .rule label,
+        :host([data-theme="light"]) .client-name { color:#29241f; }
+        :host([data-theme="light"]) .version-info,
+        :host([data-theme="light"]) .metric-note,
+        :host([data-theme="light"]) .entity,
+        :host([data-theme="light"]) .entity-id-link,
+        :host([data-theme="light"]) .status-time,
+        :host([data-theme="light"]) .log-date,
+        :host([data-theme="light"]) .alert-time,
+        :host([data-theme="light"]) .ai-empty { color:#756d63; }
+        :host([data-theme="light"]) .metric-label,
+        :host([data-theme="light"]) .security-card span { color:#6e665c; }
+        :host([data-theme="light"]) .scan {
+          color:#5c3918; background:rgba(255,255,255,.76);
+          border-color:rgba(139,83,26,.22); box-shadow:0 7px 18px rgba(91,61,29,.08);
+        }
+        :host([data-theme="light"]) .scan:hover { color:#3e240f; background:#fff6e8; }
+        :host([data-theme="light"]) .metrics {
+          background:rgba(229,221,210,.62); border-color:rgba(91,72,48,.12);
+          box-shadow:inset 0 1px rgba(255,255,255,.72);
+        }
+        :host([data-theme="light"]) .metric {
+          background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(242,237,229,.94));
+          border-color:rgba(91,72,48,.12); box-shadow:0 8px 20px rgba(82,61,36,.07);
+        }
+        :host([data-theme="light"]) .metric.connections:hover,
+        :host([data-theme="light"]) .metric.ai-metric:hover {
+          background:linear-gradient(135deg,#fffaf2,#eee5d9); border-color:rgba(168,91,23,.30);
+        }
+        :host([data-theme="light"]) .connection-panel,
+        :host([data-theme="light"]) .tabs,
+        :host([data-theme="light"]) .toolbar {
+          background:rgba(255,255,255,.76); border-color:rgba(91,72,48,.14);
+          box-shadow:0 14px 36px rgba(82,61,36,.07);
+        }
+        :host([data-theme="light"]) .tab,
+        :host([data-theme="light"]) .filter { color:#665f56; }
+        :host([data-theme="light"]) .tab.active,
+        :host([data-theme="light"]) .filter.active { color:#fffaf2; }
+        :host([data-theme="light"]) input,
+        :host([data-theme="light"]) select {
+          color:#302a24; background:#fffdf9; border-color:rgba(91,72,48,.17); color-scheme:light;
+        }
+        :host([data-theme="light"]) select:hover { background-color:#fff8ec; }
+        :host([data-theme="light"]) select option,
+        :host([data-theme="light"]) select optgroup { color:#302a24; background:#fffdf9; }
+        :host([data-theme="light"]) select option:checked { color:#fff; background:#a85b17; }
+        :host([data-theme="light"]) .search ha-icon { color:#766d62; }
+        :host([data-theme="light"]) .table-panel,
+        :host([data-theme="light"]) .log-panel,
+        :host([data-theme="light"]) .dns-panel,
+        :host([data-theme="light"]) .mesh-panel,
+        :host([data-theme="light"]) .watch-panel,
+        :host([data-theme="light"]) .ai-panel {
+          background:linear-gradient(145deg,rgba(255,255,255,.90),rgba(242,237,230,.86));
+          border-color:rgba(91,72,48,.14);
+          box-shadow:0 20px 48px rgba(82,61,36,.10),inset 0 1px rgba(255,255,255,.82);
+        }
+        :host([data-theme="light"]) th { color:#665e54; background:rgba(235,229,220,.98); }
+        :host([data-theme="light"]) .column-filters th { background:rgba(245,241,235,.98); }
+        :host([data-theme="light"]) td { color:#3d3731; border-bottom-color:rgba(91,72,48,.10); }
+        :host([data-theme="light"]) tbody tr:nth-child(even) { background:rgba(104,82,55,.025); }
+        :host([data-theme="light"]) tbody tr:hover { background:rgba(208,127,35,.08); }
+        :host([data-theme="light"]) .column-picker,
+        :host([data-theme="light"]) .custom-filter-menu,
+        :host([data-theme="light"]) .adguard-modal,
+        :host([data-theme="light"]) .dns-policy-modal,
+        :host([data-theme="light"]) .guest-modal,
+        :host([data-theme="light"]) .settings-help-dialog {
+          color:#302a24; background:#fffaf3; border-color:rgba(168,91,23,.24);
+          box-shadow:0 24px 60px rgba(82,61,36,.20);
+        }
+        :host([data-theme="light"]) .dns-policy-modal-backdrop,
+        :host([data-theme="light"]) .guest-modal-backdrop,
+        :host([data-theme="light"]) .adguard-modal-backdrop,
+        :host([data-theme="light"]) .settings-help-backdrop { background:rgba(72,60,47,.38); }
+        :host([data-theme="light"]) .security-card,
+        :host([data-theme="light"]) .ai-copy article,
+        :host([data-theme="light"]) .client,
+        :host([data-theme="light"]) .connection-card,
+        :host([data-theme="light"]) .adguard-box,
+        :host([data-theme="light"]) .guest-status-card {
+          background:rgba(255,255,255,.64); border-color:rgba(91,72,48,.13);
+        }
+        :host([data-theme="light"]) .client-detail,
+        :host([data-theme="light"]) .log-route span,
+        :host([data-theme="light"]) .dns-chip,
+        :host([data-theme="light"]) .internet-label { color:#625a51; background:rgba(91,72,48,.06); border-color:rgba(91,72,48,.11); }
+        :host([data-theme="light"]) .dns-chart,
+        :host([data-theme="light"]) .adguard-config,
+        :host([data-theme="light"]) .ai-prompt,
+        :host([data-theme="light"]) .presence-timeline { background:rgba(109,85,54,.055); }
+        :host([data-theme="light"]) .ai-copy p,
+        :host([data-theme="light"]) .presence-summary,
+        :host([data-theme="light"]) .dns-action { color:#514a43; }
+        :host([data-theme="light"]) .settings-help-button,
+        :host([data-theme="light"]) .settings-help-close,
+        :host([data-theme="light"]) .adguard-modal-close { color:#625a51; background:rgba(91,72,48,.06); }
+        :host([data-theme="light"]) .device-list tbody tr,
+        :host([data-theme="light"]) .log-table tbody tr,
+        :host([data-theme="light"]) .dns-table tbody tr { --light-card-bg:rgba(255,253,249,.96); }
+        :host([data-theme="light"]) .function-count strong { color:#81501d; }
+        :host([data-theme="light"]) .function-count.presence strong,
+        :host([data-theme="light"]) .function-count.presence ha-icon { color:#2f7f50; }
+        :host([data-theme="light"]) .function-count span,
+        :host([data-theme="light"]) .device-count span { color:#72695f; }
+        :host([data-theme="light"]) .metric.ai-metric .metric-value { color:#6f4bc1; }
+        :host([data-theme="light"]) .connection-time,
+        :host([data-theme="light"]) .connection-checked,
+        :host([data-theme="light"]) .connection-device-info { color:#746b61; }
+        :host([data-theme="light"]) .column-filter::placeholder { color:#7b746c; }
+        :host([data-theme="light"]) .column-filter,
+        :host([data-theme="light"]) .custom-filter-summary {
+          color:#403a34; background:#fffdfa; border-color:rgba(91,72,48,.18);
+        }
+        :host([data-theme="light"]) .custom-filter-option { color:#514a43; }
+        :host([data-theme="light"]) .custom-filter-option:hover { color:#30271f; background:rgba(168,91,23,.09); }
+        :host([data-theme="light"]) .custom-filter-option.active { color:#6b390e; background:rgba(168,91,23,.14); }
+        :host([data-theme="light"]) .custom-filter-count { color:#645b52; background:rgba(91,72,48,.07); }
+        :host([data-theme="light"]) .onboarding-state.assigned { color:#25643f; background:#e2f2e7; border-color:#b9dcc5; }
+        :host([data-theme="light"]) .onboarding-state.unknown { color:#645e57; background:#eeece8; }
+        :host([data-theme="light"]) .detail-stack small,
+        :host([data-theme="light"]) .log-ip,
+        :host([data-theme="light"]) .log-time,
+        :host([data-theme="light"]) .log-date,
+        :host([data-theme="light"]) .dns-answer,
+        :host([data-theme="light"]) .dns-chart-legend,
+        :host([data-theme="light"]) .dns-chart-label { color:#70685f; }
+        :host([data-theme="light"]) .rating.good,
+        :host([data-theme="light"]) .rating.okay { --rating-color:#6d675f; }
+        :host([data-theme="light"]) .log-entry { background:color-mix(in srgb,var(--log-color) 4%,#fffdf9); }
+        :host([data-theme="light"]) .log-entry:hover { background:color-mix(in srgb,var(--log-color) 10%,#fffaf4); }
+        :host([data-theme="light"]) .log-entry.discovered { --log-color:#28748d; }
+        :host([data-theme="light"]) .log-entry.renamed { --log-color:#9b6a11; }
+        :host([data-theme="light"]) .log-entry.mesh_changed { --log-color:#7650ce; }
+        :host([data-theme="light"]) .log-message { color:#5c554e; }
+        :host([data-theme="light"]) .log-device-filter ha-icon { color:#397e98; opacity:1; }
+        :host([data-theme="light"]) .log-route { color:#655e56; }
+        :host([data-theme="light"]) .dns-action,
+        :host([data-theme="light"]) .ai-prompt-toggle,
+        :host([data-theme="light"]) .simulate-mesh {
+          color:#51483e; background:#fffaf2; border-color:rgba(91,72,48,.16);
+        }
+        :host([data-theme="light"]) .dns-client-filter { color:#286b84; background:#edf8fb; border-color:#c5e3eb; }
+        :host([data-theme="light"]) .dns-row { --dns-color:#686159; background:color-mix(in srgb,var(--dns-color) 3%,#fffdf9); }
+        :host([data-theme="light"]) .dns-row:hover { background:color-mix(in srgb,var(--dns-color) 9%,#fffaf4); }
+        :host([data-theme="light"]) .dns-domain { color:#403932; }
+        :host([data-theme="light"]) .dns-chart-title { color:#4b433b; }
+        :host([data-theme="light"]) .dns-chart-bars {
+          border-bottom-color:rgba(91,72,48,.16);
+          background:repeating-linear-gradient(to bottom,rgba(91,72,48,.07) 0 1px,transparent 1px 41px);
+        }
+        :host([data-theme="light"]) .dns-policy { color:#5d554d; background:#fffaf3; }
+        :host([data-theme="light"]) .dns-policy.block { color:#a93838; border-color:#e8bebe; }
+        :host([data-theme="light"]) .dns-policy.allow { color:#277043; border-color:#b9dcc5; }
+        :host([data-theme="light"]) .dns-policy-scope { color:#403932; background:#fff; border-color:rgba(91,72,48,.16); }
+        :host([data-theme="light"]) .dns-policy-modal p,
+        :host([data-theme="light"]) .adguard-config > p,
+        :host([data-theme="light"]) .adguard-modal-head p,
+        :host([data-theme="light"]) .guest-modal-head p,
+        :host([data-theme="light"]) .guest-status-card span,
+        :host([data-theme="light"]) .guest-client small,
+        :host([data-theme="light"]) .mesh-head p,
+        :host([data-theme="light"]) .mesh-legend { color:#6f675e; }
+        :host([data-theme="light"]) .adguard-item { color:#49423b; background:#f3eee7; }
+        :host([data-theme="light"]) .guest-close { color:#514a43; }
+        :host([data-theme="light"]) .guest-client { background:#f3f8f7; border-color:#d5e6e2; }
+        :host([data-theme="light"]) .empty { color:#70685f; }
+        :host([data-theme="light"]) .empty strong { color:#403932; }
+        :host([data-theme="light"]) .ap-node { color:#3c342c; box-shadow:0 10px 26px rgba(82,61,36,.10); }
+        :host([data-theme="light"]) .ap-count,
+        :host([data-theme="light"]) .client-ip { color:#6d655d; }
+        :host([data-theme="light"]) .client-detail.signal { color:#267447; }
+        :host([data-theme="light"]) .watch { color:#70685f; background:#f3efe9; }
+        :host([data-theme="light"]) .watch.active { color:#91610b; background:#fff7dc; }
+        :host([data-theme="light"]) .watch.notify.active { color:#2b7088; background:#edf8fb; }
+        :host([data-theme="light"]) .watch.presence.active { color:#287247; background:#eaf7ee; }
+        :host([data-theme="light"]) .watch-heading p,
+        :host([data-theme="light"]) .rule small,
+        :host([data-theme="light"]) .presence-state,
+        :host([data-theme="light"]) .presence-axis { color:#6f675e; }
+        :host([data-theme="light"]) .learning,
+        :host([data-theme="light"]) .restart-learning { color:#8b5e0c; background:#fff8df; border-color:#e8d49b; }
+        :host([data-theme="light"]) .presence-summary { color:#3f5948; background:#edf7f0; border-color:#cfe5d5; }
+        :host([data-theme="light"]) .presence-summary strong,
+        :host([data-theme="light"]) .presence-name { color:#343b36; }
+        :host([data-theme="light"]) .presence-sensor-link { color:#5d5750; background:#f5f2ed; }
+        :host([data-theme="light"]) .presence-sensor-link.on { color:#286f46; background:#eaf6ee; border-color:#bfdcc8; }
+        :host([data-theme="light"]) .presence-row.home .presence-state { color:#347c51; }
+        :host([data-theme="light"]) .presence-timeline::before {
+          background:repeating-linear-gradient(90deg,transparent 0,transparent calc(25% - 1px),rgba(91,72,48,.10) 25%);
+        }
+        :host([data-theme="light"]) .alert-item {
+          --alert-color:#946411;
+          background:color-mix(in srgb,var(--alert-color) 7%,#fffdf9);
+          border-color:color-mix(in srgb,var(--alert-color) 25%,#e5ded4);
+        }
+        :host([data-theme="light"]) .alert-item.critical { --alert-color:#b43b3b; }
+        :host([data-theme="light"]) .alert-item.resolved { --alert-color:#77716a; opacity:.68; }
+        :host([data-theme="light"]) .alert-name { color:#3b342d; }
+        :host([data-theme="light"]) .alert-message { color:#625a52; }
+        :host([data-theme="light"]) .alert-time { color:#756d65; }
+        :host([data-theme="light"]) .ack { color:#6d460d; background:#fff8e9; border-color:#d9bd8c; }
+        :host([data-theme="light"]) .rule-group { background:#fffdfa; border-color:rgba(91,72,48,.13); }
+        :host([data-theme="light"]) .rule-group.basics { background:#fff9ef; border-color:#ead8bc; }
+        :host([data-theme="light"]) .rule-group.presence-settings { background:#f5fbf7; border-color:#d5e9db; }
+        :host([data-theme="light"]) .rule-group.device-settings,
+        :host([data-theme="light"]) .rule-group.notification-settings { background:#f5fafb; border-color:#d7e7eb; }
+        :host([data-theme="light"]) .rule-group.onboarding-settings { background:#fffaf0; border-color:#eadfc6; }
+        :host([data-theme="light"]) .rule-group.detection-settings,
+        :host([data-theme="light"]) .rule-group.ai-config-settings { background:#faf8ff; border-color:#e1d9f2; }
+        :host([data-theme="light"]) .rule-group h3 { color:#756044; }
+        :host([data-theme="light"]) .rule label { color:#39332d; }
+        :host([data-theme="light"]) .settings-help-head h2 { color:#342d26; }
+        :host([data-theme="light"]) .settings-help-copy p { color:#5f574f; }
+        :host([data-theme="light"]) .settings-help-copy strong { color:#79501c; }
+        :host([data-theme="light"]) .danger-zone strong { color:#a43636; }
+        :host([data-theme="light"]) .danger-zone p { color:#735f5c; }
+        :host([data-theme="light"]) .ai-head p,
+        :host([data-theme="light"]) .ai-score span { color:#6b635b; }
+        :host([data-theme="light"]) .ai-run { color:#5f3daf; background:#f3effd; border-color:#d8cdf2; }
+        :host([data-theme="light"]) .ai-prompt { color:#514a43; background:#f5f1eb; }
+        :host([data-theme="light"]) .ai-score {
+          background:color-mix(in srgb,var(--score-color) 9%,#fffdf9);
+          border-color:color-mix(in srgb,var(--score-color) 28%,#e3ddd5);
+        }
+        :host([data-theme="light"]) .ai-score.warn { --score-color:#9a6a10; }
+        :host([data-theme="light"]) .ai-copy h3 { color:#6844bd; }
+        :host([data-theme="light"]) .ai-copy p { color:#514a43; }
+        :host([data-theme="light"]) .tab:focus-visible {
+          outline:2px solid rgba(141,90,31,.65); outline-offset:2px;
+        }
+        :host([data-theme="light"]) select.column-filter,
+        :host([data-theme="light"]) .custom-column-filter summary {
+          color:#40382f; background:#fffdfa; border-color:#cfc4b6;
+          box-shadow:inset 0 1px rgba(255,255,255,.9);
+        }
+        :host([data-theme="light"]) select.column-filter:hover,
+        :host([data-theme="light"]) select.column-filter:focus,
+        :host([data-theme="light"]) .custom-column-filter[open] summary {
+          color:#352a20; background:#fff8ed; border-color:#b6752f;
+          box-shadow:0 0 0 3px rgba(182,117,47,.13);
+        }
+        :host([data-theme="light"]) .custom-column-filter summary::after {
+          border-right-color:#675d52; border-bottom-color:#675d52;
+        }
+        :host([data-theme="light"]) select.column-filter option,
+        :host([data-theme="light"]) select.column-filter optgroup {
+          color:#342e28; background:#fffdfa;
+        }
+        :host([data-theme="light"]) select.column-filter option:checked {
+          color:#fff; background:#a85b17;
+        }
+        :host([data-theme="light"]) .column-filter.has-value,
+        :host([data-theme="light"]) select.column-filter.has-value,
+        :host([data-theme="light"]) .custom-column-filter.has-value summary {
+          color:#643706; background:#f6e5c3; border-color:#d89a42;
+          box-shadow:inset 4px 0 #b66b1e,0 0 0 1px rgba(182,107,30,.10);
+          font-weight:800;
+        }
+        :host([data-theme="light"]) .column-filter.has-value::placeholder { color:#77552d; }
+        :host([data-theme="light"]) tbody tr { --state:#2d7b4c; }
+        :host([data-theme="light"]) tbody tr.off { --state:#b33e3e; opacity:.88; }
+        :host([data-theme="light"]) .status { text-shadow:none; }
+        :host([data-theme="light"]) .status .dot { box-shadow:0 0 0 3px color-mix(in srgb,var(--state) 14%,transparent); }
+        :host([data-theme="light"]) .dns-row.allowed { --dns-color:#287347; }
+        :host([data-theme="light"]) .dns-row.blocked { --dns-color:#b33939; }
+        :host([data-theme="light"]) .dns-row.allowed .dns-result { color:#287347; }
+        :host([data-theme="light"]) .dns-row.blocked .dns-result { color:#b33939; }
+        :host([data-theme="light"]) .dns-row.allowed { background:#f4faf6; }
+        :host([data-theme="light"]) .dns-row.blocked { background:#fff5f4; }
+        :host([data-theme="light"]) .dns-row.allowed:hover { background:#eaf6ee; }
+        :host([data-theme="light"]) .dns-row.blocked:hover { background:#fce9e7; }
+        :host([data-theme="light"]) .presence-summary {
+          color:#294c36; background:#e5f3e9; border-color:#b8d9c2;
+        }
+        :host([data-theme="light"]) .presence-summary ha-icon { color:#28784a; }
+        :host([data-theme="light"]) .presence-summary strong { color:#21452e; }
+        :host([data-theme="light"]) .presence-dot { background:#777f79; }
+        :host([data-theme="light"]) .presence-row.home .presence-dot {
+          background:#31a45d; box-shadow:0 0 0 3px rgba(49,164,93,.17);
+        }
+        :host([data-theme="light"]) .presence-row.home .presence-state { color:#267044; font-weight:750; }
+        :host([data-theme="light"]) .presence-timeline {
+          background:#ebe9e4; border-color:#d3ccc2;
+          box-shadow:inset 0 1px 3px rgba(70,54,35,.08);
+        }
+        :host([data-theme="light"]) .presence-segment {
+          background:linear-gradient(90deg,#64ad79,#55d37b);
+          box-shadow:0 0 0 1px rgba(45,123,76,.10),0 2px 7px rgba(45,123,76,.15);
+        }
+        :host([data-theme="light"]) .presence-axis { color:#625b53; }
+        :host([data-theme="light"]) .settings-view .cleanup-settings .cleanup {
+          color:#fff; background:#b83d3d; border-color:#a62f2f;
+          box-shadow:0 6px 16px rgba(184,61,61,.18);
+          opacity:1;
+        }
+        :host([data-theme="light"]) .settings-view .cleanup-settings .cleanup:hover {
+          color:#fff; background:#9f3030; border-color:#8f2727;
+        }
+        :host([data-theme="light"]) .settings-view .cleanup-settings .cleanup:focus-visible {
+          outline:2px solid rgba(184,61,61,.45); outline-offset:2px;
+        }
+        :host([data-theme="light"]) .settings-view .cleanup-settings .cleanup:disabled {
+          color:#8a8178; background:#e9e4de; border-color:#d5cec5; box-shadow:none; opacity:.72;
+        }
+        :host([data-theme="light"]) ::selection { color:#fff; background:#a85b17; }
+
         @media (max-width:1100px) {
           .tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); width:100%; overflow:visible; }
           .tab { min-width:0; padding:10px 8px; }
@@ -1357,7 +1701,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .log-table tbody tr,
           .dns-table tbody tr {
             display:block; margin:0 0 10px; overflow:hidden; border:1px solid var(--ns-line);
-            border-radius:14px; background:rgba(38,35,32,.92);
+            border-radius:14px; background:var(--light-card-bg,rgba(38,35,32,.92));
             box-shadow:0 10px 24px rgba(0,0,0,.14);
           }
           .device-list tbody td,
