@@ -48,6 +48,11 @@ jobs:
           unzip -q nodarion.zip -d "$extract_dir"
           test -f "$extract_dir/manifest.json"
           test ! -d "$extract_dir/custom_components"
+          for brand_asset in \
+            icon.png icon@2x.png dark_icon.png dark_icon@2x.png \
+            logo.png logo@2x.png dark_logo.png dark_logo@2x.png; do
+            test -s "$extract_dir/brand/$brand_asset"
+          done
 
       - name: Upload release asset
         env:
