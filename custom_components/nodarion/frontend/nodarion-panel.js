@@ -513,8 +513,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .scan:hover { transform:translateY(-2px); background:rgba(85,242,162,.16); }
         .scan.busy ha-icon { animation:spin .8s linear infinite; }
         @keyframes spin { to { transform:rotate(360deg); } }
-        .metrics { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
-        .metrics.guest-hidden { grid-template-columns:repeat(5,minmax(0,1fr)); }
+        .metrics { display:grid; grid-template-columns:1.05fr 1.65fr repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
+        .metrics.guest-hidden { grid-template-columns:1.05fr 1.65fr repeat(2,minmax(0,1fr)); }
         .metric, .toolbar, .table-panel, .log-panel, .mesh-panel, .watch-panel {
           background:var(--ns-panel); border:1px solid var(--ns-line);
           backdrop-filter:blur(22px) saturate(110%); box-shadow:0 22px 55px rgba(10,8,5,.22), inset 0 1px rgba(255,255,255,.035);
@@ -534,7 +534,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .device-count.online strong { color:var(--ns-green); }
         .device-count.offline strong { color:var(--ns-red); }
         .device-count span { display:block; margin-top:6px; color:#8eaea4; font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.8px; }
-        .function-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:9px; }
+        .function-counts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:9px; }
         .function-count { appearance:none; min-width:0; border:0; outline:0; padding:0 8px; color:inherit; background:transparent; text-align:left; font:inherit; cursor:pointer; }
         .function-count + .function-count { border-left:1px solid var(--ns-line); }
         .function-count:focus, .function-count:focus-visible { outline:0; box-shadow:none; }
@@ -542,6 +542,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .function-count ha-icon { color:var(--ns-green); --mdc-icon-size:17px; }
         .function-count.notify ha-icon { color:var(--ns-cyan); }
         .function-count.presence ha-icon { color:#8fffc2; }
+        .function-count.new ha-icon { color:#ffd766; }
         .function-count span { display:block; margin-top:7px; overflow:hidden; color:#8eaea4; font-size:9px; font-weight:750; text-overflow:ellipsis; text-transform:uppercase; letter-spacing:.65px; white-space:nowrap; }
         .metric.network { --glow:var(--ns-cyan); } .metric.network .metric-value { color:var(--ns-cyan); font-size:20px; margin-top:13px; }
         .metric.quick-filter { width:100%; color:inherit; text-align:left; font:inherit; cursor:pointer; }
@@ -900,6 +901,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .mac-vendor ha-icon { flex:0 0 auto; --mdc-icon-size:13px; }
         .guest-badge { display:inline-flex; align-items:center; gap:4px; width:max-content; margin-top:5px; padding:3px 7px; border-radius:999px; color:#8ee8ff; background:rgba(80,215,255,.1); border:1px solid rgba(80,215,255,.3); font:800 9px Inter,Roboto,sans-serif; letter-spacing:.5px; cursor:pointer; }
         .guest-badge ha-icon { --mdc-icon-size:12px; }
+        .guest-metric { cursor:pointer; }
+        .guest-metric:hover { border-color:rgba(80,215,255,.4); background:rgba(20,45,40,.82); }
         .guest-metric .metric-value { display:flex; align-items:center; gap:9px; }
         .guest-metric .metric-value ha-icon { color:var(--ns-cyan); --mdc-icon-size:25px; }
         .guest-modal-backdrop { position:fixed; z-index:1000; inset:0; display:grid; place-items:center; padding:20px; background:rgba(0,8,7,.78); backdrop-filter:blur(8px); }
@@ -917,6 +920,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .guest-client { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; padding:12px 14px; border-radius:11px; background:rgba(80,215,255,.045); border:1px solid rgba(80,215,255,.13); }
         .guest-client strong,.guest-client small { display:block; }
         .guest-client small { margin-top:4px; color:#78998f; }
+        .guest-qr { display:grid; grid-template-columns:190px minmax(0,1fr); align-items:center; gap:20px; margin:18px 0; padding:18px; border-radius:14px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.09); }
+        .guest-qr img { display:block; width:190px; height:190px; padding:8px; box-sizing:border-box; border-radius:10px; background:#fff; }
+        .guest-qr-copy h3 { margin:0 0 7px; color:#eafff6; font-size:16px; }
+        .guest-qr-copy p { margin:0; color:#83a49a; font-size:12px; line-height:1.5; }
+        .guest-qr-copy strong { color:var(--ns-cyan); }
+        .guest-qr-unavailable { margin:18px 0; padding:14px; border-radius:12px; color:#83a49a; background:rgba(255,255,255,.025); border:1px dashed rgba(255,255,255,.12); font-size:12px; line-height:1.45; }
         .guest-actions { display:flex; justify-content:flex-end; margin-top:18px; }
         .guest-show { display:flex; align-items:center; gap:7px; padding:10px 13px; border-radius:10px; color:#07130f; background:var(--ns-cyan); border:0; font:inherit; font-size:12px; font-weight:800; cursor:pointer; }
         .dot { width:7px; height:7px; border-radius:50%; background:var(--state); box-shadow:0 0 11px var(--state); }
@@ -1344,7 +1353,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
           border-color:rgba(91,72,48,.12); box-shadow:0 8px 20px rgba(82,61,36,.07);
         }
         :host([data-theme="light"]) .metric.connections:hover,
-        :host([data-theme="light"]) .metric.ai-metric:hover {
+        :host([data-theme="light"]) .metric.ai-metric:hover,
+        :host([data-theme="light"]) .metric.guest-metric:hover {
           background:linear-gradient(135deg,#fffaf2,#eee5d9); border-color:rgba(168,91,23,.30);
         }
         :host([data-theme="light"]) .connection-panel,
@@ -1402,6 +1412,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .guest-status-card {
           background:rgba(255,255,255,.64); border-color:rgba(91,72,48,.13);
         }
+        :host([data-theme="light"]) .guest-qr { background:rgba(255,255,255,.64); border-color:rgba(91,72,48,.13); }
+        :host([data-theme="light"]) .guest-qr-copy h3 { color:#302a24; }
+        :host([data-theme="light"]) .guest-qr-copy p,
+        :host([data-theme="light"]) .guest-qr-unavailable { color:#665e54; }
         :host([data-theme="light"]) .client-detail,
         :host([data-theme="light"]) .log-route span,
         :host([data-theme="light"]) .dns-chip,
@@ -1669,6 +1683,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .scan { flex:0 0 44px; width:44px; height:44px; justify-content:center; padding:0; }
           .metrics { grid-template-columns:1fr 1fr; }
           .metric.devices, .functions-metric, .metric.connections { grid-column:1 / -1; }
+          .guest-qr { grid-template-columns:1fr; justify-items:center; text-align:center; }
           .tabs { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:6px; }
           .tab { min-height:43px; padding:9px 7px; font-size:12px; }
           .tab ha-icon { --mdc-icon-size:18px; }
@@ -2438,6 +2453,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const logDropdown = activeElement?.closest?.(".log-list .custom-column-filter");
     const dnsDropdown = activeElement?.closest?.(".dns-live-content .dns-status-select");
     const dnsPolicyChoice = activeElement?.closest?.("[data-dns-policy-scope]");
+    const notifyTargetInput = activeElement?.closest?.("[data-notify-target]");
     const focusState = activeElement?.dataset?.columnFilter ? {
       type:"participant-input", key:activeElement.dataset.columnFilter,
       start:activeElement.selectionStart, end:activeElement.selectionEnd,
@@ -2452,16 +2468,24 @@ class EngelsoftNodarionPanel extends HTMLElement {
       type:"log-dropdown", key:logDropdown.dataset.logFilterKey,
     } : dnsPolicyChoice ? {
       type:"dns-policy-choice", key:dnsPolicyChoice.dataset.dnsPolicyScope,
+    } : notifyTargetInput ? {
+      type:"notify-target", key:notifyTargetInput.dataset.notifyTarget,
     } : dnsDropdown ? {
       type:"dns-dropdown",
     } : null;
     const deviceList = this.shadowRoot.querySelector(".device-list");
     const logList = this.shadowRoot.querySelector(".log-list");
+    const notifyTargetList = this.shadowRoot.querySelector(".notify-target-list");
+    const notifyTargetDraft = notifyTargetList
+      ? new Set([...notifyTargetList.querySelectorAll("[data-notify-target]:checked")]
+        .map((input) => input.dataset.notifyTarget))
+      : null;
     const scrollState = {
       deviceLeft:deviceList?.scrollLeft || 0,
       deviceTop:deviceList?.scrollTop || 0,
       logLeft:logList?.scrollLeft || 0,
       logTop:logList?.scrollTop || 0,
+      notifyTargetTop:notifyTargetList?.scrollTop || 0,
     };
     const entities = this._entities();
     const online = entities.filter((entity) => entity.state === "on").length;
@@ -2478,6 +2502,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const important = this._monitor.monitored.length;
     const notifications = this._monitor.notifications.length;
     const presenceDevices = this._monitor.presence_devices.length;
+    const onlineKeys = new Set(entities
+      .filter((entity) => entity.state === "on")
+      .map((entity) => entity.attributes.nodarion_key
+        || `ip_${entity.attributes.ip_address}`));
+    const importantOnline = this._monitor.monitored.filter((key) =>
+      onlineKeys.has(key)
+    ).length;
+    const notificationsOnline = this._monitor.notifications.filter((key) =>
+      onlineKeys.has(key)
+    ).length;
+    const presenceOnline = this._monitor.presence_devices.filter((key) =>
+      onlineKeys.has(key)
+    ).length;
     const alertCount = Number(this._monitor.summary?.active || 0);
     const badge = this.shadowRoot.querySelector(".tab-badge");
     badge.textContent = alertCount;
@@ -2516,15 +2553,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
       <article class="metric functions-metric">
         <div class="metric-label">Gerätefunktionen</div>
         <div class="function-counts">
-          <button class="function-count favorite" type="button" data-quick-filter="watch" data-quick-filter-value="monitored" title="Nur Favoriten anzeigen"><strong><ha-icon icon="mdi:star-outline"></ha-icon>${important}</strong><span>Favoriten</span></button>
-          <button class="function-count notify" type="button" data-quick-filter="watch" data-quick-filter-value="notify" title="Nur Geräte mit Offline-Meldung anzeigen"><strong><ha-icon icon="mdi:bell-outline"></ha-icon>${notifications}</strong><span>Glocke</span></button>
-          <button class="function-count presence" type="button" data-quick-filter="watch" data-quick-filter-value="presence" title="Nur Anwesenheitsgeräte anzeigen"><strong><ha-icon icon="mdi:home-outline"></ha-icon>${presenceDevices}</strong><span>Anwesenheit</span></button>
+          <button class="function-count favorite" type="button" data-quick-filter="watch" data-quick-filter-value="monitored" title="Favoriten: ${important} gesamt, ${importantOnline} online"><strong><ha-icon icon="mdi:star-outline"></ha-icon>${important}/${importantOnline}</strong><span>Favoriten</span></button>
+          <button class="function-count notify" type="button" data-quick-filter="watch" data-quick-filter-value="notify" title="Glocke: ${notifications} gesamt, ${notificationsOnline} online"><strong><ha-icon icon="mdi:bell-outline"></ha-icon>${notifications}/${notificationsOnline}</strong><span>Glocke</span></button>
+          <button class="function-count presence" type="button" data-quick-filter="watch" data-quick-filter-value="presence" title="Anwesenheit: ${presenceDevices} gesamt, ${presenceOnline} online"><strong><ha-icon icon="mdi:home-outline"></ha-icon>${presenceDevices}/${presenceOnline}</strong><span>Anwesenheit</span></button>
+          <button class="function-count new" type="button" data-quick-filter="onboarding" data-quick-filter-value="onboarding" title="${onboarding} neue Geräte im Einrichtungsbereich"><strong><ha-icon icon="mdi:account-plus-outline"></ha-icon>${onboarding}</strong><span>NEU</span></button>
         </div>
       </article>
-      <button class="metric onboarding-metric" type="button" title="Teilnehmer im Einrichtungsbereich anzeigen">
-        <div class="metric-label">Neue Geräte</div><div class="metric-value">${onboarding}</div>
-        <span class="metric-note">Im Einrichtungsbereich</span>
-      </button>
       ${guestMonitoring ? `<button class="metric guest-metric" type="button" title="Details zum FRITZ!Box-Gastzugang anzeigen">
         <div class="metric-label">Gastzugang</div>
         <div class="metric-value"><ha-icon icon="mdi:wifi-star"></ha-icon>${guestClients}</div>
@@ -2559,6 +2593,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
               ? `.log-list [data-log-filter-key="${focusState.key}"] summary`
               : focusState.type === "dns-policy-choice"
                 ? `[data-dns-policy-scope="${focusState.key}"]`
+                : focusState.type === "notify-target"
+                  ? `[data-notify-target="${focusState.key}"]`
                 : `.dns-live-content .dns-status-select summary`;
       const replacement = this.shadowRoot.querySelector(selector);
       if (focusState.type.endsWith("-dropdown")) {
@@ -2575,6 +2611,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }
     const updatedDeviceList = this.shadowRoot.querySelector(".device-list");
     const updatedLogList = this.shadowRoot.querySelector(".log-list");
+    const updatedNotifyTargetList = this.shadowRoot.querySelector(".notify-target-list");
     if (updatedDeviceList) {
       updatedDeviceList.scrollLeft = scrollState.deviceLeft;
       updatedDeviceList.scrollTop = scrollState.deviceTop;
@@ -2582,6 +2619,15 @@ class EngelsoftNodarionPanel extends HTMLElement {
     if (updatedLogList) {
       updatedLogList.scrollLeft = scrollState.logLeft;
       updatedLogList.scrollTop = scrollState.logTop;
+    }
+    if (updatedNotifyTargetList) {
+      if (notifyTargetDraft) {
+        updatedNotifyTargetList.querySelectorAll("[data-notify-target]")
+          .forEach((input) => {
+            input.checked = notifyTargetDraft.has(input.dataset.notifyTarget);
+          });
+      }
+      updatedNotifyTargetList.scrollTop = scrollState.notifyTargetTop;
     }
   }
 
@@ -2659,6 +2705,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
       return `<div class="guest-client"><div><strong>${esc(name)}</strong><small>${esc(attr.ip_address || "–")} · ${esc(attr.mac_address || "MAC unbekannt")}${attr.mac_vendor ? ` · ${esc(attr.mac_vendor)}` : ""}</small></div><small>${esc(connected)}</small></div>`;
     }).join("");
     const remaining = Number(info.time_remaining_seconds);
+    const qrCode = String(info.qr_code || "");
+    const qrHtml = qrCode.startsWith("data:image/svg+xml;base64,")
+      ? `<div class="guest-qr"><img src="${esc(qrCode)}" alt="QR-Code für das Gast-WLAN ${esc(info.ssid || "")}"><div class="guest-qr-copy"><h3>Mit dem Gast-WLAN verbinden</h3><p>QR-Code mit der Handykamera scannen und direkt mit <strong>${esc(info.ssid || "dem Gast-WLAN")}</strong> verbinden.</p></div></div>`
+      : `<div class="guest-qr-unavailable">${info.qr_code_restricted ? "Der WLAN-QR-Code ist nur für Home-Assistant-Administratoren sichtbar." : info.enabled ? "Die FRITZ!Box konnte für dieses Gast-WLAN keinen QR-Code bereitstellen." : "Der QR-Code ist verfügbar, sobald der Gastzugang aktiv ist."}</div>`;
     host.innerHTML = `<div class="guest-modal-backdrop"><section class="guest-modal" role="dialog" aria-modal="true" aria-labelledby="guest-modal-title">
       <div class="guest-modal-head"><div><h2 id="guest-modal-title"><ha-icon icon="mdi:wifi-star"></ha-icon>FRITZ!Box-Gastzugang</h2><p>Nur lesende Anzeige – Nodarion verändert hier keine FRITZ!Box-Einstellungen.</p></div><button class="guest-close" type="button" aria-label="Schließen"><ha-icon icon="mdi:close"></ha-icon></button></div>
       <div class="guest-status-grid">
@@ -2669,6 +2719,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         ${detail("Frequenz", info.frequency_band || "Nicht gemeldet")}
         ${detail("Restlaufzeit", Number.isFinite(remaining) ? formatLease(remaining) : info.timeout_active ? "Aktiv" : "Ohne Zeitlimit")}
       </div>
+      ${qrHtml}
       <div class="guest-client-list">${clients || `<div class="empty"><ha-icon icon="mdi:wifi-off"></ha-icon><strong>Keine Gäste online</strong>Der Gastzugang ist gerade angenehm übersichtlich.</div>`}</div>
       <div class="guest-actions"><button class="guest-show" type="button"><ha-icon icon="mdi:filter-variant"></ha-icon>Gäste in Tabelle anzeigen</button></div>
     </section></div>`;

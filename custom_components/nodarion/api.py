@@ -236,6 +236,9 @@ class NodarionView(HomeAssistantView):
             if coordinator is not None and coordinator.fritz_scanner is not None
             else {"available": False, "enabled": False, "clients": 0}
         )
+        if not cls._is_admin(request):
+            response["guest_access"].pop("qr_code", None)
+            response["guest_access"]["qr_code_restricted"] = True
         participants = []
         if coordinator is not None and coordinator.data:
             for host in coordinator.data.values():
