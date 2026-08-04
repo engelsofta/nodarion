@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import ipaddress
 import logging
 from time import monotonic
@@ -327,6 +328,20 @@ class FritzBoxScanner:
                     "hidden": self._as_bool(guest.is_hidden),
                 }
             )
+            if enabled:
+                try:
+                    qr_stream = guest.get_wifi_qr_code(kind="svg")
+                    qr_payload = qr_stream.read()
+                    if isinstance(qr_payload, str):
+                        qr_payload = qr_payload.encode("utf-8")
+                    guest_info["qr_code"] = (
+                        "data:image/svg+xml;base64,"
+                        + base64.b64encode(qr_payload).decode("ascii")
+                    )
+                except Exception as err:
+                    _LOGGER.debug(
+                        "FRITZ!Box guest WLAN QR code unavailable: %s", err
+                    )
             for item in guest_clients:
                 if not self._as_bool(item.get("status")):
                     continue

@@ -8,7 +8,7 @@
   "integration_type": "service",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/engelsofta/nodarion/issues",
-  "requirements": ["fritzconnection==1.15.1"],
+  "requirements": ["fritzconnection==1.15.1", "segno==1.6.6"],
   "single_config_entry": true,
-  "version": "1.17.8"
+  "version": "1.17.9"
 }
