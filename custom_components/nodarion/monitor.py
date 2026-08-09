@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import html
 import ipaddress
 import json
 import logging
+import re
 from typing import Any
 
 from homeassistant.components import persistent_notification
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
@@ -282,15 +285,7 @@ class NetworkMonitor:
                     and len(target.strip()) <= 255
                 }
             )
-        if not self.rules.get("guest_monitoring_enabled", True):
-            resolved_at = _now().isoformat()
-            for alert in self.alerts:
-                if alert.get("type") not in {"guest_new", "guest_quiet", "guest_long"}:
-                    continue
-                if alert.get("active"):
-                    alert["active"] = False
-                    alert["resolved_at"] = resolved_at
-            self.guest_since.clear()
+        self._resolve_disabled_rule_alerts(_now())
         await self._async_save()
 
     def async_maybe_schedule_ai_analysis(
@@ -560,7 +555,7 @@ class NetworkMonitor:
     ) -> None:
         """Record changes and evaluate all enabled monitoring rules."""
         now = _now()
-        changed = False
+        changed = self._resolve_disabled_rule_alerts(now)
         learning = self._is_learning(now)
         guest_monitoring = self.rules.get("guest_monitoring_enabled", True)
         previous_by_mac = {
@@ -665,7 +660,8 @@ class NetworkMonitor:
                             service="FRITZ!Box Gastzugang",
                         )
                     if (
-                        self.rules.get("guest_quiet_enabled", True)
+                        self.rules.get("quiet_hours_enabled", True)
+                        and self.rules.get("guest_quiet_enabled", True)
                         and self._in_quiet_hours(now)
                     ):
                         self._add_alert(
@@ -1144,21 +1140,47 @@ class NetworkMonitor:
             if self.hass.states.get(target) is None:
                 _LOGGER.warning("Nodarion notify target %s is not available", target)
                 continue
+            target_title, target_message = self._notification_text_for_target(
+                target, title, message
+            )
             try:
                 await self.hass.services.async_call(
                     "notify",
                     "send_message",
                     {
-                        "title": title,
-                        "message": message,
+                        "title": target_title,
+                        "message": target_message,
                     },
-                    blocking=False,
+                    blocking=True,
                     target={"entity_id": target},
                 )
             except Exception:
                 _LOGGER.exception(
                     "Nodarion could not send an alert to %s", target
                 )
+
+    def _notification_text_for_target(
+        self, target: str, title: str, message: str
+    ) -> tuple[str, str]:
+        """Escape notification text for a Telegram entity's configured parser."""
+        entity = er.async_get(self.hass).async_get(target)
+        if entity is None or entity.platform != "telegram_bot":
+            return title, message
+        entry = (
+            self.hass.config_entries.async_get_entry(entity.config_entry_id)
+            if entity.config_entry_id
+            else None
+        )
+        parser = str(entry.options.get("parse_mode", "") if entry else "").lower()
+        if parser == "html":
+            return html.escape(title), html.escape(message)
+        if parser == "markdownv2":
+            reserved = re.compile(r"([_\*\[\]\(\)~`>#+\-=|{}.!\\])")
+            return reserved.sub(r"\\\1", title), reserved.sub(r"\\\1", message)
+        if parser == "markdown":
+            reserved = re.compile(r"([_*`\[])")
+            return reserved.sub(r"\\\1", title), reserved.sub(r"\\\1", message)
+        return title, message
 
     def _active_alert(self, alert_type: str, key: str) -> dict[str, Any] | None:
         return next(
@@ -1190,6 +1212,31 @@ class NetworkMonitor:
         alert["active"] = False
         alert["resolved_at"] = now.isoformat()
         return True
+
+    def _resolve_disabled_rule_alerts(self, now: datetime) -> bool:
+        """Resolve alerts whose corresponding monitoring rule is disabled."""
+        alert_types: set[str] = set()
+        if not self.rules.get("quiet_hours_enabled", True):
+            alert_types.update({"quiet_activity", "guest_quiet"})
+        elif not self.rules.get("guest_quiet_enabled", True):
+            alert_types.add("guest_quiet")
+        if not self.rules.get("guest_monitoring_enabled", True):
+            alert_types.update({"guest_new", "guest_quiet", "guest_long"})
+
+        changed = False
+        if not self.rules.get("guest_monitoring_enabled", True) and self.guest_since:
+            self.guest_since.clear()
+            changed = True
+        if not alert_types:
+            return changed
+
+        resolved_at = now.isoformat()
+        for alert in self.alerts:
+            if alert.get("type") in alert_types and alert.get("active"):
+                alert["active"] = False
+                alert["resolved_at"] = resolved_at
+                changed = True
+        return changed
 
     def _is_learning(self, now: datetime) -> bool:
         started = _parse(self.started_at) or now
