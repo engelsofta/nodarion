@@ -161,6 +161,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._settingsHelp = null;
     this._settingsTab = this._loadSettingsTab();
     this._notifyTargetQuery = "";
+    this._notifyTargetsDirty = false;
     this._dnsLive = {
       entries: [], series: [], client: null, name: null, updated_at: null,
     };
@@ -326,6 +327,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._monitor = await this._hass.callApi(
         "POST", "nodarion/monitor", { action: "set_rules", rules }
       );
+      this._notifyTargetsDirty = false;
       this._render();
       const savedButton = this.shadowRoot.querySelector(selector);
       if (!savedButton) return;
@@ -571,9 +573,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .nav-metric { width:100%; min-width:0; color:inherit; text-align:left; font:inherit; cursor:pointer; transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
         .nav-metric:hover { transform:translateY(-2px); border-color:rgba(240,161,59,.4); background:rgba(240,161,59,.09); }
         .nav-metric.active { border-color:rgba(240,161,59,.72); box-shadow:0 0 0 1px rgba(240,161,59,.24), 0 22px 55px rgba(10,8,5,.22); }
-        .nav-metric.active::before { content:""; position:absolute; z-index:2; left:17px; right:17px; bottom:0; height:3px; border-radius:3px 3px 0 0; background:#e5ad50; }
-        .metric-nav-label { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; color:#8eaea4; font-size:9px; font-weight:750; }
-        .metric-nav-label ha-icon { --mdc-icon-size:15px; }
         .metric-status-value { display:flex; align-items:center; gap:8px; margin-top:12px; color:#effff8; font-size:20px; font-weight:780; }
         .metric-status-value ha-icon { color:var(--ns-cyan); --mdc-icon-size:23px; }
         .metric.events-metric { --glow:#ffd766; }
@@ -1052,8 +1051,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .settings-tab.active ha-icon { color:#f0b75e; }
         .settings-tab-panel[hidden] { display:none !important; }
         .settings-tab-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:10px; }
-        .settings-tab-panel.notifications-panel { grid-template-columns:1fr; }
-        .settings-tab-panel.ai-maintenance-panel .danger-zone { grid-column:1 / -1; }
+        .settings-tab-panel.devices-panel { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(280px,.7fr); gap:14px; }
+        .settings-tab-panel.notifications-panel { grid-template-columns:minmax(280px,2fr) minmax(440px,3fr); gap:14px; }
+        .settings-tab-panel.ai-maintenance-panel { grid-template-columns:1fr; }
+        .settings-tab-panel.devices-panel .danger-zone { margin:0; align-self:stretch; }
+        .settings-tab-panel.devices-panel .cleanup-settings .rule { grid-template-columns:1fr; align-content:start; }
+        .settings-tab-panel.devices-panel .cleanup-settings .cleanup { width:100%; justify-content:center; justify-self:stretch; margin-top:8px; }
         .watch-panel { border-radius:18px; padding:22px; min-width:0; }
         .watch-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:15px; margin-bottom:18px; }
         .watch-heading h2 { margin:0 0 5px; font-size:18px; }
@@ -1144,6 +1147,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .rule-group.detection-settings { background:rgba(182,140,255,.04); border-color:rgba(182,140,255,.14); }
         .rule-group.alert-rule-settings { background:rgba(255,215,102,.035); border-color:rgba(255,215,102,.14); }
         .rule-group.notification-settings { background:rgba(80,215,255,.035); border-color:rgba(80,215,255,.13); }
+        .rule-group.notification-target-settings { background:rgba(143,255,194,.025); border-color:rgba(143,255,194,.12); }
+        .notification-target-description { margin:4px 3px 8px; color:var(--ns-muted); font-size:10px; line-height:1.4; }
         .notify-target-section { display:grid; gap:8px; padding:10px 3px 4px; border-top:1px solid var(--ns-line); }
         .notify-target-heading { display:flex; align-items:end; justify-content:space-between; gap:10px; }
         .notify-target-heading > label { display:grid; gap:3px; color:var(--ns-text); font-size:13px; font-weight:750; }
@@ -1625,6 +1630,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .rule-group.presence-settings { background:#f5fbf7; border-color:#d5e9db; }
         :host([data-theme="light"]) .rule-group.device-settings,
         :host([data-theme="light"]) .rule-group.notification-settings { background:#f5fafb; border-color:#d7e7eb; }
+        :host([data-theme="light"]) .rule-group.notification-target-settings { background:#f5faf7; border-color:#d5e7da; }
         :host([data-theme="light"]) .rule-group.onboarding-settings { background:#fffaf0; border-color:#eadfc6; }
         :host([data-theme="light"]) .rule-group.detection-settings,
         :host([data-theme="light"]) .rule-group.ai-config-settings { background:#faf8ff; border-color:#e1d9f2; }
@@ -1736,6 +1742,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         @media (max-width:1100px) {
           .tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); width:100%; overflow:visible; }
           .tab { min-width:0; padding:10px 8px; }
+          .settings-tab-panel.notifications-panel { grid-template-columns:1fr; }
+          .settings-tab-panel.devices-panel { grid-template-columns:1fr; }
           .ai-settings .rule-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
         }
         @media (max-width:1200px) { .metrics { grid-template-columns:repeat(3,1fr); } }
@@ -1751,7 +1759,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .mesh-head { flex-direction:column; } .mesh-panel { padding:18px; }
           .watch-layout { grid-template-columns:1fr; } .security-metrics { grid-template-columns:1fr 1fr; }
           .presence-row { grid-template-columns:1fr; gap:7px; }
-          .settings-tab-panel { grid-template-columns:1fr; }
+          .settings-tab-panel, .settings-tab-panel.ai-maintenance-panel { grid-template-columns:1fr; }
           .rule-group.ai-config-settings .rule { grid-template-columns:1fr; }
           .rule-group.ai-config-settings .settings-select { width:100%; }
           .ai-settings .rule-list { grid-template-columns:1fr; }
@@ -2482,6 +2490,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const notifyTargetAction = event.target.closest("[data-notify-target-action]");
       if (notifyTargetAction) {
         const checked = notifyTargetAction.dataset.notifyTargetAction === "all";
+        this._notifyTargetsDirty = true;
         settingsView.querySelectorAll(
           ".notify-target:not([hidden]) [data-notify-target]"
         ).forEach((input) => { input.checked = checked; });
@@ -2530,6 +2539,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     });
     settingsView.addEventListener("change", (event) => {
       if (event.target?.matches?.("[data-notify-target]")) {
+        this._notifyTargetsDirty = true;
         const selected = settingsView.querySelectorAll("[data-notify-target]:checked").length;
         const total = settingsView.querySelectorAll("[data-notify-target]").length;
         const count = settingsView.querySelector(".notify-target-count");
@@ -2595,7 +2605,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const deviceList = this.shadowRoot.querySelector(".device-list");
     const logList = this.shadowRoot.querySelector(".log-list");
     const notifyTargetList = this.shadowRoot.querySelector(".notify-target-list");
-    const notifyTargetDraft = notifyTargetList
+    const notifyTargetDraft = this._notifyTargetsDirty && notifyTargetList
       ? new Set([...notifyTargetList.querySelectorAll("[data-notify-target]:checked")]
         .map((input) => input.dataset.notifyTarget))
       : null;
@@ -2678,25 +2688,21 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <button class="device-count new ${this._columnFilters.onboarding === "onboarding" ? "active" : ""}" type="button" data-quick-filter="onboarding" data-quick-filter-value="onboarding" title="${onboarding} neue Geräte im Einrichtungsbereich"><strong>${onboarding}</strong><span>NEU</span></button>
         </div>
         ${guestMonitoring ? `<button class="guest-inline" type="button" title="Gastzugang anzeigen"><ha-icon icon="mdi:wifi-star"></ha-icon>${guestClients} ${guestClients === 1 ? "Gast" : "Gäste"} · ${guestInfo.enabled ? "aktiv" : "deaktiviert"}</button>` : ""}
-        <span class="metric-nav-label">Teilnehmer anzeigen <ha-icon icon="mdi:arrow-right"></ha-icon></span>
       </article>
       <button class="metric nav-metric events-metric ${this._activeTab === "log" ? "active" : ""}" type="button" data-nav-tab="log" aria-current="${this._activeTab === "log" ? "page" : "false"}">
         <div class="metric-label">Ereignisse</div>
         <div class="metric-status-value"><ha-icon icon="mdi:text-box-search-outline"></ha-icon>${eventCount}</div>
         <span class="metric-note">${alertCount ? `${alertCount} offene ${alertCount === 1 ? "Warnung" : "Warnungen"}` : "Keine offenen Warnungen"}</span>
-        <span class="metric-nav-label">Live-Log öffnen <ha-icon icon="mdi:arrow-right"></ha-icon></span>
       </button>
       <button class="metric nav-metric dns-metric ${this._activeTab === "dns" ? "active" : ""}" type="button" data-nav-tab="dns" aria-current="${this._activeTab === "dns" ? "page" : "false"}">
         <div class="metric-label">DNS-Schutz</div>
         <div class="metric-status-value"><ha-icon icon="mdi:shield-check-outline"></ha-icon>${esc(dnsStatus)}</div>
         <span class="metric-note">AdGuard DNS-Live</span>
-        <span class="metric-nav-label">DNS-Live öffnen <ha-icon icon="mdi:arrow-right"></ha-icon></span>
       </button>
       <button class="metric nav-metric ai-metric ${this._activeTab === "ai" ? "active" : ""}" type="button" data-nav-tab="ai" aria-current="${this._activeTab === "ai" ? "page" : "false"}" title="${esc(aiNote)}">
         <div class="metric-label">Netzbewertung</div>
         <div class="metric-value">${esc(aiScore)}</div>
         <span class="metric-note">${esc(aiNote)}</span>
-        <span class="metric-nav-label">KI-Analyse öffnen <ha-icon icon="mdi:arrow-right"></ha-icon></span>
       </button>
       <article class="metric nav-metric watch-metric ${this._activeTab === "watch" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="watch" aria-current="${this._activeTab === "watch" ? "page" : "false"}">
         <div class="metric-label">Überwachung ${alertCount ? `<span class="metric-alert-badge">${alertCount}</span>` : ""}</div>
@@ -2705,7 +2711,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <button class="function-count notify ${this._columnFilters.watch === "notify" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="notify" title="Glocke: ${notifications} gesamt, ${notificationsOnline} online"><strong><ha-icon icon="mdi:bell-outline"></ha-icon>${notifications}/${notificationsOnline}</strong><span>Glocke</span></button>
           <button class="function-count presence ${this._columnFilters.watch === "presence" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="presence" title="Anwesenheit: ${presenceDevices} gesamt, ${presenceOnline} online"><strong><ha-icon icon="mdi:home-outline"></ha-icon>${presenceDevices}/${presenceOnline}</strong><span>Anwesenheit</span></button>
         </div>
-        <span class="metric-nav-label">Überwachung öffnen <ha-icon icon="mdi:arrow-right"></ha-icon></span>
       </article>`;
     this._renderConnections();
     this._renderGuest();
@@ -2761,6 +2766,14 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .forEach((input) => {
             input.checked = notifyTargetDraft.has(input.dataset.notifyTarget);
           });
+        const selected = updatedNotifyTargetList.querySelectorAll(
+          "[data-notify-target]:checked"
+        ).length;
+        const total = updatedNotifyTargetList.querySelectorAll(
+          "[data-notify-target]"
+        ).length;
+        const count = this.shadowRoot.querySelector(".notify-target-count");
+        if (count) count.textContent = `${selected} von ${total} ausgewählt`;
       }
       updatedNotifyTargetList.scrollTop = scrollState.notifyTargetTop;
     }
@@ -3813,7 +3826,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
             <button class="settings-tab ${this._settingsTab === "devices" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "devices"}" data-settings-tab="devices"><ha-icon icon="mdi:devices"></ha-icon>Geräte</button>
             <button class="settings-tab ${this._settingsTab === "rules" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "rules"}" data-settings-tab="rules"><ha-icon icon="mdi:shield-alert-outline"></ha-icon>Regeln &amp; Alarme</button>
             <button class="settings-tab ${this._settingsTab === "notifications" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "notifications"}" data-settings-tab="notifications"><ha-icon icon="mdi:bell-outline"></ha-icon>Benachrichtigungen</button>
-            <button class="settings-tab ${this._settingsTab === "ai-maintenance" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "ai-maintenance"}" data-settings-tab="ai-maintenance"><ha-icon icon="mdi:creation-outline"></ha-icon>KI &amp; Wartung</button>
+            <button class="settings-tab ${this._settingsTab === "ai-maintenance" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "ai-maintenance"}" data-settings-tab="ai-maintenance"><ha-icon icon="mdi:creation-outline"></ha-icon>KI-Analyse</button>
           </nav>
           <div class="rule-list">
             <div class="settings-tab-panel general-panel" role="tabpanel" data-settings-panel="general" ${this._settingsTab === "general" ? "" : "hidden"}>
@@ -3845,6 +3858,14 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="rule"><label>Gäste zur Ruhezeit melden<small>Verbindungen im eingestellten Ruhezeitraum hervorheben</small></label><input type="checkbox" data-rule="guest_quiet_enabled" ${checked(rules.guest_quiet_enabled)} ${rules.guest_monitoring_enabled ? "" : "disabled"}></div>
               <div class="rule"><label>Maximale Gastdauer<small>Nach dieser Anzahl Stunden eine Warnung anzeigen</small></label><input type="number" min="1" max="168" data-rule="guest_max_hours" value="${Number(rules.guest_max_hours)}" ${rules.guest_monitoring_enabled ? "" : "disabled"}></div>
             </section>
+            <section class="rule-group danger-zone cleanup-settings">
+              <h3>Bereinigung<button class="settings-help-button" type="button" data-settings-help="cleanup" title="Bereinigung erklären" aria-label="Hilfe zur Bereinigung">?</button></h3>
+              <div class="rule">
+                <label>Offline-Teilnehmer löschen<small>Entfernt alle aktuell offline geführten Geräte einschließlich ihrer gespeicherten Einstellungen.</small></label>
+                <button class="cleanup" type="button" title="Alle derzeit offline geführten Geräte sofort entfernen"><ha-icon icon="mdi:broom"></ha-icon>Löschen</button>
+              </div>
+              <div class="cleanup-result" role="status"></div>
+            </section>
             </div>
             <div class="settings-tab-panel rules-panel" role="tabpanel" data-settings-panel="rules" ${this._settingsTab === "rules" ? "" : "hidden"}>
             <section class="rule-group device-settings">
@@ -3870,8 +3891,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="rule"><label>HA-Glocke<small>Neue Auffälligkeiten als dauerhafte Meldung in Home Assistant anzeigen</small></label><input type="checkbox" data-rule="notify_alerts" ${checked(rules.notify_alerts)}></div>
               <div class="rule"><label>Warnungen senden<small>Normale Warnungen an die ausgewählten Ziele senden</small></label><input type="checkbox" data-rule="notify_warning" ${checked(rules.notify_warning)}></div>
               <div class="rule"><label>Kritische Meldungen senden<small>Kritische Ausfälle an die ausgewählten Ziele senden</small></label><input type="checkbox" data-rule="notify_critical" ${checked(rules.notify_critical)}></div>
-              <div class="notify-target-section"><div class="notify-target-heading"><label>Benachrichtigungsziele<small>Companion App, Telegram und andere in HA eingerichtete Ziele</small></label><span class="notify-target-count">${selectedNotifyCount} von ${notifyEntities.length} ausgewählt</span></div><div class="notify-target-toolbar"><span class="notify-search-wrap"><ha-icon icon="mdi:magnify"></ha-icon><input class="notify-target-search" type="search" value="${esc(this._notifyTargetQuery)}" placeholder="Ziel durchsuchen …" aria-label="Benachrichtigungsziel durchsuchen"></span><button class="notify-target-action" type="button" data-notify-target-action="all">Alle</button><button class="notify-target-action" type="button" data-notify-target-action="none">Keine</button></div><div class="notify-target-list">${notifyTargetHtml}</div></div>
               <div class="notify-event-hint"><ha-icon icon="mdi:transit-connection-variant"></ha-icon><span>Für eigene Automationen wird immer das Ereignis <code>nodarion_alert</code> ausgelöst.</span></div>
+            </section>
+            <section class="rule-group notification-target-settings">
+              <h3><span>Benachrichtigungsziele</span><span class="notify-target-count">${selectedNotifyCount} von ${notifyEntities.length} ausgewählt</span></h3>
+              <p class="notification-target-description">Companion App, Telegram und andere in Home Assistant eingerichtete Ziele</p>
+              <div class="notify-target-section"><div class="notify-target-toolbar"><span class="notify-search-wrap"><ha-icon icon="mdi:magnify"></ha-icon><input class="notify-target-search" type="search" value="${esc(this._notifyTargetQuery)}" placeholder="Ziel durchsuchen …" aria-label="Benachrichtigungsziel durchsuchen"></span><button class="notify-target-action" type="button" data-notify-target-action="all">Alle</button><button class="notify-target-action" type="button" data-notify-target-action="none">Keine</button></div><div class="notify-target-list">${notifyTargetHtml}</div></div>
             </section>
             </div>
             <div class="settings-tab-panel ai-maintenance-panel" role="tabpanel" data-settings-panel="ai-maintenance" ${this._settingsTab === "ai-maintenance" ? "" : "hidden"}>
@@ -3880,14 +3905,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="rule"><label>Tägliche KI-Auswertung<small>Automatisch einmal täglich einen Bericht erstellen</small></label><input type="checkbox" data-rule="ai_analysis_enabled" ${checked(rules.ai_analysis_enabled)}></div>
               <div class="rule"><label>KI-Auswertung um<small>Erster Netzwerkscan nach diesem Zeitpunkt</small></label><input type="time" data-rule="ai_analysis_time" value="${esc(rules.ai_analysis_time)}"></div>
               <div class="rule"><label>DNS-Datenschutz<small>Anonymisiert überträgt nur Zähler und stabile, neutrale Domain-IDs</small></label><input type="hidden" data-rule="ai_privacy" value="${esc(rules.ai_privacy)}"><details class="custom-column-filter settings-select"><summary>${rules.ai_privacy === "domains" ? "Domainnamen mitsenden" : "Domains anonymisieren"}</summary><div class="custom-filter-menu"><button type="button" class="custom-filter-option ${rules.ai_privacy === "anonymized" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="anonymized"><ha-icon icon="${rules.ai_privacy === "anonymized" ? "mdi:check" : "mdi:incognito"}"></ha-icon><span>Domains anonymisieren</span></button><button type="button" class="custom-filter-option ${rules.ai_privacy === "domains" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="domains"><ha-icon icon="${rules.ai_privacy === "domains" ? "mdi:check" : "mdi:web"}"></ha-icon><span>Domainnamen mitsenden</span></button></div></details></div>
-            </section>
-            <section class="rule-group danger-zone cleanup-settings">
-              <h3>Bereinigung<button class="settings-help-button" type="button" data-settings-help="cleanup" title="Bereinigung erklären" aria-label="Hilfe zur Bereinigung">?</button></h3>
-              <div class="rule">
-                <label>Offline-Teilnehmer löschen<small>Entfernt alle aktuell offline geführten Geräte einschließlich ihrer gespeicherten Einstellungen.</small></label>
-                <button class="cleanup" type="button" title="Alle derzeit offline geführten Geräte sofort entfernen"><ha-icon icon="mdi:broom"></ha-icon>Löschen</button>
-              </div>
-              <div class="cleanup-result" role="status"></div>
             </section>
             </div>
           </div>
