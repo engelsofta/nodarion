@@ -3,235 +3,183 @@
 </div>
 
 <p align="center">
-  <strong>Deutsch</strong> · <a href="README.en.md">English</a>
+  <a href="README.de.md">Deutsch</a> · <strong>English</strong>
 </p>
 
-<h1 align="center">Engelsoft Nodarion für Home Assistant</h1>
+<h1 align="center">Engelsoft Nodarion for Home Assistant</h1>
 
 <p align="center">
-  <a href="https://github.com/engelsofta/nodarion/releases/latest"><img src="https://img.shields.io/github/v/release/engelsofta/nodarion?label=Version&color=d4a33f" alt="Aktuelle Version"></a>
-  <a href="https://github.com/engelsofta/nodarion/releases"><img src="https://img.shields.io/github/downloads/engelsofta/nodarion/total?label=Downloads&color=d4a33f" alt="Downloads aller Releases"></a>
-  <a href="https://www.home-assistant.io/"><img src="https://img.shields.io/badge/Home%20Assistant-Custom-41BDF5?logo=homeassistant&logoColor=white" alt="Home Assistant Custom Integration"></a>
-  <a href="https://hacs.xyz/"><img src="https://img.shields.io/badge/HACS-Custom-ED7D31" alt="HACS Custom Repository"></a>
-  <a href="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml/badge.svg" alt="HACS-Validierung"></a>
+  <a href="https://github.com/engelsofta/nodarion/releases/latest"><img src="https://img.shields.io/github/v/release/engelsofta/nodarion?label=Version&color=d4a33f" alt="Latest version"></a>
+  <a href="https://github.com/engelsofta/nodarion/releases"><img src="https://img.shields.io/github/downloads/engelsofta/nodarion/total?label=Downloads&color=d4a33f" alt="Total release downloads"></a>
+  <a href="https://www.home-assistant.io/"><img src="https://img.shields.io/badge/Home%20Assistant-Custom-41BDF5?logo=homeassistant&logoColor=white" alt="Home Assistant custom integration"></a>
+  <a href="https://hacs.xyz/"><img src="https://img.shields.io/badge/HACS-Custom-ED7D31" alt="HACS custom repository"></a>
+  <a href="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml/badge.svg" alt="HACS validation"></a>
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
 </p>
 
-> **Ein Netzwerk, ein Gesamtbild:** Nodarion führt aktive Ping-/TCP-Scans,
-> FRITZ!Box- und Mesh-Daten sowie die DNS-Aktivitäten aus AdGuard Home pro
-> Teilnehmer zusammen. Statt drei voneinander getrennten Datenquellen entsteht
-> eine gemeinsame, verständliche Sicht auf Geräte, Verbindungen und
-> Auffälligkeiten – inklusive lokaler Regeln und optionaler KI-Analyse.
+> **One network, one complete picture:** Nodarion combines active ping/TCP scans,
+> FRITZ!Box and Mesh data, and DNS activity from AdGuard Home for each device.
+> Instead of three separate data sources, you get one clear view of devices,
+> connections, and anomalies — including local rules and optional AI analysis.
 
-Diese Kombination aus Netzwerkscanner, Router-Integration und DNS-Auswertung
-ist für Home Assistant außergewöhnlich und macht Nodarion zu einer besonders
-umfassenden Lösung für die Überwachung des Heimnetzes. Die Integration erkennt
-nicht nur, **ob** ein Gerät erreichbar ist, sondern hilft auch zu verstehen,
-**wo** es verbunden ist, **wie** es kommuniziert und **ob** sein Verhalten
-auffällig erscheint.
+Nodarion is a local Home Assistant custom integration. It scans a configurable
+IPv4 network and creates a connectivity binary sensor for every discovered
+device. Beyond simple reachability, it helps explain where a device is
+connected, how it communicates, and whether its behaviour looks unusual.
 
-Nodarion arbeitet als lokale Home-Assistant-Custom-Integration, scannt ein
-einstellbares IPv4-Netz und legt pro gefundenem Teilnehmer einen
-Konnektivitäts-Binärsensor an.
+## What is new in the current build
 
-## Neu im aktuellen Build
+- The complete Nodarion panel now follows the language selected in Home
+  Assistant. German is fully supported; every other language falls back to
+  English.
+- Dates, times, numbers, and both manual and daily AI network reports are
+  generated in the appropriate German or English locale.
+- Active anomalies are grouped into one continuously updated Home Assistant
+  notification, keeping the notification centre tidy even on busy networks.
+- Approving a new device reliably enables its internet access and resolves all
+  related warnings. Devices whose access is already enabled can safely be
+  approved again.
+- Refined rating indicators and a scrollable warning view improve readability
+  on smaller screens.
 
-- Die komplette Nodarion-Oberfläche folgt jetzt der in Home Assistant gewählten
-  Sprache: Deutsch wird vollständig unterstützt, alle anderen Sprachen erhalten
-  die englische Oberfläche als Fallback.
-- Datums-, Zeit- und Zahlenformate sowie manuell und täglich erzeugte
-  KI-Netzwerkanalysen werden passend auf Deutsch oder Englisch ausgegeben.
-- Aktive Auffälligkeiten werden in einer einzigen, laufend aktualisierten
-  Home-Assistant-Meldung gebündelt. Das hält die Benachrichtigungen auch in
-  lebhaften Netzen angenehm aufgeräumt.
-- Das Bestätigen eines neuen Geräts gibt dessen Internetzugang zuverlässig frei
-  und erledigt die zugehörigen Warnungen gemeinsam. Bereits freigegebene Geräte
-  lassen sich dabei ebenfalls problemlos erneut bestätigen.
-- Überarbeitete Bewertungen und eine scrollbarere Warnungsansicht verbessern die
-  Lesbarkeit auf kleinen Displays.
+## Insights
 
-## Einblicke
+### Device overview
 
-### Teilnehmerübersicht
+The central table combines reachability, device state, Mesh access point,
+AdGuard DNS activity, internet access, and personal monitoring controls.
 
-Die zentrale Gerätetabelle führt Erreichbarkeit, Gerätestatus,
-Mesh-Zugangspunkt, AdGuard-DNS-Aktivität, Internetfreigabe und persönliche
-Überwachungsfunktionen in einer gemeinsamen Ansicht zusammen.
+![Device overview in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
 
-![Teilnehmerübersicht in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
+### AdGuard DNS Live
 
-### AdGuard DNS-Live
+Review DNS queries live with history, client mapping, response type, processing
+time, and direct block or allow actions.
 
-DNS-Anfragen werden live mit Verlauf, Client-Zuordnung, Antworttyp,
-Bearbeitungsdauer und direkter Blockiermöglichkeit dargestellt.
+![AdGuard DNS Live in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
 
-![AdGuard DNS-Live in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
+### AI network analysis
 
-### KI-Netzwerkanalyse
+Optional AI analysis summarizes network health, anomalies, changes, and
+recommendations in a clear daily assessment.
 
-Die optionale KI-Auswertung fasst Netzwerkzustand, Auffälligkeiten,
-Veränderungen und Empfehlungen in einer übersichtlichen Tagesbewertung
-zusammen.
-
-![KI-Netzwerkanalyse in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/ki-netzwerkanalyse.png)
+![AI network analysis in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/ki-netzwerkanalyse.png)
 
 ## Installation
 
 ### HACS
 
 <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=engelsofta&repository=nodarion&category=integration">
-  <img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Nodarion als benutzerdefiniertes HACS-Repository hinzufügen">
+  <img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Add Nodarion as a custom HACS repository">
 </a>
 
-Mit dem Button lässt sich Nodarion direkt als benutzerdefiniertes Repository
-in HACS hinterlegen. Alternativ funktioniert die Einrichtung manuell:
+Use the button above, or add the repository manually:
 
-1. In HACS **Integrationen** öffnen.
-2. Im Menü **Benutzerdefinierte Repositories** auswählen.
-3. `https://github.com/engelsofta/nodarion` als Repository vom Typ
-   **Integration** hinzufügen.
-4. **Engelsoft Nodarion** installieren und Home Assistant neu starten.
+1. Open **Integrations** in HACS.
+2. Select **Custom repositories** from the menu.
+3. Add `https://github.com/engelsofta/nodarion` as an **Integration** repository.
+4. Install **Engelsoft Nodarion** and restart Home Assistant.
 
-### Manuell
+### Manual installation
 
-1. Den Ordner `custom_components/nodarion` in den gleichnamigen Ordner der
-   Home-Assistant-Konfiguration kopieren.
-2. Home Assistant neu starten.
-3. Unter **Einstellungen → Geräte & Dienste → Integration hinzufügen** nach
-   **Engelsoft Nodarion** suchen.
-4. Das lokale Netz als CIDR eintragen, zum Beispiel `192.168.178.0/24`.
+1. Copy `custom_components/nodarion` into the directory with the same name in
+   your Home Assistant configuration.
+2. Restart Home Assistant.
+3. Go to **Settings → Devices & services → Add integration** and search for
+   **Engelsoft Nodarion**.
+4. Enter the local network in CIDR notation, for example
+   `192.168.178.0/24`.
 
-## FRITZ!Box-Gastzugang
+## Main features
 
-Nodarion liest den Gastzugang lokal und ausschließlich lesend über TR-064 aus. Die Übersicht zeigt Status, WLAN-Name, gemeldete Sicherheitseinstellungen und aktuell verbundene Gäste. Gastgeräte erhalten in der Teilnehmerliste eine Kennzeichnung und können dort gefiltert werden. Verbindungen und Trennungen erscheinen im Live-Log; optional warnt die Überwachung bei neuen Gästen, Aktivität zur Ruhezeit oder ungewöhnlich langer Verbindung.
+- Automatically registered **Engelsoft Nodarion** page in the Home Assistant
+  sidebar
+- Active ping/TCP discovery with optional direct FRITZ!Box detection over TR-064
+- One Home Assistant device and `binary_sensor` for every network device
+- Persistent inventory with stable entity IDs based on IP address
+- Presence tracking for selected devices with a configurable offline timeout
+- Search, status filters, sorting, metrics, configurable columns, and a
+  responsive device table
+- Favorites, current Mesh access point, and a log of Mesh handovers
+- LAN, Wi-Fi, or powerline connection details, Wi-Fi band, RX/TX rate, and
+  signal strength when supplied by the FRITZ!Box
+- DHCP/static assignment and remaining DHCP lease time
+- FRITZ!Box model and installed FRITZ!OS version
+- Automatic internet blocking for newly discovered devices until they are
+  explicitly approved
+- Local MAC vendor database with more than 58,000 prefixes; randomized or
+  locally administered addresses are intentionally not assigned to a vendor
+- Persistent live log for new devices, online/offline transitions, name
+  changes, guest activity, and Mesh handovers
+- Configurable setup range for identifying new devices, optionally imported
+  from the FRITZ!Box DHCP range
+- Optional AdGuard Home analysis per device, including queries, blocking rate,
+  domains, filter reasons, DNS log, and possible DNS bypass detection
+- Administrator-only AdGuard management for filters, allow/block actions, and
+  DNS rewrites
+- Local monitoring rules for unknown devices, quiet-hour activity, frequent
+  state changes, identity changes, important offline devices, and guest access
+- Multiple Home Assistant notification targets for warnings and critical alerts
+- A `nodarion_alert` event for custom Home Assistant automations
+- Optional daily AI analysis using the preferred Home Assistant AI Task entity
+- Manual scans and AI reports directly from the Nodarion panel
 
-Über den Schalter **Gastnetz anzeigen und überwachen** in den Überwachungseinstellungen lässt sich die Funktion vollständig ausblenden. Dann erscheinen Gastzugang, Gastgeräte, zugehörige Protokolle und Warnungen nirgends in Nodarion.
+## FRITZ!Box guest access
 
-Der Verbindungsbeginn und der Warnverlauf werden im Home-Assistant-Speicher gesichert. Ein Neustart setzt die laufende Beobachtungsdauer daher nicht zurück.
+Nodarion reads guest access locally and in read-only mode over TR-064. It shows
+the state, Wi-Fi name, reported security settings, and connected guests. Guest
+devices can be labelled and filtered in the device table. Connections and
+disconnections appear in the live log, with optional warnings for new guests,
+quiet-hour activity, or unusually long sessions.
 
-## Verhalten
+The **Show and monitor guest network** setting can hide the feature completely.
+Connection start times and warning history are persisted, so restarting Home
+Assistant does not reset an ongoing guest session.
 
-- Eine automatisch registrierte **Engelsoft Nodarion**-Seite in der HA-Seitenleiste
-- Gerätebezogene Anwesenheitssteuerung: ausgewählte Teilnehmer werden sofort
-  online und erst nach einem einstellbaren Timeout offline gesetzt
-- Wichtige Netzwerkteilnehmer direkt im Dashboard markieren
-- Optionale Home-Assistant-Meldung, sobald ein überwachtes Gerät offline geht
-- Dauerhaftes Live-Log für neue Geräte, Online-/Offline-Wechsel und Namensänderungen
-- Persistenter Teilnehmerbestand: bekannte Geräte bleiben auch nach einem
-  Home-Assistant-Neustart sichtbar, wenn sie beim ersten Scan offline sind
-- Kennzahlen, Suche, Statusfilter, Sortierung und responsive Gerätetabelle
-- Klick auf einen Teilnehmer öffnet dessen Home-Assistant-Eigenschaften
-- Optionale direkte FRITZ!Box-Erkennung über TR-064 als Ergänzung zu Ping/TCP
-- Automatische FRITZ!Box-Internetsperre für neu entdeckte Geräte bis zur
-  manuellen Bestätigung in der Teilnehmerliste
-- Anzeige des aktuellen Mesh-Zugangspunkts und Protokollierung von Mesh-Wechseln
-- Anzeige von LAN-, WLAN- oder Powerline-Verbindung, WLAN-Frequenzband,
-  RX-/TX-Datenrate und – sofern von der FRITZ!Box geliefert – Signalstärke
-- Anzeige der Adressvergabe (DHCP oder statisch) und der verbleibenden
-  DHCP-Lease-Zeit
-- Anzeige von FRITZ!Box-Modell und installierter FRITZ!OS-Version
-- Optionale AdGuard-Home-Auswertung pro Teilnehmer mit DNS-Anfragen,
-  Blockierungsquote, letzter Aktivität, Domains, Treffergründen, DNS-Protokoll
-  und einem Hinweis auf eine mögliche DNS-Umgehung
-- AdGuard-Home-Verwaltung für Home-Assistant-Administratoren: Domains direkt
-  aus dem DNS-Protokoll blockieren oder freigeben, eigene Filterregeln pflegen
-  sowie DNS-Rewrites anlegen und löschen
-- Eigener Reiter **Überwachung** mit lokalen Regeln für unbekannte Geräte,
-  ungewöhnliche Aktivität während einer Ruhezeit, häufige Statuswechsel,
-  Identitätsänderungen und länger offline gebliebene wichtige Geräte
-- Einstellbare Lernphase, Bestätigungszeit und Grenzwerte direkt in der
-  Nodarion-Oberfläche
-- Persistente Warnungshistorie mit optionalen Home-Assistant-Benachrichtigungen
-- Mehrere auswählbare Home-Assistant-Benachrichtigungsziele, beispielsweise
-  Companion App oder Telegram Bot, getrennt für Warnungen und kritische Meldungen
-- Optionale tägliche KI-Netzwerkanalyse über die bevorzugte
-  Home-Assistant-AI-Task-Entität mit Bewertung, Empfehlungen und Tagesvergleich
-- Über **Jetzt scannen** kann aus der Oberfläche ein Scan angefordert werden.
-- Jeder Teilnehmer erhält ein Gerät und einen `binary_sensor`.
-- `on` bedeutet erreichbar, `off` bedeutet nach der einstellbaren Anzahl
-  fehlgeschlagener Scans nicht mehr erreichbar.
-- IP, MAC-Adresse, Hostname, Verbindungsdetails, Adressvergabe und Anzahl
-  verpasster Scans stehen als Attribute bereit.
-- Vollständig lokaler MAC-Herstellerabgleich mit über 58.000 Präfixen. Der
-  Hersteller erscheint direkt unter der MAC-Adresse; Präfix, Zuteilungstyp und
-  Registerstand werden beim Darüberfahren angezeigt.
-- Randomisierte beziehungsweise lokal verwaltete MAC-Adressen werden aus
-  Datenschutz- und Genauigkeitsgründen nicht einem Hersteller zugeordnet.
-- Jede IP-Adresse ist ein fester überwachter Platz mit einer dauerhaft gleichen
-  Entity-ID, zum Beispiel `binary_sensor.192_168_178_42`.
-- Wechselt das Gerät hinter einer IP-Adresse, bleiben Gerät und Entity-ID
-  erhalten; MAC-Adresse, Hostname und automatisch verwalteter Name werden
-  aktualisiert.
-- Der automatisch verwaltete HA-Gerätename wird bei einer Änderung des
-  Hostnamens aktualisiert. Ein vom Benutzer gesetzter HA-Name bleibt erhalten.
-- Die IP-Adresse dient als stabile Identität des überwachten Platzes.
+## Notifications and automations
 
-## Benachrichtigungen und Automationen
+Under **Settings → Notifications and checks**, you can select any `notify.*`
+entity configured in Home Assistant. Nodarion sends new alerts through
+`notify.send_message`, so credentials for Telegram and other services remain in
+Home Assistant.
 
-Unter **Einstellungen → Benachrichtigungen und Prüfungen** können alle in Home
-Assistant vorhandenen `notify.*`-Entitäten ausgewählt werden. Nodarion sendet
-neue Warnungen über `notify.send_message`; die Zugangsdaten für Telegram und
-andere Dienste bleiben dadurch vollständig in Home Assistant.
+The Home Assistant notification centre receives one summary that is updated as
+active anomalies change. Resolved warnings leave the summary but remain in the
+Nodarion history.
 
-Für die Home-Assistant-Glocke fasst Nodarion alle derzeit aktiven
-Auffälligkeiten in einer einzigen Meldung zusammen und aktualisiert diese
-automatisch. Erledigte Warnungen verschwinden aus der Zusammenfassung, bleiben
-aber im Nodarion-Verlauf erhalten.
+Every new warning also fires the `nodarion_alert` event. Event data includes
+`type`, `severity`, `device_name`, `ip_address`, `mac_address`, `access_point`,
+and `message`, allowing custom automations to respond independently of the
+notification targets selected in Nodarion.
 
-Zusätzlich löst jede neu angelegte Warnung das Ereignis `nodarion_alert` aus.
-Die Ereignisdaten enthalten unter anderem `type`, `severity`, `device_name`,
-`ip_address`, `mac_address`, `access_point` und `message`. Eigene Automationen
-können damit unabhängig von den in Nodarion ausgewählten Zielen weitere Aktionen
-ausführen.
+## Important notes
 
-## Hinweise
+The Home Assistant host must be able to reach the target network directly.
+Container installations may require `network_mode: host`. Without FRITZ!Box
+support, devices that respond to neither ping nor a configured TCP port cannot
+be discovered. With FRITZ!Box support enabled, a device reported as active by
+the router is considered online even without a ping response.
 
-Der Home-Assistant-Host muss das Zielnetz direkt erreichen können. Bei einer
-Container-Installation kann `network_mode: host` nötig sein. Ohne aktivierte
-FRITZ!Box-Anbindung können Geräte, die weder auf Ping noch auf einen der
-konfigurierten TCP-Ports reagieren, technisch nicht entdeckt werden. Bei
-aktivierter FRITZ!Box-Anbindung gilt ein dort als aktiv gemeldeter Teilnehmer
-auch ohne Ping-Antwort als online. Veraltete Einträge aus der Nachbartabelle
-allein werden weiterhin nicht als Online-Nachweis verwendet. Auch eine
-abgelehnte TCP-Verbindung zählt nicht; erforderlich ist ein erfolgreicher
-TCP-Verbindungsaufbau.
+TR-064 application access must be enabled on the FRITZ!Box. A dedicated
+FRITZ!Box user for Nodarion is recommended. Internet protection uses the
+`X_AVM-DE_HostFilter` service: local network communication remains possible,
+while internet access is granted explicitly from the device table.
 
-Für die direkte FRITZ!Box-Erkennung muss in der FRITZ!Box der Zugriff für
-Anwendungen über TR-064 erlaubt sein. Empfohlen wird ein eigener
-FRITZ!Box-Benutzer für Nodarion. Die Zugangsdaten können über die Optionen der
-Integration hinterlegt werden.
+To reduce network and system load, only ping/TCP discovery runs at the selected
+scan interval. FRITZ!Box and Mesh data is refreshed at most once per minute,
+AdGuard data every ten minutes, and FRITZ!Box device information once per hour.
 
-Beim ersten Start der Internetschutzfunktion gelten alle bereits gespeicherten
-Teilnehmer als bestätigt. Erst danach neu entdeckte Geräte werden über den
-TR-064-Dienst `X_AVM-DE_HostFilter` für den Internetzugang gesperrt. Die lokale
-Kommunikation im Heimnetz bleibt möglich. Die Freigabe erfolgt ausdrücklich in
-der Spalte „Internetzugang“. Ändert sich die MAC-Adresse an einem bekannten
-IP-Platz, ist eine erneute Bestätigung erforderlich.
+AdGuard Home analysis requires direct access to its web interface and an
+administrator account. The query log must be enabled. Devices using a VPN,
+Private DNS, or an external DNS server may not appear. Write operations are
+restricted to Home Assistant administrators and input is validated before it is
+sent to AdGuard Home.
 
-Zur Reduzierung der Netz- und Systemlast läuft nur die aktive Ping/TCP-Erkennung
-im eingestellten Scanintervall. FRITZ!Box- und Mesh-Daten werden höchstens jede
-Minute, AdGuard-Daten höchstens alle zehn Minuten und FRITZ!Box-Geräteinformationen
-höchstens einmal pro Stunde neu abgefragt. Dazwischen nutzt Nodarion die zuletzt
-erfolgreich gelesenen Zusatzdaten.
+AI analysis is disabled by default. With anonymized DNS privacy, only counters
+and stable, non-reversible domain identifiers are passed to the configured AI.
+Full domain names are included only when explicitly selected. When a cloud AI
+is used, the summarized network data leaves the local system.
 
-Für die optionale AdGuard-Home-Auswertung werden die direkt erreichbare
-Adresse der AdGuard-Home-Weboberfläche sowie ein Administrationsbenutzer
-benötigt. Das Query-Log muss aktiviert sein. Nodarion liest höchstens 10.000
-Einträge, speichert daraus nur eine begrenzte In-Memory-Auswertung und lädt
-nach dem ersten Abruf nur neue Einträge nach. Geräte, die VPN, Private DNS
-oder einen externen DNS-Server verwenden, können in AdGuard Home fehlen.
+## License
 
-Schreibende AdGuard-Funktionen sind ausschließlich für
-Home-Assistant-Administratoren sichtbar und serverseitig geschützt. Vor dem
-Löschen von Regeln oder Rewrites verlangt das Panel eine Bestätigung. Domains,
-Regeln und Rewrite-Ziele werden vor der Übergabe an AdGuard Home validiert.
-
-Die KI-Auswertung ist standardmäßig deaktiviert. Bei anonymisiertem
-DNS-Datenschutz werden nur Zähler und stabile, nicht rückrechenbare
-Domain-Kennungen an die konfigurierte KI übergeben. Vollständige Domainnamen
-werden nur nach ausdrücklicher Auswahl übertragen. Bei einer Cloud-KI verlassen
-die zusammengefassten Netzwerkdaten das lokale System.
-
-## Lizenz
-
-Engelsoft Nodarion wird unter der [MIT-Lizenz](LICENSE) veröffentlicht.
+Engelsoft Nodarion is released under the [MIT License](LICENSE).
