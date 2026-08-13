@@ -104,7 +104,7 @@ const EN = new Map(Object.entries({
   "Anwesenheitssensor": "Presence sensor", "Geräte-Einrichtung": "Device setup",
   "Einrichtungsbereich aktiv": "Setup range enabled", "Bereich beginnt": "Range starts",
   "Bereich endet": "Range ends", "Benachrichtigung": "Notification",
-  "Online": "Online", "Offline": "Offline", "Unbekannt": "Unknown", "unbekannt": "unknown",
+  "Online": "Online", "Offline": "Offline", "Neu": "New", "Unbekannt": "Unknown", "unbekannt": "unknown",
   "Privat / randomisiert": "Private / randomized", "Noch": "Remaining", "Tage": "days",
   "Tag": "day", "Stunden": "hours", "Minuten": "minutes", "Sek.": "sec.",
   "Std.": "hrs.", "Gast": "guest", "Gäste": "guests", "aktiv": "enabled",
