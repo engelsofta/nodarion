@@ -103,10 +103,15 @@ class NodarionView(HomeAssistantView):
             try:
                 await coordinator.async_approve_internet_access(key)
             except Exception as err:
+                _LOGGER.exception(
+                    "Could not approve internet access for %s",
+                    key,
+                )
                 return self.json_message(
                     f"Internetzugang konnte nicht freigegeben werden: {err}",
                     502,
                 )
+            await manager.async_acknowledge_new_device_alerts(key)
             return self.json(self._frontend_state(request, manager))
         if action == "set_rules":
             rules = data.get("rules")
@@ -121,7 +126,8 @@ class NodarionView(HomeAssistantView):
             if coordinator is None:
                 return self.json_message("Integration ist nicht geladen", 503)
             try:
-                await manager.async_run_ai_analysis(coordinator)
+                language = "de" if data.get("language") == "de" else "en"
+                await manager.async_run_ai_analysis(coordinator, language=language)
             except Exception as err:
                 return self.json_message(
                     f"KI-Analyse fehlgeschlagen: {err}", 502
@@ -142,16 +148,25 @@ class NodarionView(HomeAssistantView):
                 ),
                 None,
             )
-            await manager.async_acknowledge(alert_id)
             if alert and alert.get("type") == "new_device" and alert.get("key"):
                 coordinator = self._coordinator(request)
-                if coordinator is not None:
-                    try:
-                        await coordinator.async_approve_internet_access(
-                            alert["key"]
-                        )
-                    except Exception:
-                        pass
+                if coordinator is None:
+                    return self.json_message("Integration ist nicht geladen", 503)
+                try:
+                    await coordinator.async_approve_internet_access(alert["key"])
+                except Exception as err:
+                    _LOGGER.exception(
+                        "Could not approve internet access while acknowledging %s",
+                        alert["key"],
+                    )
+                    return self.json_message(
+                        f"Bestätigung fehlgeschlagen, weil der Internetzugang "
+                        f"nicht freigegeben werden konnte: {err}",
+                        502,
+                    )
+                await manager.async_acknowledge_new_device_alerts(alert["key"])
+            else:
+                await manager.async_acknowledge(alert_id)
         else:
             key = data.get("key")
             if not isinstance(key, str) or not key.startswith("ip_"):

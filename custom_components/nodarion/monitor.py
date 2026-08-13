@@ -22,6 +22,7 @@ STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.monitor"
 MAX_EVENTS = 250
 MAX_ALERTS = 100
+ALERT_SUMMARY_NOTIFICATION_ID = f"{DOMAIN}_alert_summary"
 _LOGGER = logging.getLogger(__name__)
 DEFAULT_RULES: dict[str, Any] = {
     "enabled": True,
@@ -160,6 +161,15 @@ class NetworkMonitor:
         self.ai_last_run_date = data.get("ai_last_run_date")
         self.ai_last_error = data.get("ai_last_error")
         migrated = self._restore_monitored_inventory_from_history()
+        # Releases before the summary notification created one HA entry per
+        # alert. Remove those legacy entries while migrating to the fixed ID.
+        for alert in self.alerts:
+            alert_id = alert.get("id")
+            if alert_id:
+                persistent_notification.async_dismiss(
+                    self.hass, f"{DOMAIN}_{alert_id}"
+                )
+        self._refresh_alert_notification()
         if not data or migrated or rules_migrated:
             await self._async_save()
 
@@ -286,6 +296,7 @@ class NetworkMonitor:
                 }
             )
         self._resolve_disabled_rule_alerts(_now())
+        self._refresh_alert_notification()
         await self._async_save()
 
     def async_maybe_schedule_ai_analysis(
@@ -323,6 +334,7 @@ class NetworkMonitor:
         self,
         coordinator: Any,
         current_hosts: dict[str, NetworkHost] | None = None,
+        language: str | None = None,
     ) -> dict[str, Any]:
         """Generate and persist a structured network assessment."""
         if self._ai_running:
@@ -333,7 +345,10 @@ class NetworkMonitor:
             snapshot = self._analysis_snapshot(coordinator, current_hosts)
             previous = self.ai_last_snapshot or {}
             comparison = self._snapshot_comparison(previous, snapshot)
-            instructions = (
+            report_language = language or (
+                "de" if str(self.hass.config.language).lower().startswith("de") else "en"
+            )
+            german_instructions = (
                 "Bewerte den folgenden datensparsamen Netzwerk-Tagesbericht. "
                 "10 bedeutet unauffällig und sicher, 1 bedeutet akut "
                 "untersuchungsbedürftig. Bewerte nur anhand der gelieferten "
@@ -343,22 +358,46 @@ class NetworkMonitor:
                 "bewertet werden. Werte Mesh-Roaming nur dann als mögliche "
                 "Auffälligkeit, wenn es gegenüber dem Vortag ungewöhnlich "
                 "stark zunimmt und zugleich häufige Online-/Offline-Wechsel "
-                "oder andere Verbindungsprobleme vorliegen. Formuliere auf "
-                "Deutsch, knapp und konkret.\n\n"
+                "oder andere Verbindungsprobleme vorliegen. Formuliere alle "
+                "Textfelder auf Deutsch, knapp und konkret.\n\n"
                 f"Aktueller Bericht:\n{json.dumps(snapshot, ensure_ascii=False)}"
                 f"\n\nÄnderungen zum letzten Bericht:\n"
                 f"{json.dumps(comparison, ensure_ascii=False)}"
+            )
+            english_instructions = (
+                "Assess the following privacy-conscious daily network report. "
+                "A score of 10 means normal and secure; 1 means urgent "
+                "investigation is required. Use only the supplied data, do not "
+                "invent causes, and mention incomplete data. Normal handovers "
+                "between mesh repeaters are expected roaming behaviour for "
+                "mobile devices and must be rated neutrally or positively. "
+                "Treat mesh roaming as a possible anomaly only when it rises "
+                "unusually sharply compared with the previous day and frequent "
+                "online/offline changes or other connection problems also occur. "
+                "Write all text fields in concise, concrete English.\n\n"
+                f"Current report:\n{json.dumps(snapshot, ensure_ascii=False)}"
+                f"\n\nChanges since the previous report:\n"
+                f"{json.dumps(comparison, ensure_ascii=False)}"
+            )
+            instructions = (
+                english_instructions if report_language == "en" else german_instructions
             )
             response = await self.hass.services.async_call(
                 "ai_task",
                 "generate_data",
                 {
-                    "task_name": "Nodarion tägliche Netzwerkanalyse",
+                    "task_name": (
+                        "Nodarion daily network analysis"
+                        if report_language == "en"
+                        else "Nodarion tägliche Netzwerkanalyse"
+                    ),
                     "instructions": instructions,
                     "structure": {
                         "score": {
                             "description": (
-                                "Ganzzahlige Sicherheitsbewertung von 1 bis 10"
+                                "Integer security score from 1 to 10"
+                                if report_language == "en"
+                                else "Ganzzahlige Sicherheitsbewertung von 1 bis 10"
                             ),
                             "required": True,
                             "selector": {
@@ -366,30 +405,34 @@ class NetworkMonitor:
                             },
                         },
                         "summary": {
-                            "description": "Kurze Gesamtbewertung",
+                            "description": "Brief overall assessment" if report_language == "en" else "Kurze Gesamtbewertung",
                             "required": True,
                             "selector": {"text": {"multiline": True}},
                         },
                         "risks": {
                             "description": (
-                                "Wichtigste Auffälligkeiten, knapp aufgelistet"
+                                "Most important anomalies, listed briefly"
+                                if report_language == "en"
+                                else "Wichtigste Auffälligkeiten, knapp aufgelistet"
                             ),
                             "required": True,
                             "selector": {"text": {"multiline": True}},
                         },
                         "changes": {
-                            "description": "Einordnung gegenüber dem Vortag",
+                            "description": "Comparison with the previous day" if report_language == "en" else "Einordnung gegenüber dem Vortag",
                             "required": True,
                             "selector": {"text": {"multiline": True}},
                         },
                         "recommendations": {
-                            "description": "Konkrete empfohlene Prüfungen",
+                            "description": "Specific recommended checks" if report_language == "en" else "Konkrete empfohlene Prüfungen",
                             "required": True,
                             "selector": {"text": {"multiline": True}},
                         },
                         "confidence": {
                             "description": (
-                                "Vertrauen in die Bewertung und Datenlücken"
+                                "Confidence in the assessment and data gaps"
+                                if report_language == "en"
+                                else "Vertrauen in die Bewertung und Datenlücken"
                             ),
                             "required": True,
                             "selector": {"text": {"multiline": True}},
@@ -538,7 +581,7 @@ class NetworkMonitor:
         await self._async_save()
 
     async def async_acknowledge(self, alert_id: str) -> None:
-        """Acknowledge an alert and trust a newly discovered host."""
+        """Acknowledge an alert."""
         for alert in self.alerts:
             if alert.get("id") != alert_id:
                 continue
@@ -546,7 +589,27 @@ class NetworkMonitor:
             alert["active"] = False
             alert["acknowledged_at"] = _now().isoformat()
             break
+        self._refresh_alert_notification()
         await self._async_save()
+
+    async def async_acknowledge_new_device_alerts(self, key: str) -> None:
+        """Acknowledge all open new-device alerts after successful approval."""
+        now = _now().isoformat()
+        changed = False
+        for alert in self.alerts:
+            if (
+                alert.get("key") == key
+                and alert.get("type") == "new_device"
+                and alert.get("active")
+                and not alert.get("acknowledged")
+            ):
+                alert["acknowledged"] = True
+                alert["active"] = False
+                alert["acknowledged_at"] = now
+                changed = True
+        if changed:
+            self._refresh_alert_notification()
+            await self._async_save()
 
     async def async_process(
         self,
@@ -1109,13 +1172,7 @@ class NetworkMonitor:
             "service": details.get("service", "Nodarion-Überwachung"),
         }
         self.hass.bus.async_fire(f"{DOMAIN}_alert", event_data)
-        if self.rules["notify_alerts"]:
-            persistent_notification.async_create(
-                self.hass,
-                f"**{host.display_name}** ({host.ip}): {message}",
-                title="Nodarion Netzwerküberwachung",
-                notification_id=f"{DOMAIN}_{alert['id']}",
-            )
+        self._refresh_alert_notification()
         targets = self.rules.get("notify_targets", [])
         if targets and self.rules.get(f"notify_{severity}", False):
             self.hass.async_create_task(
@@ -1211,6 +1268,7 @@ class NetworkMonitor:
             return False
         alert["active"] = False
         alert["resolved_at"] = now.isoformat()
+        self._refresh_alert_notification()
         return True
 
     def _resolve_disabled_rule_alerts(self, now: datetime) -> bool:
@@ -1236,7 +1294,72 @@ class NetworkMonitor:
                 alert["active"] = False
                 alert["resolved_at"] = resolved_at
                 changed = True
+        if changed:
+            self._refresh_alert_notification()
         return changed
+
+    def _refresh_alert_notification(self) -> None:
+        """Keep one Home Assistant notification in sync with active alerts."""
+        if not self.rules.get("notify_alerts"):
+            persistent_notification.async_dismiss(
+                self.hass, ALERT_SUMMARY_NOTIFICATION_ID
+            )
+            return
+
+        active = [
+            alert
+            for alert in self.alerts
+            if alert.get("active") and not alert.get("acknowledged")
+        ]
+        if not active:
+            persistent_notification.async_dismiss(
+                self.hass, ALERT_SUMMARY_NOTIFICATION_ID
+            )
+            return
+
+        active.sort(
+            key=lambda alert: (
+                alert.get("severity") == "critical",
+                str(alert.get("timestamp") or ""),
+            ),
+            reverse=True,
+        )
+        critical_count = sum(
+            alert.get("severity") == "critical" for alert in active
+        )
+        heading = (
+            f"**{len(active)} aktive "
+            f"{'Warnung' if len(active) == 1 else 'Warnungen'}**"
+        )
+        if critical_count:
+            heading += f" · ⛔ {critical_count} kritisch"
+
+        lines = [heading, ""]
+        for alert in active:
+            icon = "🔴" if alert.get("severity") == "critical" else "🟡"
+            name = str(alert.get("name") or alert.get("ip") or "Unbekannt")
+            message = str(alert.get("message") or "Netzwerkauffälligkeit")
+            ip = str(alert.get("ip") or "").strip()
+            timestamp = _parse(alert.get("timestamp"))
+            time_label = (
+                timestamp.astimezone().strftime("%d.%m. %H:%M")
+                if timestamp
+                else ""
+            )
+            details = " · ".join(value for value in (ip, time_label) if value)
+            lines.append(f"{icon} **{name}**  ")
+            lines.append(f"{message}  ")
+            if details:
+                lines.append(f"_{details}_  ")
+            lines.append("")
+
+        lines.append("Öffne Nodarion, um Warnungen zu prüfen oder zu bestätigen.")
+        persistent_notification.async_create(
+            self.hass,
+            "\n".join(lines),
+            title="Nodarion Netzwerküberwachung",
+            notification_id=ALERT_SUMMARY_NOTIFICATION_ID,
+        )
 
     def _is_learning(self, now: datetime) -> bool:
         started = _parse(self.started_at) or now

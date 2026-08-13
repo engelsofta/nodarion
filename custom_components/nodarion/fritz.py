@@ -167,12 +167,23 @@ class FritzBoxScanner:
             password=self.password,
             timeout=5.0,
         )
-        hosts.fc.call_action(
-            "X_AVM-DE_HostFilter1",
-            "DisallowWANAccessByIP",
-            NewIPv4Address=ip,
-            NewDisallow="0" if allowed else "1",
-        )
+        try:
+            hosts.fc.call_action(
+                "X_AVM-DE_HostFilter1",
+                "DisallowWANAccessByIP",
+                NewIPv4Address=ip,
+                NewDisallow="0" if allowed else "1",
+            )
+        except Exception as err:
+            # FRITZ!OS returns 714 when asked to remove a WAN block that no
+            # longer has a HostFilter entry. Releasing access is idempotent:
+            # an absent block already represents the requested end state.
+            if not allowed or "errorCode: 714" not in str(err):
+                raise
+            _LOGGER.debug(
+                "WAN access for %s was already granted (no HostFilter entry)",
+                ip,
+            )
         return "granted" if allowed else "denied"
 
     def _get_fritz_data(

@@ -5,6 +5,258 @@ const esc = (value) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 
+// The panel is authored in German. Home Assistant's selected language decides
+// whether those labels are kept or translated; every unsupported language
+// intentionally falls back to English.
+let panelLocale = "en";
+const EN = new Map(Object.entries({
+  "Warnungen und Auffälligkeiten": "Warnings and anomalies",
+  "Aktive Hinweise stehen oben, erledigte bleiben als Verlauf erhalten.": "Active notices are shown first; resolved ones remain in the history.",
+  "Änderungen werden direkt in AdGuard Home gespeichert. DNS-Live ist während der Bearbeitung pausiert.": "Changes are saved directly to AdGuard Home. DNS Live is paused while editing.",
+  "Nur lesende Anzeige – Nodarion verändert hier keine FRITZ!Box-Einstellungen.": "Read-only view – Nodarion does not change any FRITZ!Box settings here.",
+  "Die FRITZ!Box konnte den Internetzugang nicht freigeben. Bitte Benutzerrechte und TR-064-Unterstützung prüfen.": "The FRITZ!Box could not enable internet access. Check user permissions and TR-064 support.",
+  "Noch keine KI-Auswertung vorhanden. Aktiviere den täglichen Bericht oder starte die erste Analyse manuell.": "No AI analysis yet. Enable the daily report or start the first analysis manually.",
+  "Nach dem nächsten Scan erscheint hier deine Netzwerktopologie.": "Your network topology will appear here after the next scan.",
+  "Markiere Teilnehmer in der Tabelle mit dem Haus-Symbol.": "Mark devices in the table with the home icon.",
+  "Erkannte Auffälligkeiten erscheinen automatisch hier.": "Detected anomalies will appear here automatically.",
+  "Änderungen gelten ab dem nächsten Netzwerkscan.": "Changes take effect with the next network scan.",
+  "QR-Code mit der Handykamera scannen und direkt mit": "Scan the QR code with your phone camera and connect directly to",
+  "Der WLAN-QR-Code ist nur für Home-Assistant-Administratoren sichtbar.": "The Wi-Fi QR code is only visible to Home Assistant administrators.",
+  "Die FRITZ!Box konnte für dieses Gast-WLAN keinen QR-Code bereitstellen.": "The FRITZ!Box could not provide a QR code for this guest Wi-Fi.",
+  "Der QR-Code ist verfügbar, sobald der Gastzugang aktiv ist.": "The QR code is available once guest access is active.",
+  "Alle Regeln gemeinsam ein- oder ausschalten": "Enable or disable all rules together",
+  "Tage, in denen aktuelle Geräte als bekannt gelten": "Days during which current devices are considered known",
+  "Markierte Geräte gehen sofort online und erst nach dieser Zeit offline (Minuten)": "Marked devices go online immediately and offline after this time (minutes)",
+  "Geräte in diesem IP-Bereich als neu kennzeichnen": "Mark devices in this IP range as new",
+  "DHCP-Start und -Ende automatisch per TR-064 abfragen": "Retrieve DHCP start and end automatically via TR-064",
+  "Neue Geräte im Einrichtungsbereich direkt mit Stern markieren": "Automatically mark new devices in the setup range with a star",
+  "Neue Geräte im Einrichtungsbereich in Home Assistant melden": "Report new devices in the setup range to Home Assistant",
+  "Keine passenden DNS-Anfragen": "No matching DNS requests",
+  "DNS-Anfragen werden geladen": "Loading DNS requests",
+  "Filter ändern oder auf neue Anfragen warten.": "Change the filters or wait for new requests.",
+  "Keine passenden Geräte": "No matching devices",
+  "Keine Ereignisse gefunden": "No events found",
+  "Filter ändern oder leeren.": "Change or clear the filters.",
+  "Keine eigenen Regeln vorhanden": "No custom rules",
+  "Keine DNS-Rewrites vorhanden": "No DNS rewrites",
+  "Keine offenen Warnungen": "No open warnings",
+  "Alles ruhig im Netz": "Everything is quiet on the network",
+  "Noch keine Mesh-Daten": "No mesh data yet",
+  "Noch keine Anwesenheitsgeräte": "No presence devices yet",
+  "Niemand zuhause": "Nobody home",
+  "Mit dem Gast-WLAN verbinden": "Connect to guest Wi-Fi",
+  "Keine Gäste online": "No guests online",
+  "Der Gastzugang ist gerade angenehm übersichtlich.": "Guest access is pleasantly quiet right now.",
+  "Gäste in Tabelle anzeigen": "Show guests in table",
+  "In den Optionen deaktiviert": "Disabled in options",
+  "Alle Einstellungen speichern": "Save all settings",
+  "Von FRITZ!Box übernehmen": "Import from FRITZ!Box",
+  "Automatisch von der FRITZ!Box erkannt": "Detected automatically by the FRITZ!Box",
+  "Erste DHCP-Adresse für neue Geräte": "First DHCP address for new devices",
+  "Letzte DHCP-Adresse für neue Geräte": "Last DHCP address for new devices",
+  "Anwesenheitssensor ist aktiviert.": "Presence sensor is enabled.",
+  "Aktueller Zustand und Verlauf der letzten 24 Stunden.": "Current state and history for the last 24 hours.",
+  "24-Stunden-Bewertung mit Tagesvergleich": "24-hour rating with day-to-day comparison",
+  "Neueste DNS-Anfragen": "Latest DNS requests",
+  "automatisch alle 3 Sekunden": "automatically every 3 seconds",
+  "Netzwerkgeräte": "Network devices", "Gerätestatus": "Device status",
+  "Teilnehmer": "Devices", "IP-Adresse": "IP address", "MAC-Adresse": "MAC address",
+  "Verbindung": "Connection", "Verbindungen werden geladen": "Loading connections",
+  "Mesh-Zugangspunkt": "Mesh access point", "Alle Mesh-Punkte": "All mesh points",
+  "WLAN-Daten": "Wi-Fi data", "Adressvergabe": "Address assignment",
+  "Erkannt durch": "Detected by", "Internetzugang": "Internet access",
+  "Überwachung": "Monitoring", "Überwachung aktiv": "Monitoring enabled",
+  "Automatisch überwachen": "Monitor automatically", "Einstellungen": "Settings",
+  "Jetzt scannen": "Scan now", "Live-Log": "Live log", "Ereignisse": "Events",
+  "Warnungen": "Warnings", "Warnung": "Warning", "offene": "open",
+  "DNS-Schutz": "DNS protection", "Netzbewertung": "Network rating",
+  "Schutz aktiv": "Protection enabled", "Schutz nicht erreichbar": "Protection unavailable",
+  "Favoriten": "Favorites", "Glocke": "Notifications", "Anwesenheit": "Presence",
+  "FRITZ!Box-Gastzugang": "FRITZ!Box guest access", "Gastzugang": "Guest access",
+  "Spalten auswählen": "Choose columns", "Zeit": "Time", "Gerät": "Device",
+  "Ereignis": "Event", "Dienst": "Service", "Details": "Details",
+  "Datum / Uhrzeit": "Date / time", "Name / IP": "Name / IP", "Meldung": "Message",
+  "Freigeben": "Allow", "Freigegeben": "Allowed", "Blockieren": "Block",
+  "Ergebnis": "Result", "Domain / Antwort": "Domain / answer", "Client-IP": "Client IP",
+  "DNS-Server": "DNS server", "Grund": "Reason", "Dauer": "Duration", "Aktion": "Action",
+  "AdGuard-Konfiguration": "AdGuard configuration", "Eigene Filterregeln": "Custom filter rules",
+  "Hinzufügen": "Add", "Domain freigeben": "Allow domain", "Nur dieser Client": "This client only",
+  "Für alle Clients": "For all clients", "Abbrechen": "Cancel", "Konfiguration": "Configuration",
+  "Aktualisieren": "Refresh", "Alle Ergebnisse": "All results", "Nur erlaubt": "Allowed only",
+  "Diagramm aus": "Hide chart", "Diagramm an": "Show chart",
+  "Stundendiagramm ausblenden": "Hide hourly chart", "Stundendiagramm einblenden": "Show hourly chart",
+  "Nur blockiert": "Blocked only", "Alle Clients": "All clients", "erlaubt": "allowed",
+  "blockiert": "blocked", "Zusammenfassung": "Summary", "Auffälligkeiten": "Anomalies",
+  "Änderungen": "Changes", "Empfehlungen": "Recommendations",
+  "Vertrauen und Datenlage": "Confidence and data quality", "KI-Netzwerkanalyse": "AI network analysis",
+  "Erste Bewertung": "First rating", "zum Vortag": "from previous day",
+  "unverändert": "unchanged", "letzter Bericht": "latest report",
+  "Prompt anzeigen": "Show prompt", "Prompt ausblenden": "Hide prompt",
+  "Jetzt analysieren": "Analyze now", "Analyse läuft": "Analysis running",
+  "Letzte Analyse fehlgeschlagen": "Last analysis failed", "Netzwerkhinweis": "Network notice",
+  "Bestätigen": "Acknowledge", "Zuhause": "Home", "Abwesend": "Away", "Anwesend": "Present",
+  "Aktive Warnungen": "Active warnings", "Kritisch": "Critical",
+  "Unbekannte Geräte": "Unknown devices", "Instabile Geräte": "Unstable devices",
+  "Lernphase beendet": "Learning phase complete", "Neu starten": "Restart",
+  "Allgemein": "General", "Geräte": "Devices", "Regeln & Alarme": "Rules & alerts",
+  "Benachrichtigungen": "Notifications", "KI-Analyse": "AI analysis", "Grundlagen": "Basics",
+  "Lernphase": "Learning phase", "Anwesenheits-Timeout": "Presence timeout",
+  "Anwesenheitssensor": "Presence sensor", "Geräte-Einrichtung": "Device setup",
+  "Einrichtungsbereich aktiv": "Setup range enabled", "Bereich beginnt": "Range starts",
+  "Bereich endet": "Range ends", "Benachrichtigung": "Notification",
+  "Online": "Online", "Offline": "Offline", "Unbekannt": "Unknown", "unbekannt": "unknown",
+  "Privat / randomisiert": "Private / randomized", "Noch": "Remaining", "Tage": "days",
+  "Tag": "day", "Stunden": "hours", "Minuten": "minutes", "Sek.": "sec.",
+  "Std.": "hrs.", "Gast": "guest", "Gäste": "guests", "aktiv": "enabled",
+  "deaktiviert": "disabled", "Erledigt": "Resolved", "vor": "ago", "jetzt": "now",
+  "Sehr gut": "Excellent", "Gut": "Good", "Schwach": "Weak", "Sehr schwach": "Very weak",
+  "Unauffällig": "Normal", "Moderat": "Moderate", "Erhöht": "Elevated", "Auffällig hoch": "Unusually high",
+  "Blockliste": "Blocklist", "Jugendschutz": "Parental control", "Gesperrter Dienst": "Blocked service",
+  "Ungültige Anfrage": "Invalid request", "Nicht protokolliert": "Not logged",
+  "Speichern fehlgeschlagen": "Save failed", "Speichert": "Saving", "Gespeichert": "Saved",
+  "Keine Funktion": "No function", "Alle Funktionen": "All functions", "Alle Gerätestatus": "All device statuses",
+  "Zeit unbekannt": "Time unknown", "Noch nicht geprüft": "Not checked yet", "Wird freigegeben": "Enabling access",
+  "Gastzugang anzeigen": "Show guest access", "Nur Geräte im Gastzugang anzeigen": "Show guest access devices only",
+  "Noch keine Bewertung": "No rating yet", "Einen kleinen Moment": "Just a moment",
+  "Freigabe fehlgeschlagen": "Access approval failed", "KI-Analyse fehlgeschlagen": "AI analysis failed",
+  "Keine Offline-Geräte gefunden.": "No offline devices found.", "AdGuard-Änderung fehlgeschlagen.": "AdGuard change failed.",
+  "AdGuard Home ist nicht erreichbar.": "AdGuard Home is unreachable.",
+  "AdGuard Home ist in Nodarion nicht aktiviert oder nicht erreichbar": "AdGuard Home is not enabled in Nodarion or is unreachable",
+  "Bereinigung konnte nicht ausgeführt werden.": "Cleanup could not be performed.",
+  "DNS-Live nach": "Filter DNS Live by", "ausgewählt": "selected", "Keine Bewertung": "No rating",
+  "Gast zur Ruhezeit": "Guest during quiet hours", "Aktivität zur Ruhezeit": "Activity during quiet hours",
+  "Simulation abgeschlossen": "Simulation complete", "ist jetzt mit": "is now connected to",
+  "Für diesen MAC-Präfix wurde in der lokalen Datei kein Hersteller gefunden.": "No manufacturer was found for this MAC prefix in the local file.",
+  "Lokale bzw. randomisierte MAC-Adresse – eine Herstellerzuordnung ist nicht zuverlässig möglich.": "Local or randomized MAC address – reliable manufacturer identification is not possible.",
+  "Internetzugang für": "Enable internet access for", "freigeben und das Gerät dauerhaft bestätigen?": "and permanently approve this device?",
+  "Noch kein": "No", "-Ziel in Home Assistant vorhanden.": "target exists in Home Assistant.",
+  "Diese Aktion ist bewusst nicht Teil des normalen Speicherns und wird erst nach einer zusätzlichen Bestätigung ausgeführt.": "This action is intentionally separate from normal saving and runs only after an additional confirmation.",
+  "Für Geräte mit Stern gilt die Offline-Frist. Nach deren Ablauf erscheint eine Warnung, sofern das Gerät weiterhin nicht erreichbar ist.": "The offline grace period applies to starred devices. A warning appears when it expires if the device is still unreachable.",
+  "Neue Geräte werden erst nach der Bestätigungszeit gemeldet. Kurze oder fehlerhafte Erkennungen lösen dadurch nicht sofort eine Warnung aus.": "New devices are reported only after the confirmation period, preventing brief or faulty detections from immediately triggering a warning.",
+  "Haus-markierte Geräte melden sich sofort als anwesend. Erst wenn ein Gerät länger als das Anwesenheits-Timeout nicht erreichbar ist, gilt es als abwesend.": "Home-marked devices become present immediately and are considered away only after being unreachable for longer than the presence timeout.",
+  "Der Einrichtungsbereich kennzeichnet Geräte im angegebenen DHCP-Adressbereich als Neu. Nach der Vergabe einer festen Adresse außerhalb dieses Bereichs gelten sie als zugeordnet.": "The setup range marks devices in the specified DHCP address range as new. They are considered assigned after receiving a fixed address outside that range.",
+  "Bei automatischer Übernahme liest Nodarion Start und Ende direkt aus der FRITZ!Box. Optional können neue Geräte sofort überwacht oder zusätzlich in Home Assistant gemeldet werden.": "With automatic import, Nodarion reads the start and end directly from the FRITZ!Box. New devices can optionally be monitored immediately or also reported in Home Assistant.",
+  "Gastnetz anzeigen und überwachen": "Show and monitor guest network",
+  "Gastgeräte in Nodarion erfassen, anzeigen und protokollieren": "Detect, display, and log guest devices in Nodarion",
+  "Neue Gäste melden": "Report new guests",
+  "Beim erstmaligen Verbinden mit dem FRITZ!Box-Gastzugang warnen": "Warn when a device first connects to FRITZ!Box guest access",
+  "Gäste zur Ruhezeit melden": "Report guests during quiet hours",
+  "Verbindungen im eingestellten Ruhezeitraum hervorheben": "Highlight connections during the configured quiet hours",
+  "Maximale Gastdauer": "Maximum guest duration",
+  "Nach dieser Anzahl Stunden eine Warnung anzeigen": "Show a warning after this number of hours",
+  "Offline-Teilnehmer löschen": "Delete offline devices",
+  "Entfernt alle aktuell offline geführten Geräte einschließlich ihrer gespeicherten Einstellungen.": "Removes all devices currently marked offline, including their saved settings.",
+  "Alle derzeit offline geführten Geräte sofort entfernen": "Immediately remove all devices currently marked offline",
+  "Geräteüberwachung": "Device monitoring",
+  "Neue Geräte bestätigen": "Confirm new devices",
+  "Erst nach dieser Online-Zeit warnen (Minuten)": "Warn only after this online time (minutes)",
+  "Wichtiges Gerät offline": "Important device offline",
+  "Warnung nach Minuten": "Warn after minutes",
+  "Weitere Prüfungen": "Additional checks",
+  "Statuswechsel pro Stunde": "State changes per hour",
+  "Ab dieser Anzahl als instabil melden": "Report as unstable from this number onward",
+  "Identitätswechsel melden": "Report identity changes",
+  "Andere MAC-Adresse am gleichen IP-Platz": "Different MAC address at the same IP address",
+  "Ruhezeiten": "Quiet hours", "Ruhezeit überwachen": "Monitor quiet hours",
+  "Aktivierungen in diesem Zeitraum melden": "Report activity during this period",
+  "Ruhezeit beginnt": "Quiet hours start", "Ruhezeit endet": "Quiet hours end",
+  "HA-Glocke": "HA notifications",
+  "Neue Auffälligkeiten als dauerhafte Meldung in Home Assistant anzeigen": "Show new anomalies as persistent notifications in Home Assistant",
+  "Warnungen senden": "Send warnings",
+  "Normale Warnungen an die ausgewählten Ziele senden": "Send regular warnings to the selected targets",
+  "Kritische Meldungen senden": "Send critical notifications",
+  "Kritische Ausfälle an die ausgewählten Ziele senden": "Send critical outages to the selected targets",
+  "Für eigene Automationen wird immer das Ereignis": "The event",
+  "ausgelöst.": "is always fired for custom automations.",
+  "Benachrichtigungsziele": "Notification targets",
+  "Companion App, Telegram und andere in Home Assistant eingerichtete Ziele": "Companion App, Telegram, and other targets configured in Home Assistant",
+  "Ziel durchsuchen": "Search targets", "Benachrichtigungsziel durchsuchen": "Search notification targets",
+  "Tägliche KI-Auswertung": "Daily AI analysis",
+  "Automatisch einmal täglich einen Bericht erstellen": "Automatically create a report once a day",
+  "KI-Auswertung um": "AI analysis at",
+  "Erster Netzwerkscan nach diesem Zeitpunkt": "First network scan after this time",
+  "DNS-Datenschutz": "DNS privacy",
+  "Anonymisiert überträgt nur Zähler und stabile, neutrale Domain-IDs": "Anonymized mode transmits only counters and stable, neutral domain IDs",
+  "Domains anonymisieren": "Anonymize domains", "Domainnamen mitsenden": "Include domain names",
+  "Grundlagen erklären": "Explain basics", "Hilfe zu Grundlagen": "Help with basics",
+  "Anwesenheit erklären": "Explain presence", "Hilfe zu Anwesenheit": "Help with presence",
+  "Geräte-Einrichtung erklären": "Explain device setup", "Hilfe zu Geräte-Einrichtung": "Help with device setup",
+  "Bereinigung erklären": "Explain cleanup", "Hilfe zur Bereinigung": "Cleanup help",
+  "Geräteüberwachung erklären": "Explain device monitoring", "Hilfe zu Geräteüberwachung": "Device monitoring help",
+  "Ruhezeiten erklären": "Explain quiet hours", "Hilfe zu Ruhezeiten": "Quiet-hours help",
+  "Prüfungen erklären": "Explain checks", "Hilfe zu weiteren Prüfungen": "Additional-checks help",
+  "Benachrichtigungen erklären": "Explain notifications", "Hilfe zu Benachrichtigungen": "Notifications help",
+  "KI-Analyse erklären": "Explain AI analysis", "Hilfe zur KI-Analyse": "AI analysis help",
+  "Hilfe schließen": "Close help", "Hilfe": "Help", "Bereinigung": "Cleanup", "Löschen": "Delete",
+  "Kein AdGuard-DNS": "No AdGuard DNS", "Nicht verwaltet": "Not managed",
+  "Nicht bewertet": "Not rated", "Anfragen": "queries", "blockiert": "blocked",
+  "Gesperrt / frei": "Blocked / allowed", "Gesperrt": "Blocked",
+  "Freigabe ausstehend": "Approval pending", "Lernphase · automatisch freigegeben": "Learning phase · automatically allowed",
+  "Anteil blockierter DNS-Anfragen": "Share of blocked DNS queries",
+  "Nur Offline-Geräte anzeigen": "Show offline devices only",
+  "DNS-Live-Log für": "Open DNS Live log for", "öffnen": "open",
+  "Statisch": "Static", "Signal": "signal", "Normal": "Normal",
+  "von": "of", "Keine": "None", "Alle": "All",
+  "Offline-Meldung": "Offline notification", "Nicht erreichbar": "Unreachable", "Nicht eingerichtet": "Not configured",
+  "Hersteller": "Manufacturer", "Quelle: lokale MAC-Vendor-Datei": "Source: local MAC vendor file",
+  "Registrierter Präfix": "Registered prefix", "Zuteilung": "Allocation", "Registerstand": "Registry date",
+  "Zeitraum": "Period", "Daten vollständig": "Data complete", "Nein (Abfragelimit erreicht)": "No (query limit reached)",
+  "Ja": "Yes", "Letzte Aktivität": "Last activity", "Letzte Domain": "Last domain",
+  "Zuletzt blockiert": "Last blocked", "Treffergrund": "Match reason", "DNS-Protokoll": "DNS protocol",
+  "Häufig abgefragt": "Frequently queried", "Häufig blockiert": "Frequently blocked",
+  "Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus": "Locally administered or randomized MAC address; changes do not trigger an identity warning",
+  "Überwachung beenden": "Stop monitoring", "Als wichtig überwachen": "Monitor as important",
+  "Gerät im DHCP-Einrichtungsbereich": "Device in DHCP setup range",
+  "Automatisch erkannter Gerätetyp": "Automatically detected device type",
+  "Live-Log dieses Geräts anzeigen": "Show this device's live log", "Home-Assistant-Dialog öffnen": "Open Home Assistant dialog",
+  "WLAN-Empfang": "Wi-Fi reception", "Mesh-Punkt": "Mesh point",
+  "Mit Überwachung aktiv werden sämtliche Warn- und Prüfregeln gemeinsam geschaltet. Die Erkennung und Anzeige der Geräte läuft unabhängig davon weiter.": "Enabling monitoring turns all warning and checking rules on or off together. Device detection and display continue independently.",
+  "Der optionale Home-Assistant-Binary-Sensor ist aktiv, sobald mindestens eines dieser Geräte zuhause ist. Er eignet sich beispielsweise für Licht-, Heizungs- oder Alarm-Automationen.": "The optional Home Assistant binary sensor is active whenever at least one of these devices is home. It can be used for lighting, heating, or alarm automations.",
+  "Während der Ruhezeit kann das Aktivwerden eines Geräts als Auffälligkeit gemeldet werden. Zeiträume über Mitternacht, beispielsweise 23:00 bis 06:00 Uhr, werden automatisch korrekt behandelt.": "Device activity during quiet hours can be reported as an anomaly. Periods spanning midnight, such as 23:00 to 06:00, are handled automatically.",
+  "Ist die Prüfung deaktiviert, beeinflusst die Ruhezeit weder Erkennung noch Anwesenheitssteuerung.": "When this check is disabled, quiet hours affect neither detection nor presence tracking.",
+  "Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln gewarnt wird.": "Frequent online/offline changes within one hour indicate an unstable connection. The threshold determines how many changes trigger a warning.",
+  "Die HA-Glocke zeigt Meldungen direkt in Home Assistant. Ausgewählte Benachrichtigungsziele senden Warnungen zusätzlich etwa an die Companion App oder einen eingerichteten Telegram Bot.": "HA notifications appear directly in Home Assistant. Selected notification targets can additionally send warnings to the Companion App or a configured Telegram bot.",
+  "Unabhängig von diesen Schaltern erzeugt jede neue Warnung das Home-Assistant-Ereignis nodarion_alert. Damit lassen sich eigene Automationen und weitere Eskalationswege bauen.": "Regardless of these switches, every new warning fires the Home Assistant event nodarion_alert. It can be used for custom automations and additional escalation paths.",
+  "Die tägliche Auswertung fasst Netzwerkzustand, Änderungen und Auffälligkeiten nach dem gewählten Zeitpunkt zusammen. Eine manuelle Analyse bleibt im KI-Reiter jederzeit möglich.": "The daily analysis summarizes network status, changes, and anomalies after the selected time. A manual analysis remains available in the AI tab at any time.",
+  "Mit anonymisiertem DNS-Datenschutz werden keine lesbaren Domainnamen an die KI übergeben. Domainnamen mitsenden ermöglicht detailliertere Bewertungen, gibt aber entsprechend mehr Informationen weiter.": "With anonymized DNS privacy, no readable domain names are sent to the AI. Including domain names enables more detailed assessments but shares correspondingly more information.",
+  "Offline-Teilnehmer löschen entfernt alle derzeit offline geführten Geräte samt gespeicherter Markierungen und Überwachungseinstellungen.": "Deleting offline devices removes every device currently marked offline, including saved labels and monitoring settings.",
+  "Wirklich ALLE derzeit offline angezeigten Geräte sofort entfernen? Offline überwachte Geräte und deren Überwachungseinstellungen werden ebenfalls gelöscht.": "Really remove ALL devices currently shown as offline? Monitored offline devices and their monitoring settings will also be deleted.",
+  "wird von": "is being moved from", "übergeben": "to", "Änderungen lösen keine Identitätswarnung aus": "Changes do not trigger an identity warning",
+  "Verbunden": "Connected", "Geprüft": "Checked", "Mesh-Wechsel": "Mesh change",
+  "Erlaubt": "Allowed", "Blockiert": "Blocked", "Verarbeitet": "Processed",
+  "Umbenannt": "Renamed", "Neu erkannt": "Newly detected",
+  "Gast verbunden": "Guest connected", "Gast getrennt": "Guest disconnected",
+  "Unbekanntes Gerät": "Unknown device", "Instabile Verbindung": "Unstable connection",
+  "Identität geändert": "Identity changed", "Neuer Gast": "New guest",
+  "Gast lange verbunden": "Guest connected for a long time",
+  "ist wieder online": "is back online", "ist offline": "is offline",
+  "ist seit mindestens": "has been online for at least",
+  "Statuswechsel innerhalb einer Stunde erkannt.": "state changes detected within one hour.",
+  "Gerät wurde während der eingestellten Ruhezeit aktiv.": "Device became active during the configured quiet hours.",
+  "Gastgerät wurde während der Ruhezeit aktiv.": "Guest device became active during quiet hours.",
+  "Gastgerät ist seit mindestens": "Guest device has been connected for at least",
+  "Wichtiges Gerät ist seit mindestens": "Important device has been offline for at least",
+  "hat das Gastnetz verlassen": "left the guest network",
+  "Name geändert": "Name changed", "Mesh-Wechsel von": "Mesh handover from",
+  "seit": "since", "Uhr": "", "basiert auf den markierten Home-Geräten": "based on the marked Home devices",
+  "alle ": "every ", "Min.": "min.",
+}));
+const EN_REPLACEMENTS = [...EN].sort((a, b) => b[0].length - a[0].length);
+const translateText = (value) => {
+  if (panelLocale === "de" || !value) return value;
+  let result = String(value);
+  for (const [source, target] of EN_REPLACEMENTS) {
+    // "Moderat" is a prefix of its English translation "Moderate". A plain
+    // replaceAll would therefore append another "e" whenever localization is
+    // re-run by the mutation observer.
+    result = source === "Moderat"
+      ? result.replace(/\bModerat\b/g, target)
+      : result.replaceAll(source, target);
+  }
+  return result;
+};
+const activeLocale = () => panelLocale === "de" ? "de-DE" : "en-GB";
+
 const ipv4Number = (value) => {
   const parts = String(value || "").split(".");
   if (parts.length !== 4 || parts.some((part) =>
@@ -56,7 +308,7 @@ const formatDateTime = (value) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "–"
-    : new Intl.DateTimeFormat("de-DE", {
+    : new Intl.DateTimeFormat(activeLocale(), {
         day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
       }).format(date);
 };
@@ -70,10 +322,10 @@ const formatStateChanged = (value) => {
   if (!value) return "Zeit unbekannt";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Zeit unbekannt";
-  const day = new Intl.DateTimeFormat("de-DE", {
+  const day = new Intl.DateTimeFormat(activeLocale(), {
     day: "2-digit", month: "2-digit", year: "numeric",
   }).format(date);
-  const time = new Intl.DateTimeFormat("de-DE", {
+  const time = new Intl.DateTimeFormat(activeLocale(), {
     hour: "2-digit", minute: "2-digit",
   }).format(date);
   return `${day}\n${time} Uhr`;
@@ -192,10 +444,60 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ai_analysis: { reports: [], running: false, last_error: null },
     };
     this._monitorLoading = false;
+    this._translationFrame = null;
+    this._translationObserver = new MutationObserver(() => this._scheduleLocalization());
+    this._observeTranslations();
+  }
+
+  connectedCallback() {
+    this._observeTranslations();
   }
 
   disconnectedCallback() {
     window.clearTimeout(this._dnsLiveTimer);
+    if (this._translationFrame !== null) {
+      window.cancelAnimationFrame(this._translationFrame);
+      this._translationFrame = null;
+    }
+    this._translationObserver.disconnect();
+  }
+
+  _observeTranslations() {
+    this._translationObserver.observe(this.shadowRoot, {
+      childList: true, subtree: true, characterData: true, attributes: true,
+      attributeFilter: ["title", "placeholder", "aria-label"],
+    });
+  }
+
+  _scheduleLocalization() {
+    if (panelLocale === "de" || this._translationFrame !== null) return;
+    this._translationFrame = window.requestAnimationFrame(() => {
+      this._translationFrame = null;
+      this._localizeDom();
+    });
+  }
+
+  _localizeDom() {
+    if (panelLocale === "de") return;
+    // Translation itself changes text nodes. Temporarily disconnecting avoids
+    // feeding those changes back into the observer and locking up the UI.
+    this._translationObserver.disconnect();
+    const walker = document.createTreeWalker(this.shadowRoot, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.parentElement?.closest("style, script")) continue;
+      const translated = translateText(node.nodeValue);
+      if (translated !== node.nodeValue) node.nodeValue = translated;
+    }
+    for (const element of this.shadowRoot.querySelectorAll("[title], [placeholder], [aria-label]")) {
+      for (const attribute of ["title", "placeholder", "aria-label"]) {
+        if (!element.hasAttribute(attribute)) continue;
+        const value = element.getAttribute(attribute);
+        const translated = translateText(value);
+        if (translated !== value) element.setAttribute(attribute, translated);
+      }
+    }
+    this._observeTranslations();
   }
 
   _loadColumnVisibility() {
@@ -234,6 +536,14 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   set hass(value) {
     this._hass = value;
+    const nextLocale = String(value?.language || "en").toLowerCase().startsWith("de") ? "de" : "en";
+    if (nextLocale !== panelLocale) {
+      panelLocale = nextLocale;
+      if (this._built) {
+        this._built = false;
+        this._build();
+      }
+    }
     if (!this._built) this._build();
     const darkMode = value?.themes?.darkMode;
     this.dataset.theme = darkMode === undefined
@@ -247,6 +557,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._render();
     }
     if (Date.now() - this._lastMonitorLoad > 10000) this._loadMonitor();
+    this._scheduleLocalization();
   }
 
   set narrow(value) {
@@ -361,7 +672,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }
     try {
       this._monitor = await this._hass.callApi(
-        "POST", "nodarion/monitor", { action: "run_ai_analysis" }
+        "POST", "nodarion/monitor", { action: "run_ai_analysis", language: panelLocale }
       );
     } catch (error) {
       this._monitor.ai_analysis = {
@@ -813,8 +1124,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .detail-stack .dns-alert { color:var(--ns-red); }
         .dns-live-link { display:block; width:100%; padding:0; border:0; color:inherit; background:transparent; font:inherit; text-align:left; cursor:pointer; }
         .dns-live-link:hover strong { color:var(--ns-cyan); text-decoration:underline; }
-        .rating { width:max-content; display:inline-flex; align-items:center; gap:6px; margin-top:2px; padding:3px 7px; border-radius:999px; color:var(--rating-color); background:color-mix(in srgb,var(--rating-color) 10%,transparent); border:1px solid color-mix(in srgb,var(--rating-color) 24%,transparent); font-size:11px; font-weight:750; }
-        .rating::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--rating-color); box-shadow:0 0 7px color-mix(in srgb,var(--rating-color) 65%,transparent); }
+        .rating { width:max-content; max-width:100%; min-width:0; box-sizing:border-box; display:inline-flex; align-items:center; gap:6px; margin-top:2px; padding:3px 7px; border-radius:999px; color:var(--rating-color); background:color-mix(in srgb,var(--rating-color) 10%,transparent); border:1px solid color-mix(in srgb,var(--rating-color) 24%,transparent); font-size:11px; font-weight:750; }
+        .rating::before { content:""; flex:0 0 auto; width:6px; height:6px; border-radius:50%; background:var(--rating-color); box-shadow:0 0 7px color-mix(in srgb,var(--rating-color) 65%,transparent); }
+        .rating-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .rating.good, .rating.okay { --rating-color:#b8b1a7; }
         .rating.warn { --rating-color:#ffd766; }
         .rating.bad { --rating-color:var(--ns-red); }
@@ -1092,6 +1404,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .presence-timeline::before { content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg,transparent 0,transparent calc(25% - 1px),rgba(255,255,255,.055) 25%); }
         .presence-segment { position:absolute; top:4px; bottom:4px; min-width:2px; border-radius:5px; background:linear-gradient(90deg,rgba(86,199,139,.55),#8fffc2); box-shadow:0 0 8px rgba(143,255,194,.2); }
         .presence-axis { display:flex; justify-content:space-between; margin:6px 1px 0; color:#61746e; font-size:8px; }
+        .alerts-panel { display:flex; flex-direction:column; max-height:calc(100dvh - 64px); }
+        .alerts-panel .alert-list { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding-right:5px; scrollbar-width:thin; scrollbar-color:rgba(240,161,59,.42) transparent; }
+        .alerts-panel .alert-list::-webkit-scrollbar { width:7px; }
+        .alerts-panel .alert-list::-webkit-scrollbar-track { background:transparent; }
+        .alerts-panel .alert-list::-webkit-scrollbar-thumb { border-radius:999px; background:rgba(240,161,59,.32); }
         .alert-list { display:grid; gap:9px; }
         .alert-item { --alert-color:#ffd766; display:grid; grid-template-columns:38px 1fr auto; align-items:center; gap:12px; padding:13px; border-radius:13px; background:color-mix(in srgb,var(--alert-color) 5%,rgba(2,10,8,.4)); border:1px solid color-mix(in srgb,var(--alert-color) 22%,transparent); }
         .alert-item.critical { --alert-color:var(--ns-red); }
@@ -2651,7 +2968,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       versions.frontend ? `Frontend ${versions.frontend}` : null,
     ].filter(Boolean).join(" · ");
     const latest = entities.reduce((date, entity) => entity.last_updated > date ? entity.last_updated : date, "");
-    const age = latest ? new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(latest)) : "–";
+    const age = latest ? new Intl.DateTimeFormat(activeLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(latest)) : "–";
     const connections = entities[0]?.attributes.connection_status || {};
     const configuredConnections = Object.values(connections).filter(
       (connection) => connection.configured
@@ -2823,9 +3140,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         { action: "approve_internet", key: button.dataset.key }
       );
       button.textContent = "Freigegeben";
-    } catch (_error) {
+    } catch (error) {
+      const detail = error?.body?.message || error?.message;
       window.alert(
-        "Die FRITZ!Box konnte den Internetzugang nicht freigeben. Bitte Benutzerrechte und TR-064-Unterstützung prüfen."
+        detail
+          ? `Die FRITZ!Box konnte den Internetzugang nicht freigeben:\n\n${detail}`
+          : "Die FRITZ!Box konnte den Internetzugang nicht freigeben. Bitte Benutzerrechte und TR-064-Unterstützung prüfen."
       );
       button.disabled = false;
       button.textContent = original;
@@ -2899,7 +3219,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const date = new Date(value);
       return Number.isNaN(date.getTime())
         ? "Noch nicht geprüft"
-        : `Geprüft ${new Intl.DateTimeFormat("de-DE", {
+        : `Geprüft ${new Intl.DateTimeFormat(activeLocale(), {
             hour: "2-digit", minute: "2-digit", second: "2-digit",
           }).format(date)}`;
     };
@@ -3143,9 +3463,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <td data-column="mac" data-label="MAC-Adresse" class="mono" title="${esc(vendorTitle)}">${esc(attr.mac_address || "Unbekannt")}${attr.mac_vendor ? `<span class="mac-vendor" title="${esc(vendorTitle)}"><ha-icon icon="mdi:factory"></ha-icon>${esc(attr.mac_vendor)}</span>` : ""}${privateMac ? `<span class="private-mac" title="Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus"><ha-icon icon="mdi:incognito"></ha-icon>Privat / randomisiert</span>` : ""}</td>
         <td data-column="connection" data-label="Verbindung"><div class="detail-stack"><strong>${esc(connection)}</strong></div></td>
         <td data-column="mesh" data-label="Mesh-Punkt"><div class="detail-stack"><strong>${esc(accessPoint)}</strong></div></td>
-        <td data-column="rate" data-label="WLAN"><div class="detail-stack"><strong>${esc(rates || "–")}</strong>${signal ? `<span class="rating ${signalAssessment?.level || "okay"}" title="WLAN-Empfang: ${esc(signalAssessment?.label || "Nicht bewertet")}">${esc(signal)} · ${esc(signalAssessment?.label || "")}</span>` : ""}</div></td>
+        <td data-column="rate" data-label="WLAN"><div class="detail-stack"><strong>${esc(rates || "–")}</strong>${signal ? `<span class="rating ${signalAssessment?.level || "okay"}" title="WLAN-Empfang: ${esc(signalAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(signal)} · ${esc(signalAssessment?.label || "")}</span></span>` : ""}</div></td>
         <td data-column="address" data-label="Adressvergabe"><div class="detail-stack"><strong>${esc(addressSource || "–")}</strong>${addressSource === "DHCP" && lease ? `<small>Noch ${esc(lease)}</small>` : ""}</div></td>
-        <td data-column="dns" data-label="AdGuard DNS" title="${esc(dnsTitle)}"><button class="dns-live-link" type="button" data-ip="${esc(attr.ip_address)}" data-name="${esc(name)}" title="DNS-Live-Log für ${esc(name)} öffnen"><span class="detail-stack"><strong class="${attr.adguard_bypass_suspected ? "dns-alert" : ""}">${esc(dnsPrimary)}</strong>${dnsSecondary ? `<span class="rating ${dnsAssessment?.level || "okay"}" title="Anteil blockierter DNS-Anfragen: ${esc(dnsAssessment?.label || "Nicht bewertet")}">${esc(dnsSecondary)} · ${esc(dnsAssessment?.label || "")}</span>` : ""}</span></button></td>
+        <td data-column="dns" data-label="AdGuard DNS" title="${esc(dnsTitle)}"><button class="dns-live-link" type="button" data-ip="${esc(attr.ip_address)}" data-name="${esc(name)}" title="DNS-Live-Log für ${esc(name)} öffnen"><span class="detail-stack"><strong class="${attr.adguard_bypass_suspected ? "dns-alert" : ""}">${esc(dnsPrimary)}</strong>${dnsSecondary ? `<span class="rating ${dnsAssessment?.level || "okay"}" title="Anteil blockierter DNS-Anfragen: ${esc(dnsAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(dnsSecondary)} · ${esc(dnsAssessment?.label || "")}</span></span>` : ""}</span></button></td>
         <td data-column="source" data-label="Erkannt durch">${esc(sources)}</td>
         <td data-column="internet" data-label="Internetzugang"><div class="internet-state"><span class="internet-label ${esc(internetClass)}">${esc(internetLabel)}</span>${approvalRequired ? `<button class="approve-internet" data-key="${esc(key)}" data-name="${esc(name)}" data-entity-id="${esc(entity.entity_id)}">Freigeben</button>` : ""}</div></td>
         <td data-column="watch" data-label="Überwachung">
@@ -3300,7 +3620,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       .filter((item) => {
         if (this._logDeviceFilter && item.key !== this._logDeviceFilter.key) return false;
         const stamp = new Date(item.timestamp);
-        const formattedStamp = Number.isNaN(stamp.getTime()) ? item.timestamp : new Intl.DateTimeFormat("de-DE", {
+        const formattedStamp = Number.isNaN(stamp.getTime()) ? item.timestamp : new Intl.DateTimeFormat(activeLocale(), {
           day:"2-digit", month:"2-digit", year:"numeric",
           hour:"2-digit", minute:"2-digit", second:"2-digit",
         }).format(stamp);
@@ -3313,10 +3633,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     const rows = events.map((item) => {
       const timestamp = new Date(item.timestamp);
-      const time = new Intl.DateTimeFormat("de-DE", {
+      const time = new Intl.DateTimeFormat(activeLocale(), {
         hour: "2-digit", minute: "2-digit", second: "2-digit",
       }).format(timestamp);
-      const date = new Intl.DateTimeFormat("de-DE", {
+      const date = new Intl.DateTimeFormat(activeLocale(), {
         day: "2-digit", month: "2-digit", year: "numeric",
       }).format(timestamp);
       const message = item.type === "mesh_changed" && item.from_access_point && item.to_access_point
@@ -3394,7 +3714,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const rows = entries.map((item) => {
       const timestamp = new Date(item.time);
       const time = Number.isNaN(timestamp.getTime()) ? "–" : new Intl.DateTimeFormat(
-        "de-DE",
+        activeLocale(),
         {
           day: "2-digit", month: "2-digit", hour: "2-digit",
           minute: "2-digit", second: "2-digit",
@@ -3412,7 +3732,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const answer = (item.answer || []).join(", ") || "–";
       const elapsed = Number(item.elapsed_ms);
       const elapsedFormatted = Number.isFinite(elapsed)
-        ? new Intl.NumberFormat("de-DE", {
+        ? new Intl.NumberFormat(activeLocale(), {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           }).format(elapsed)
@@ -3438,7 +3758,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       </tr>`;
     }).join("");
     const updated = this._dnsLive.updated_at
-      ? new Intl.DateTimeFormat("de-DE", {
+      ? new Intl.DateTimeFormat(activeLocale(), {
           hour: "2-digit", minute: "2-digit", second: "2-digit",
         }).format(new Date(this._dnsLive.updated_at))
       : "–";
@@ -3465,10 +3785,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const stamp = new Date(bucket.time);
       const hour = Number.isNaN(stamp.getTime())
         ? "–"
-        : new Intl.DateTimeFormat("de-DE", { hour: "2-digit" }).format(stamp);
+        : new Intl.DateTimeFormat(activeLocale(), { hour: "2-digit" }).format(stamp);
       const fullTime = Number.isNaN(stamp.getTime())
         ? "–"
-        : new Intl.DateTimeFormat("de-DE", {
+        : new Intl.DateTimeFormat(activeLocale(), {
             day: "2-digit", month: "2-digit", hour: "2-digit",
             minute: "2-digit",
           }).format(stamp);
@@ -3582,12 +3902,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
       : null;
     const scoreClass = score <= 3 ? "bad" : score <= 6 ? "warn" : "";
     const reportTime = latestReport?.timestamp
-      ? new Intl.DateTimeFormat("de-DE", {
+      ? new Intl.DateTimeFormat(activeLocale(), {
           dateStyle: "medium", timeStyle: "short",
         }).format(new Date(latestReport.timestamp))
       : "–";
     const history = reports.slice(0, 14).reverse().map((report) => {
-      const stamp = new Intl.DateTimeFormat("de-DE", {
+      const stamp = new Intl.DateTimeFormat(activeLocale(), {
         dateStyle: "short",
       }).format(new Date(report.timestamp));
       return `<i class="ai-history-bar" style="--score:${Number(report.score || 1)}" title="${esc(stamp)} · ${Number(report.score || 0)}/10"></i>`;
@@ -3680,7 +4000,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       : `<div class="notify-target-empty">Noch kein <code>notify.*</code>-Ziel in Home Assistant vorhanden.</div>`;
     const learning = this._monitor.learning || {};
     const learningEnd = learning.ends_at
-      ? new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(learning.ends_at))
+      ? new Intl.DateTimeFormat(activeLocale(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(learning.ends_at))
       : "–";
     const learningRemainingMs = learning.ends_at
       ? Math.max(0, new Date(learning.ends_at).getTime() - Date.now())
@@ -3722,7 +4042,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const alertHtml = alerts.length ? alerts.map((alert) => {
       const active = alert.active && !alert.acknowledged;
       const alertEntityId = entityIdByKey.get(alert.key);
-      const time = new Intl.DateTimeFormat("de-DE", {
+      const time = new Intl.DateTimeFormat(activeLocale(), {
         dateStyle: "short", timeStyle: "short",
       }).format(new Date(alert.timestamp));
       return `<article class="alert-item ${esc(alert.severity)} ${active ? "" : "resolved"}">
@@ -3773,7 +4093,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           return `<i class="presence-segment" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"></i>`;
         }).join("");
         const lastChange = changes.at(-1)?.time;
-        const changed = lastChange ? new Intl.DateTimeFormat("de-DE", {
+        const changed = lastChange ? new Intl.DateTimeFormat(activeLocale(), {
           hour: "2-digit", minute: "2-digit",
         }).format(new Date(lastChange)) : null;
         return `<div class="presence-row ${currentHome ? "home" : "away"}">
@@ -3809,7 +4129,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       </div>
       <div class="watch-overview-grid">
       <div class="watch-layout alerts-only">
-        <section class="watch-panel">
+        <section class="watch-panel alerts-panel">
           <div class="watch-heading">
             <div><h2>Warnungen und Auffälligkeiten</h2><p>Aktive Hinweise stehen oben, erledigte bleiben als Verlauf erhalten.</p></div>
             <div class="learning-actions">

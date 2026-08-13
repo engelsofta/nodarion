@@ -2,6 +2,10 @@
   <img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/custom_components/nodarion/brand/logo.png" alt="Engelsoft Nodarion" width="600">
 </div>
 
+<p align="center">
+  <strong>Deutsch</strong> · <a href="README.en.md">English</a>
+</p>
+
 <h1 align="center">Engelsoft Nodarion für Home Assistant</h1>
 
 <p align="center">
@@ -29,6 +33,22 @@ auffällig erscheint.
 Nodarion arbeitet als lokale Home-Assistant-Custom-Integration, scannt ein
 einstellbares IPv4-Netz und legt pro gefundenem Teilnehmer einen
 Konnektivitäts-Binärsensor an.
+
+## Neu im aktuellen Build
+
+- Die komplette Nodarion-Oberfläche folgt jetzt der in Home Assistant gewählten
+  Sprache: Deutsch wird vollständig unterstützt, alle anderen Sprachen erhalten
+  die englische Oberfläche als Fallback.
+- Datums-, Zeit- und Zahlenformate sowie manuell und täglich erzeugte
+  KI-Netzwerkanalysen werden passend auf Deutsch oder Englisch ausgegeben.
+- Aktive Auffälligkeiten werden in einer einzigen, laufend aktualisierten
+  Home-Assistant-Meldung gebündelt. Das hält die Benachrichtigungen auch in
+  lebhaften Netzen angenehm aufgeräumt.
+- Das Bestätigen eines neuen Geräts gibt dessen Internetzugang zuverlässig frei
+  und erledigt die zugehörigen Warnungen gemeinsam. Bereits freigegebene Geräte
+  lassen sich dabei ebenfalls problemlos erneut bestätigen.
+- Überarbeitete Bewertungen und eine scrollbarere Warnungsansicht verbessern die
+  Lesbarkeit auf kleinen Displays.
 
 ## Einblicke
 
@@ -152,6 +172,11 @@ Unter **Einstellungen → Benachrichtigungen und Prüfungen** können alle in Ho
 Assistant vorhandenen `notify.*`-Entitäten ausgewählt werden. Nodarion sendet
 neue Warnungen über `notify.send_message`; die Zugangsdaten für Telegram und
 andere Dienste bleiben dadurch vollständig in Home Assistant.
+
+Für die Home-Assistant-Glocke fasst Nodarion alle derzeit aktiven
+Auffälligkeiten in einer einzigen Meldung zusammen und aktualisiert diese
+automatisch. Erledigte Warnungen verschwinden aus der Zusammenfassung, bleiben
+aber im Nodarion-Verlauf erhalten.
 
 Zusätzlich löst jede neu angelegte Warnung das Ereignis `nodarion_alert` aus.
 Die Ereignisdaten enthalten unter anderem `type`, `severity`, `device_name`,

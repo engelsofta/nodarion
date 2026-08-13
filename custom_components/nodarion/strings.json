@@ -3,81 +3,81 @@
   "config": {
     "step": {
       "user": {
-        "title": "Netzwerkscanner einrichten",
-        "description": "Scanne ein lokales IPv4-Netz. Beispiel: 192.168.1.0/24",
+        "title": "Set up network scanner",
+        "description": "Scan a local IPv4 network. Example: 192.168.1.0/24",
         "data": {
-          "network": "Netzwerk (CIDR)",
-          "scan_interval": "Scanintervall (Sekunden)",
-          "timeout": "Zeitlimit pro Prüfung (Sekunden)",
-          "concurrency": "Gleichzeitige Prüfungen",
-          "ports": "TCP-Ports (kommagetrennt)",
-          "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)",
-          "offline_after": "Nach fehlgeschlagenen Scans als offline melden",
-          "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)",
-          "fritz_enabled": "FRITZ!Box-Erkennung verwenden",
-          "fritz_host": "FRITZ!Box-Adresse",
-          "fritz_user": "FRITZ!Box-Benutzer",
-          "fritz_password": "FRITZ!Box-Passwort",
-          "adguard_enabled": "AdGuard-Home-Auswertung verwenden",
-          "adguard_host": "AdGuard-Home-Adresse",
-          "adguard_port": "AdGuard-Home-Port",
-          "adguard_user": "AdGuard-Home-Benutzer",
-          "adguard_password": "AdGuard-Home-Passwort",
-          "adguard_ssl": "HTTPS verwenden",
-          "adguard_verify_ssl": "SSL-Zertifikat prüfen",
-          "adguard_period_hours": "DNS-Auswertungszeitraum (Stunden)"
+          "network": "Network (CIDR)",
+          "scan_interval": "Scan interval (seconds)",
+          "timeout": "Timeout per check (seconds)",
+          "concurrency": "Concurrent checks",
+          "ports": "TCP ports (comma-separated)",
+          "exclude": "Excluded IP addresses (comma-separated)",
+          "offline_after": "Report as offline after failed scans",
+          "remove_after_days": "Remove offline devices after days (0 = never)",
+          "fritz_enabled": "Use FRITZ!Box detection",
+          "fritz_host": "FRITZ!Box address",
+          "fritz_user": "FRITZ!Box user",
+          "fritz_password": "FRITZ!Box password",
+          "adguard_enabled": "Use AdGuard Home analysis",
+          "adguard_host": "AdGuard Home address",
+          "adguard_port": "AdGuard Home port",
+          "adguard_user": "AdGuard Home user",
+          "adguard_password": "AdGuard Home password",
+          "adguard_ssl": "Use HTTPS",
+          "adguard_verify_ssl": "Verify SSL certificate",
+          "adguard_period_hours": "DNS analysis period (hours)"
         }
       }
     },
     "error": {
-      "invalid_network": "Ungültiges IPv4-Netz oder größer als /20",
-      "invalid_ports": "Ports müssen zwischen 1 und 65535 liegen",
-      "invalid_exclude": "Die Ausschlussliste enthält eine ungültige IP-Adresse",
-      "fritz_credentials_required": "Für die FRITZ!Box-Erkennung wird dieses Feld benötigt",
-      "adguard_credentials_required": "Für die AdGuard-Home-Auswertung wird dieses Feld benötigt",
-      "adguard_host_required": "Für die AdGuard-Home-Auswertung wird eine Adresse benötigt",
-      "adguard_credentials_incomplete": "Benutzername und Passwort entweder beide eintragen oder beide leer lassen"
+      "invalid_network": "Invalid IPv4 network or larger than /20",
+      "invalid_ports": "Ports must be between 1 and 65535",
+      "invalid_exclude": "The exclusion list contains an invalid IP address",
+      "fritz_credentials_required": "This field is required for FRITZ!Box detection",
+      "adguard_credentials_required": "This field is required for AdGuard Home analysis",
+      "adguard_host_required": "An address is required for AdGuard Home analysis",
+      "adguard_credentials_incomplete": "Enter both username and password, or leave both blank"
     },
     "abort": {
-      "already_configured": "Der Netzwerkscanner ist bereits eingerichtet"
+      "already_configured": "The network scanner is already configured"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Scanner-Einstellungen",
+        "title": "Scanner settings",
         "data": {
-          "network": "Netzwerk (CIDR)",
-          "scan_interval": "Scanintervall (Sekunden)",
-          "timeout": "Zeitlimit pro Prüfung (Sekunden)",
-          "concurrency": "Gleichzeitige Prüfungen",
-          "ports": "TCP-Ports (kommagetrennt)",
-          "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)",
-          "offline_after": "Nach fehlgeschlagenen Scans als offline melden",
-          "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)",
-          "fritz_enabled": "FRITZ!Box-Erkennung verwenden",
-          "fritz_host": "FRITZ!Box-Adresse",
-          "fritz_user": "FRITZ!Box-Benutzer",
-          "fritz_password": "FRITZ!Box-Passwort",
-          "adguard_enabled": "AdGuard-Home-Auswertung verwenden",
-          "adguard_host": "AdGuard-Home-Adresse",
-          "adguard_port": "AdGuard-Home-Port",
-          "adguard_user": "AdGuard-Home-Benutzer",
-          "adguard_password": "AdGuard-Home-Passwort",
-          "adguard_ssl": "HTTPS verwenden",
-          "adguard_verify_ssl": "SSL-Zertifikat prüfen",
-          "adguard_period_hours": "DNS-Auswertungszeitraum (Stunden)"
+          "network": "Network (CIDR)",
+          "scan_interval": "Scan interval (seconds)",
+          "timeout": "Timeout per check (seconds)",
+          "concurrency": "Concurrent checks",
+          "ports": "TCP ports (comma-separated)",
+          "exclude": "Excluded IP addresses (comma-separated)",
+          "offline_after": "Report as offline after failed scans",
+          "remove_after_days": "Remove offline devices after days (0 = never)",
+          "fritz_enabled": "Use FRITZ!Box detection",
+          "fritz_host": "FRITZ!Box address",
+          "fritz_user": "FRITZ!Box user",
+          "fritz_password": "FRITZ!Box password",
+          "adguard_enabled": "Use AdGuard Home analysis",
+          "adguard_host": "AdGuard Home address",
+          "adguard_port": "AdGuard Home port",
+          "adguard_user": "AdGuard Home user",
+          "adguard_password": "AdGuard Home password",
+          "adguard_ssl": "Use HTTPS",
+          "adguard_verify_ssl": "Verify SSL certificate",
+          "adguard_period_hours": "DNS analysis period (hours)"
         }
       }
     },
     "error": {
-      "invalid_network": "Ungültiges IPv4-Netz oder größer als /20",
-      "invalid_ports": "Ports müssen zwischen 1 und 65535 liegen",
-      "invalid_exclude": "Die Ausschlussliste enthält eine ungültige IP-Adresse",
-      "fritz_credentials_required": "Für die FRITZ!Box-Erkennung wird dieses Feld benötigt",
-      "adguard_credentials_required": "Für die AdGuard-Home-Auswertung wird dieses Feld benötigt",
-      "adguard_host_required": "Für die AdGuard-Home-Auswertung wird eine Adresse benötigt",
-      "adguard_credentials_incomplete": "Benutzername und Passwort entweder beide eintragen oder beide leer lassen"
+      "invalid_network": "Invalid IPv4 network or larger than /20",
+      "invalid_ports": "Ports must be between 1 and 65535",
+      "invalid_exclude": "The exclusion list contains an invalid IP address",
+      "fritz_credentials_required": "This field is required for FRITZ!Box detection",
+      "adguard_credentials_required": "This field is required for AdGuard Home analysis",
+      "adguard_host_required": "An address is required for AdGuard Home analysis",
+      "adguard_credentials_incomplete": "Enter both username and password, or leave both blank"
     }
   }
 }
