@@ -41,6 +41,8 @@ class GuiContractTests(unittest.TestCase):
         self.assertNotIn("device-category", PANEL)
         self.assertNotIn("guest-badge", PANEL)
         self.assertIn('typeof attr.network_infrastructure === "boolean"', PANEL)
+        self.assertIn("deviceIconTitle(entity)", PANEL)
+        self.assertNotIn("Automatisch erkannter Gerätetyp", PANEL)
 
     def test_internet_filter_uses_current_status_values(self) -> None:
         self.assertIn('customFilter("internet"', PANEL)
@@ -66,8 +68,8 @@ class GuiContractTests(unittest.TestCase):
         const_source = (
             ROOT / "custom_components" / "nodarion" / "const.py"
         ).read_text(encoding="utf-8")
-        self.assertIn('FRONTEND_VERSION = "1.26.25"', const_source)
-        self.assertIn('internet-status.mjs?v=1.26.25', PANEL)
+        self.assertIn('FRONTEND_VERSION = "1.26.26"', const_source)
+        self.assertIn('internet-status.mjs?v=1.26.26', PANEL)
 
 
 if __name__ == "__main__":

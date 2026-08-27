@@ -75,7 +75,7 @@ entsprechend ihrer technischen Möglichkeiten behandelt.
 ## Versionen
 
 - Integration: `1.21.0`
-- Frontend: `1.26.25`
+- Frontend: `1.26.26`
 
 ---
 
@@ -148,4 +148,4 @@ according to their actual technical capabilities.
 ## Versions
 
 - Integration: `1.21.0`
-- Frontend: `1.26.25`
+- Frontend: `1.26.26`

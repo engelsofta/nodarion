@@ -1,4 +1,4 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.26.25";
+import { internetStatusFor } from "./internet-status.mjs?v=1.26.26";
 
 const esc = (value) =>
   String(value ?? "")
@@ -271,7 +271,12 @@ const EN = new Map(Object.entries({
   "Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus": "Locally administered or randomized MAC address; changes do not trigger an identity warning",
   "Überwachung beenden": "Stop monitoring", "Als wichtig überwachen": "Monitor as important",
   "Gerät im DHCP-Einrichtungsbereich": "Device in DHCP setup range",
-  "Automatisch erkannter Gerätetyp": "Automatically detected device type",
+  "Netzwerkteilnehmer · Symbol anhand verfügbarer Gerätedaten": "Network device · icon based on available device data",
+  "VPN-Verbindung · nicht durch den FRITZ!Box-Hostfilter verwaltet": "VPN connection · not managed by the FRITZ!Box host filter",
+  "Gastgerät · durch den FRITZ!Box-Gastzugang verwaltet": "Guest device · managed by FRITZ!Box guest access",
+  "Router · geschützte Netzwerkinfrastruktur": "Router · protected network infrastructure",
+  "Mesh-Komponente · aus FRITZ!Box-Topologie erkannt": "Mesh component · detected from FRITZ!Box topology",
+  "Mesh-Komponente · anhand verfügbarer Gerätedaten erkannt": "Mesh component · detected from available device data",
   "Live-Log dieses Geräts anzeigen": "Show this device's live log", "Home-Assistant-Dialog öffnen": "Open Home Assistant dialog",
   "WLAN-Empfang": "Wi-Fi reception", "Mesh-Punkt": "Mesh point",
   "Mit Überwachung aktiv werden sämtliche Warn- und Prüfregeln gemeinsam geschaltet. Die Erkennung und Anzeige der Geräte läuft unabhängig davon weiter.": "Enabling monitoring turns all warning and checking rules on or off together. Device detection and display continue independently.",
@@ -439,6 +444,21 @@ const deviceIcon = (entity) => {
   if (matches("thermostat", "sensor", "steckdose", "plug", "shelly", "tuya", "esp", "zigbee", "iot")) return "mdi:chip";
   if (String(attr.connection_type || "").toUpperCase() === "WLAN") return "mdi:wifi";
   return "mdi:lan";
+};
+
+const deviceIconTitle = (entity) => {
+  const attr = entity.attributes || {};
+  if (attr.vpn_connection || /^(vpn|wireguard)/i.test(String(attr.hostname || attr.friendly_name || ""))) {
+    return "VPN-Verbindung · nicht durch den FRITZ!Box-Hostfilter verwaltet";
+  }
+  if (attr.guest_network) return "Gastgerät · durch den FRITZ!Box-Gastzugang verwaltet";
+  if (isRootRouter(entity)) return "Router · geschützte Netzwerkinfrastruktur";
+  if (isNetworkInfrastructure(entity)) {
+    return attr.infrastructure_source === "mesh_topology"
+      ? "Mesh-Komponente · aus FRITZ!Box-Topologie erkannt"
+      : "Mesh-Komponente · anhand verfügbarer Gerätedaten erkannt";
+  }
+  return "Netzwerkteilnehmer · Symbol anhand verfügbarer Gerätedaten";
 };
 
 const blockReason = (value) => ({
@@ -1261,7 +1281,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .device-icon.vpn { color:#c8a7ff; background:rgba(182,140,255,.1); border-color:rgba(182,140,255,.28); }
         .device-icon.guest { color:#ffe08a; background:rgba(255,215,102,.09); border-color:rgba(255,215,102,.27); }
         .device-icon.router { color:#aaffd0; background:rgba(85,242,162,.09); border-color:rgba(85,242,162,.25); }
-        .device-icon.mesh { color:#d4b9ff; background:rgba(182,140,255,.1); border-color:rgba(182,140,255,.28); }
+        .device-icon.mesh { color:#8eb7ff; background:rgba(70,125,255,.1); border-color:rgba(95,145,255,.3); }
         .device-label { min-width:0; }
         .entity { display:block; color:#73958a; font:500 11px ui-monospace,SFMono-Regular,Consolas,monospace; margin-top:4px; }
         .entity-id-link { display:block; margin-top:4px; padding:0; border:0; color:#73958a; background:transparent; font:500 11px ui-monospace,SFMono-Regular,Consolas,monospace; text-align:left; cursor:pointer; }
@@ -1878,7 +1898,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .device-icon.vpn { color:#d4b9ff; background:rgba(182,140,255,.12); border-color:rgba(182,140,255,.3); }
         .device-icon.guest { color:#ffe08a; background:rgba(255,215,102,.1); border-color:rgba(255,215,102,.3); }
         .device-icon.router { color:#aaffd0; background:rgba(85,242,162,.1); border-color:rgba(85,242,162,.28); }
-        .device-icon.mesh { color:#d4b9ff; background:rgba(182,140,255,.12); border-color:rgba(182,140,255,.3); }
+        .device-icon.mesh { color:#8eb7ff; background:rgba(70,125,255,.12); border-color:rgba(95,145,255,.34); }
         .column-picker-button {
           color:#f4dfbd; background:rgba(240,161,59,.08); border-color:rgba(240,161,59,.25);
         }
@@ -3818,7 +3838,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <td data-column="state" data-label="Status"><div class="status-cell"><div class="status"><i class="dot"></i>${online ? "Online" : "Offline"}</div><span class="status-time">${esc(formatStateChanged(stateChanged))}</span></div></td>
         <td data-column="onboarding" data-label="IP-Bereich"><span class="onboarding-state ${lifecycle}">${esc(lifecycleLabel)}</span></td>
         <td data-column="name" data-label="Teilnehmer"><div class="device-cell">
-          <span class="device-icon ${specialDeviceClass}" title="Automatisch erkannter Gerätetyp"><ha-icon icon="${deviceIcon(entity)}"></ha-icon></span>
+          <span class="device-icon ${specialDeviceClass}" title="${esc(deviceIconTitle(entity))}"><ha-icon icon="${deviceIcon(entity)}"></ha-icon></span>
           <div class="device-label"><button class="entity-link" data-key="${esc(key)}" data-name="${esc(name)}" title="Live-Log dieses Geräts anzeigen">${esc(name)}</button>
           <button class="entity-id-link" data-entity-id="${esc(entity.entity_id)}" title="Home-Assistant-Dialog öffnen">${esc(entity.entity_id)}</button></div>
         </div>
