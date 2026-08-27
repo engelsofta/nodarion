@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import NetworkCoordinator
-from .models import NetworkHost
+from .models import NetworkHost, is_network_infrastructure
 from .vendor import MacVendorLookup
 
 ATTR_IP_ADDRESS = "ip_address"
@@ -234,6 +234,8 @@ class NetworkHostEntity(
                 else False
             ),
             "hostname": host.hostname,
+            "fritz_hostname": host.fritz_hostname,
+            "scanner_hostname": host.scanner_hostname,
             "missed_scans": host.missed_scans,
             "presence_control": (
                 self._key in self.coordinator.monitor.presence_devices
@@ -257,6 +259,11 @@ class NetworkHostEntity(
             "fritzbox_model": host.fritzbox_model,
             "fritzos_version": host.fritzos_version,
             "guest_network": host.guest_network,
+            "vpn_connection": host.vpn_connection,
+            "network_infrastructure": is_network_infrastructure(host),
+            "infrastructure_source": (
+                host.infrastructure_source or "name_fallback"
+            ),
             "dns_queries": host.dns_queries,
             "dns_blocked": host.dns_blocked,
             "dns_blocked_ratio": host.dns_blocked_ratio,
@@ -272,7 +279,10 @@ class NetworkHostEntity(
             "adguard_data_complete": host.adguard_data_complete,
             "adguard_bypass_suspected": host.adguard_bypass_suspected,
             "wan_access": host.wan_access,
+            "desired_wan_access": host.desired_wan_access,
             "internet_approval_required": host.internet_approval_required,
+            "trusted": self.coordinator.monitor.is_trusted(host),
+            "trust_status": self.coordinator.monitor.trust_status(host),
             # Return an independent snapshot so a later coordinator update
             # cannot retroactively mutate attributes of an existing HA state.
             "connection_status": {

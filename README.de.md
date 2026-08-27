@@ -205,11 +205,23 @@ Beim ersten Start der Internetschutzfunktion gelten alle bereits gespeicherten
 Teilnehmer als bestätigt. Erst danach neu entdeckte Geräte werden über den
 TR-064-Dienst `X_AVM-DE_HostFilter` für den Internetzugang gesperrt. Die lokale
 Kommunikation im Heimnetz bleibt möglich. Die Freigabe erfolgt ausdrücklich in
-der Spalte „Internetzugang“. Ändert sich die MAC-Adresse an einem bekannten
-IP-Platz, ist eine erneute Bestätigung erforderlich.
+der Spalte „Internetzugang“. Freigaben werden zusätzlich an der bestätigten
+MAC-Adresse gespeichert und bleiben deshalb bei einem DHCP-/IP-Wechsel sowie
+bei der automatischen Bereinigung alter Offline-Anzeigen erhalten. Ein
+MAC-Wechsel muss in zwei aufeinanderfolgenden Prüfungen bestätigt werden, bevor
+Nodarion die Freigabe entzieht. Alle Freigaben, Sperren, Entzüge,
+Durchsetzungsfehler und Bereinigungen erscheinen mit Ursache im Live-Log.
 
-Zur Reduzierung der Netz- und Systemlast läuft nur die aktive Ping/TCP-Erkennung
-im eingestellten Scanintervall. FRITZ!Box- und Mesh-Daten werden höchstens jede
+Die Statusanzeige unterscheidet zwischen „Vertrauenswürdig“, „Freigegeben“,
+„Noch nicht geprüft“ und „Gesperrt“. Während der Lernphase werden alle in dieser
+Zeit tatsächlich erkannten Teilnehmer unabhängig von der Erkennungsquelle als
+„Lernphase · automatisch freigegeben“ gekennzeichnet. Durchgehend ausgeschaltete
+Geräte können erst nach ihrem späteren Erscheinen bestätigt werden.
+
+Zur Reduzierung der Netz- und Systemlast prüft die Ping/TCP-Erkennung bekannte
+Adressen im eingestellten Scanintervall und durchsucht das gesamte Netz alle
+fünf Scanzyklen nach neuen Teilnehmern. Reverse-DNS-Namen werden eine Stunde
+zwischengespeichert. FRITZ!Box- und Mesh-Daten werden höchstens jede
 Minute, AdGuard-Daten höchstens alle zehn Minuten und FRITZ!Box-Geräteinformationen
 höchstens einmal pro Stunde neu abgefragt. Dazwischen nutzt Nodarion die zuletzt
 erfolgreich gelesenen Zusatzdaten.
@@ -221,7 +233,7 @@ Einträge, speichert daraus nur eine begrenzte In-Memory-Auswertung und lädt
 nach dem ersten Abruf nur neue Einträge nach. Geräte, die VPN, Private DNS
 oder einen externen DNS-Server verwenden, können in AdGuard Home fehlen.
 
-Schreibende AdGuard-Funktionen sind ausschließlich für
+Alle schreibenden Nodarion- und AdGuard-Funktionen sind ausschließlich für
 Home-Assistant-Administratoren sichtbar und serverseitig geschützt. Vor dem
 Löschen von Regeln oder Rewrites verlangt das Panel eine Bestätigung. Domains,
 Regeln und Rewrite-Ziele werden vor der Übergabe an AdGuard Home validiert.

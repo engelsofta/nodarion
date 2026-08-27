@@ -47,6 +47,16 @@ from .const import (
 
 
 def _schema(values: dict[str, Any]) -> vol.Schema:
+    def number(minimum: float, maximum: float, step: float = 1):
+        return selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=minimum,
+                max=maximum,
+                step=step,
+                mode=selector.NumberSelectorMode.BOX,
+            )
+        )
+
     return vol.Schema(
         {
             vol.Required(
@@ -55,14 +65,14 @@ def _schema(values: dict[str, Any]) -> vol.Schema:
             vol.Required(
                 CONF_SCAN_INTERVAL,
                 default=values.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-            ): vol.All(vol.Coerce(int), vol.Range(min=10, max=86400)),
+            ): number(10, 86400),
             vol.Required(
                 CONF_TIMEOUT, default=values.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
-            ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=10)),
+            ): number(0.1, 10, 0.1),
             vol.Required(
                 CONF_CONCURRENCY,
                 default=values.get(CONF_CONCURRENCY, DEFAULT_CONCURRENCY),
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=512)),
+            ): number(1, 512),
             vol.Required(
                 CONF_PORTS, default=values.get(CONF_PORTS, DEFAULT_PORTS)
             ): str,
@@ -72,13 +82,13 @@ def _schema(values: dict[str, Any]) -> vol.Schema:
             vol.Required(
                 CONF_OFFLINE_AFTER,
                 default=values.get(CONF_OFFLINE_AFTER, DEFAULT_OFFLINE_AFTER),
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+            ): number(1, 100),
             vol.Required(
                 CONF_REMOVE_AFTER_DAYS,
                 default=values.get(
                     CONF_REMOVE_AFTER_DAYS, DEFAULT_REMOVE_AFTER_DAYS
                 ),
-            ): vol.All(vol.Coerce(int), vol.Range(min=0, max=3650)),
+            ): number(0, 3650),
             vol.Required(
                 CONF_FRITZ_ENABLED,
                 default=values.get(CONF_FRITZ_ENABLED, False),
@@ -110,7 +120,7 @@ def _schema(values: dict[str, Any]) -> vol.Schema:
             vol.Optional(
                 CONF_ADGUARD_PORT,
                 default=values.get(CONF_ADGUARD_PORT, DEFAULT_ADGUARD_PORT),
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+            ): number(1, 65535),
             vol.Optional(
                 CONF_ADGUARD_USER,
                 default=values.get(CONF_ADGUARD_USER, ""),
@@ -137,7 +147,7 @@ def _schema(values: dict[str, Any]) -> vol.Schema:
                     CONF_ADGUARD_PERIOD_HOURS,
                     DEFAULT_ADGUARD_PERIOD_HOURS,
                 ),
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=168)),
+            ): number(1, 168),
         }
     )
 

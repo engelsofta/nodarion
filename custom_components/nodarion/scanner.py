@@ -9,6 +9,7 @@ import logging
 import re
 import socket
 import sys
+from time import monotonic
 
 from homeassistant.helpers.device_registry import format_mac
 
@@ -38,14 +39,24 @@ class NetworkScanner:
         self.semaphore = asyncio.Semaphore(concurrency)
         self.ports = tuple(ports)
         self.excluded = excluded
+        self._scan_number = 0
+        self._known_ips: set[str] = set()
+        self._dns_cache: dict[str, tuple[str | None, float]] = {}
 
     async def async_scan(self) -> dict[str, NetworkHost]:
         """Scan the configured network."""
-        addresses = [
+        all_addresses = [
             str(address)
             for address in self.network.hosts()
             if str(address) not in self.excluded
         ]
+        self._scan_number += 1
+        full_discovery = not self._known_ips or self._scan_number % 5 == 1
+        addresses = (
+            all_addresses
+            if full_discovery
+            else [ip for ip in all_addresses if ip in self._known_ips]
+        )
         results = await asyncio.gather(*(self._probe(ip) for ip in addresses))
         arp = await self._read_neighbors()
         hosts: dict[str, NetworkHost] = {}
@@ -66,8 +77,14 @@ class NetworkScanner:
                 mac=mac,
                 hostname=hostname,
                 online=True,
+                scanner_hostname=hostname,
                 sources=(detection_source,),
             )
+        detected_ips = {host.ip for host in hosts.values()}
+        if full_discovery:
+            self._known_ips = detected_ips
+        else:
+            self._known_ips.update(detected_ips)
         return hosts
 
     async def _probe(self, ip: str) -> str | None:
@@ -155,10 +172,16 @@ class NetworkScanner:
         return result
 
     async def _reverse_dns(self, ip: str) -> str | None:
+        cached = self._dns_cache.get(ip)
+        now = monotonic()
+        if cached is not None and cached[1] > now:
+            return cached[0]
         try:
             hostname, _aliases, _addresses = await asyncio.wait_for(
                 asyncio.to_thread(socket.gethostbyaddr, ip), self.timeout
             )
-            return hostname.rstrip(".")
+            value = hostname.rstrip(".")
         except (TimeoutError, OSError):
-            return None
+            value = None
+        self._dns_cache[ip] = (value, now + 3600)
+        return value

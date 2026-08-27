@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 
 def canonical_hostname(hostname: str | None) -> str:
@@ -24,6 +25,17 @@ def preferred_hostname(
     return current
 
 
+def is_network_infrastructure(host: "NetworkHost") -> bool:
+    """Return whether a discovered host is router or mesh infrastructure."""
+    if host.network_infrastructure is not None:
+        return host.network_infrastructure
+    hostname = (host.fritz_hostname or host.hostname or "").strip().rstrip(".").casefold()
+    if hostname in {"fritz.box", "fritz!box", "fritzbox"}:
+        return True
+    tokens = set(filter(None, re.split(r"[^a-z0-9!]+", hostname)))
+    return bool(tokens & {"router", "repeater", "powerline", "accesspoint"})
+
+
 @dataclass(slots=True)
 class NetworkHost:
     """A discovered network host."""
@@ -33,6 +45,8 @@ class NetworkHost:
     mac: str | None
     hostname: str | None
     online: bool
+    fritz_hostname: str | None = None
+    scanner_hostname: str | None = None
     missed_scans: int = 0
     sources: tuple[str, ...] = ("ping_tcp",)
     access_point: str | None = None
@@ -62,8 +76,12 @@ class NetworkHost:
     adguard_data_complete: bool = True
     adguard_bypass_suspected: bool = False
     wan_access: str | None = None
+    desired_wan_access: str | None = None
     internet_approval_required: bool = False
     guest_network: bool = False
+    vpn_connection: bool = False
+    network_infrastructure: bool | None = None
+    infrastructure_source: str | None = None
 
     @property
     def display_name(self) -> str:

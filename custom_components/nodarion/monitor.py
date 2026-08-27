@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 import html
 import ipaddress
@@ -17,6 +18,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
 from .models import NetworkHost, canonical_hostname
+from .trust import is_trusted_identity, is_vpn_connection, normalize_mac
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.monitor"
@@ -105,8 +107,10 @@ class NetworkMonitor:
         self.alerts: list[dict[str, Any]] = []
         self.rules = dict(DEFAULT_RULES)
         self.known_hosts: set[str] = set()
+        self.trusted_macs: set[str] = set()
         self.host_inventory: dict[str, dict[str, Any]] = {}
         self.first_seen: dict[str, str] = {}
+        self.online_since: dict[str, str] = {}
         self.offline_since: dict[str, str] = {}
         self.transitions: dict[str, list[str]] = {}
         self.guest_since: dict[str, str] = {}
@@ -118,6 +122,7 @@ class NetworkMonitor:
         self.ai_last_run_date: str | None = None
         self.ai_last_error: str | None = None
         self._ai_running = False
+        self._save_lock = asyncio.Lock()
         self._store = Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
 
     async def async_load(self) -> None:
@@ -140,13 +145,37 @@ class NetworkMonitor:
             rules_migrated = True
         self.rules.pop("absence_sensor_enabled", None)
         self.known_hosts = set(data.get("known_hosts", []))
+        self.trusted_macs = {
+            normalized
+            for mac in data.get("trusted_macs", [])
+            if (normalized := normalize_mac(str(mac))) is not None
+        }
         self.host_inventory = {
             key: dict(value)
             for key, value in data.get("host_inventory", {}).items()
             if isinstance(key, str) and isinstance(value, dict)
         }
+        # Migrate approvals created before MAC-backed trust existed.
+        for key in self.known_hosts:
+            mac = self.host_inventory.get(key, {}).get("mac")
+            if mac:
+                self.trusted_macs.add(str(mac).upper())
         self.first_seen = dict(data.get("first_seen", {}))
+        self.online_since = dict(data.get("online_since", {}))
         self.offline_since = dict(data.get("offline_since", {}))
+        # Older releases kept transition times only in the event history.
+        # Recover the latest online timestamp once instead of replacing it
+        # with Home Assistant's restart time.
+        for key, item in self.host_inventory.items():
+            if not item.get("online") or key in self.online_since:
+                continue
+            latest = next((
+                event.get("timestamp")
+                for event in reversed(self.events)
+                if event.get("key") == key and event.get("type") == "online"
+            ), None) or self.first_seen.get(key)
+            if latest:
+                self.online_since[key] = str(latest)
         self.transitions = {
             key: list(values) for key, values in data.get("transitions", {}).items()
         }
@@ -207,24 +236,114 @@ class NetworkMonitor:
         self.internet_guard_initialized = True
         await self._async_save()
 
-    async def async_trust_host(self, key: str) -> None:
-        """Mark a device as manually approved."""
-        self.known_hosts.add(key)
-        await self._async_save()
+    def is_trusted(self, host: NetworkHost) -> bool:
+        """Return whether an IP slot or its physical device was approved."""
+        return is_trusted_identity(
+            host.key, host.mac, self.known_hosts, self.trusted_macs
+        )
 
-    async def async_trust_hosts(self, keys: set[str]) -> None:
+    def trust_status(self, host: NetworkHost) -> str:
+        """Return the single persisted-policy status exposed to consumers."""
+        if host.internet_approval_required:
+            return "pending"
+        if host.guest_network or host.vpn_connection:
+            return "exempt"
+        return "trusted" if self.is_trusted(host) else "unverified"
+
+    async def async_trust_host(
+        self, key: str, host: NetworkHost | None = None, *, reason: str = "manual"
+    ) -> None:
+        """Mark a device as manually approved."""
+        changed = key not in self.known_hosts
+        self.known_hosts.add(key)
+        if host is not None and host.mac:
+            normalized_mac = normalize_mac(host.mac)
+            assert normalized_mac is not None
+            changed = normalized_mac not in self.trusted_macs or changed
+            self.trusted_macs.add(normalized_mac)
+        if changed:
+            if host is not None:
+                self._add_event(
+                    "internet_approval_granted",
+                    host,
+                    "Internetfreigabe gespeichert.",
+                    mac=host.mac,
+                    reason=reason,
+                    service="Nodarion-Internetschutz",
+                )
+            await self._async_save()
+
+    async def async_trust_hosts(
+        self,
+        keys: set[str],
+        hosts: dict[str, NetworkHost] | None = None,
+        *,
+        reason: str = "learning",
+    ) -> None:
         """Trust newly discovered devices together during the learning phase."""
         new_keys = keys - self.known_hosts
-        if not new_keys:
+        new_macs = {
+            normalize_mac(host.mac)
+            for key, host in (hosts or {}).items()
+            if key in keys and host.mac
+        } - self.trusted_macs
+        if not new_keys and not new_macs:
             return
         self.known_hosts.update(new_keys)
+        self.trusted_macs.update(new_macs)
+        for key in new_keys:
+            host = (hosts or {}).get(key)
+            if host is not None:
+                self._add_event(
+                    "internet_approval_granted",
+                    host,
+                    "Während der Lernphase automatisch freigegeben.",
+                    mac=host.mac,
+                    reason=reason,
+                    service="Nodarion-Internetschutz",
+                )
         await self._async_save()
 
-    async def async_untrust_host(self, key: str) -> None:
-        """Require approval again after a device identity changes."""
+    async def async_untrust_host(
+        self,
+        key: str,
+        *,
+        host: NetworkHost | None = None,
+        previous_mac: str | None = None,
+    ) -> None:
+        """Require approval again and record an identity-based revocation."""
         if key in self.known_hosts:
             self.known_hosts.discard(key)
+            if host is not None and previous_mac and host.mac:
+                self._add_event(
+                    "internet_approval_revoked",
+                    host,
+                    (
+                        "Internetfreigabe automatisch entzogen: MAC-Adresse "
+                        f"geändert ({previous_mac} → {host.mac})."
+                    ),
+                    old_mac=previous_mac,
+                    new_mac=host.mac,
+                    service="Nodarion-Internetschutz",
+                )
             await self._async_save()
+
+    async def async_record_internet_event(
+        self,
+        event_type: str,
+        host: NetworkHost,
+        message: str,
+        **details: Any,
+    ) -> None:
+        """Persist an auditable internet-policy or enforcement event."""
+        self._add_event(
+            event_type,
+            host,
+            message,
+            service="Nodarion-Internetschutz",
+            **details,
+        )
+        await self._async_save()
 
     async def async_set_rules(self, values: dict[str, Any]) -> None:
         """Validate and save anomaly detection rules."""
@@ -580,6 +699,26 @@ class NetworkMonitor:
         self.known_hosts.update(current_keys)
         await self._async_save()
 
+    async def async_extend_learning(self, days: int = 7) -> None:
+        """Extend an active learning phase or start a new short phase."""
+        now = _now()
+        started = _parse(self.started_at) or now
+        current_end = started + timedelta(days=self.rules["learning_days"])
+        if current_end <= now:
+            self.started_at = now.isoformat()
+            self.rules["learning_days"] = min(30, max(1, days))
+        else:
+            self.rules["learning_days"] = min(
+                30, self.rules["learning_days"] + max(1, days)
+            )
+        await self._async_save()
+
+    async def async_end_learning(self) -> None:
+        """End learning immediately without changing saved trust decisions."""
+        duration = max(1, int(self.rules["learning_days"]))
+        self.started_at = (_now() - timedelta(days=duration)).isoformat()
+        await self._async_save()
+
     async def async_acknowledge(self, alert_id: str) -> None:
         """Acknowledge an alert."""
         for alert in self.alerts:
@@ -648,6 +787,10 @@ class NetworkMonitor:
                             collection.add(key)
                     if prior_key in self.first_seen:
                         self.first_seen[key] = self.first_seen.pop(prior_key)
+                    if prior_key in self.online_since:
+                        self.online_since[key] = self.online_since.pop(prior_key)
+                    if prior_key in self.offline_since:
+                        self.offline_since[key] = self.offline_since.pop(prior_key)
                     if (
                         _in_onboarding_range(prior_host.ip, self.rules)
                         and not _in_onboarding_range(host.ip, self.rules)
@@ -664,6 +807,12 @@ class NetworkMonitor:
                             service="Geräte-Einrichtung",
                         )
                 self.first_seen.setdefault(key, now.isoformat())
+                if host.online:
+                    self.online_since.setdefault(key, now.isoformat())
+                    self.offline_since.pop(key, None)
+                else:
+                    self.offline_since.setdefault(key, now.isoformat())
+                    self.online_since.pop(key, None)
                 if _in_onboarding_range(host.ip, self.rules):
                     if self.rules.get("onboarding_auto_monitor"):
                         self.monitored.add(key)
@@ -898,6 +1047,8 @@ class NetworkMonitor:
                 mac=item.get("mac"),
                 hostname=item.get("hostname"),
                 online=bool(item.get("online", False)),
+                fritz_hostname=item.get("fritz_hostname"),
+                scanner_hostname=item.get("scanner_hostname"),
                 sources=tuple(item.get("sources") or ("ping_tcp",)),
                 access_point=item.get("access_point"),
                 connection_type=item.get("connection_type"),
@@ -906,17 +1057,28 @@ class NetworkMonitor:
                 fritzbox_model=item.get("fritzbox_model"),
                 fritzos_version=item.get("fritzos_version"),
                 wan_access=item.get("wan_access"),
+                desired_wan_access=item.get("desired_wan_access"),
                 internet_approval_required=bool(
                     item.get("internet_approval_required", False)
                 ),
                 guest_network=bool(item.get("guest_network", False)),
+                vpn_connection=(
+                    bool(item.get("vpn_connection", False))
+                    or is_vpn_connection(
+                        item.get("connection_type"),
+                        item.get("hostname"),
+                        item.get("mac"),
+                    )
+                ),
+                network_infrastructure=item.get("network_infrastructure"),
+                infrastructure_source=item.get("infrastructure_source"),
             )
         return restored
 
     async def async_forget_hosts(
         self, keys: set[str], *, force: bool = False
     ) -> None:
-        """Remove hosts from persistent inventory."""
+        """Remove stale inventory while preserving automatic approvals."""
         changed = False
         for key in keys:
             if (
@@ -933,10 +1095,47 @@ class NetworkMonitor:
                 self.monitored.discard(key)
                 self.notifications.discard(key)
                 self.presence_devices.discard(key)
-            changed = self.host_inventory.pop(key, None) is not None or changed
+            inventory = self.host_inventory.pop(key, None)
+            changed = inventory is not None or changed
+            if inventory and inventory.get("ip"):
+                forgotten_host = NetworkHost(
+                    key=key,
+                    ip=str(inventory["ip"]),
+                    mac=inventory.get("mac"),
+                    hostname=inventory.get("hostname"),
+                    online=False,
+                )
+                self._add_event(
+                    "device_forgotten" if force else "inventory_pruned",
+                    forgotten_host,
+                    (
+                        "Gerät vollständig gelöscht; Freigabe entfernt."
+                        if force
+                        else "Veralteten Offline-Eintrag entfernt; Freigabe bleibt erhalten."
+                    ),
+                    reason="manual" if force else "retention",
+                    service="Nodarion-Datenpflege",
+                )
             self.first_seen.pop(key, None)
+            self.online_since.pop(key, None)
             self.offline_since.pop(key, None)
-            self.known_hosts.discard(key)
+            if force:
+                if key in self.known_hosts:
+                    self.known_hosts.discard(key)
+                    changed = True
+                mac = str((inventory or {}).get("mac") or "").upper()
+                if mac and mac in self.trusted_macs:
+                    self.trusted_macs.discard(mac)
+                    changed = True
+            elif inventory and inventory.get("mac") and key in self.known_hosts:
+                # Keep the physical-device approval, but release the stale IP
+                # slot so unrelated hardware cannot inherit trust later.
+                self.known_hosts.discard(key)
+                changed = True
+            # Automatic retention cleanup deliberately keeps known_hosts and
+            # trusted_macs for MAC-less devices and MAC-backed approvals
+            # respectively: hiding inventory must not revoke an administrator
+            # decision or transfer it to unrelated hardware on the same IP.
             self.transitions.pop(key, None)
             self.guest_since.pop(key, None)
         if changed:
@@ -949,6 +1148,8 @@ class NetworkMonitor:
             "ip": host.ip,
             "mac": host.mac,
             "hostname": host.hostname,
+            "fritz_hostname": host.fritz_hostname,
+            "scanner_hostname": host.scanner_hostname,
             "online": host.online,
             "sources": list(host.sources),
             "access_point": host.access_point,
@@ -958,8 +1159,12 @@ class NetworkMonitor:
             "fritzbox_model": host.fritzbox_model,
             "fritzos_version": host.fritzos_version,
             "wan_access": host.wan_access,
+            "desired_wan_access": host.desired_wan_access,
             "internet_approval_required": host.internet_approval_required,
             "guest_network": host.guest_network,
+            "vpn_connection": host.vpn_connection,
+            "network_infrastructure": host.network_infrastructure,
+            "infrastructure_source": host.infrastructure_source,
         }
 
     def _restore_monitored_inventory_from_history(self) -> bool:
@@ -1011,6 +1216,7 @@ class NetworkMonitor:
             event_type, host, message, service=self._service_for(host)
         )
         if host.online:
+            self.online_since[host.key] = now.isoformat()
             self.offline_since.pop(host.key, None)
             self._resolve_alert("important_offline", host.key, now)
             if host.key not in self.known_hosts:
@@ -1029,6 +1235,7 @@ class NetworkMonitor:
                     now,
                 )
         else:
+            self.online_since.pop(host.key, None)
             self.offline_since[host.key] = now.isoformat()
             if host.key not in self.known_hosts:
                 self.first_seen.pop(host.key, None)
@@ -1086,6 +1293,8 @@ class NetworkMonitor:
             "alerts": list(reversed(self.alerts)),
             "rules": dict(self.rules),
             "known_hosts": sorted(self.known_hosts),
+            "online_since": dict(self.online_since),
+            "offline_since": dict(self.offline_since),
             "guest_since": dict(self.guest_since),
             "learning": {
                 "active": now < learning_end,
@@ -1425,8 +1634,9 @@ class NetworkMonitor:
         return "Nodarion-Überwachung"
 
     async def _async_save(self) -> None:
-        await self._store.async_save(
-            {
+        async with self._save_lock:
+            await self._store.async_save(
+                {
                 "monitored": sorted(self.monitored),
                 "notifications": sorted(self.notifications),
                 "presence_devices": sorted(self.presence_devices),
@@ -1434,8 +1644,10 @@ class NetworkMonitor:
                 "alerts": self.alerts,
                 "rules": self.rules,
                 "known_hosts": sorted(self.known_hosts),
+                "trusted_macs": sorted(self.trusted_macs),
                 "host_inventory": self.host_inventory,
                 "first_seen": self.first_seen,
+                "online_since": self.online_since,
                 "offline_since": self.offline_since,
                 "transitions": self.transitions,
                 "guest_since": self.guest_since,
@@ -1446,5 +1658,5 @@ class NetworkMonitor:
                 "ai_last_snapshot": self.ai_last_snapshot,
                 "ai_last_run_date": self.ai_last_run_date,
                 "ai_last_error": self.ai_last_error,
-            }
-        )
+                }
+            )

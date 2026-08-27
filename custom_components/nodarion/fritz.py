@@ -15,8 +15,9 @@ from fritzconnection.lib.fritzwlan import FritzGuestWLAN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import format_mac
 
-from .models import NetworkHost
 from .const import FRITZ_DEVICE_INFO_INTERVAL_SECONDS
+from .models import NetworkHost
+from .trust import has_upnp_error_code, is_vpn_connection
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -118,6 +119,10 @@ class FritzBoxScanner:
             mac = self._format_mac(item.get("mac"))
             name = str(item.get("name") or "").strip() or None
             details = topology_data.get(mac, {}) if mac else {}
+            connection_type = (
+                details.get("connection_type")
+                or self._normalize_connection_type(item.get("interface_type"))
+            )
             key = f"ip_{ip}"
             hosts[key] = NetworkHost(
                 key=key,
@@ -125,12 +130,10 @@ class FritzBoxScanner:
                 mac=mac,
                 hostname=name,
                 online=True,
+                fritz_hostname=name,
                 sources=("fritzbox",),
                 access_point=details.get("access_point"),
-                connection_type=(
-                    details.get("connection_type")
-                    or self._normalize_connection_type(item.get("interface_type"))
-                ),
+                connection_type=connection_type,
                 wifi_band=details.get("wifi_band"),
                 link_rate_mbps=(
                     details.get("link_rate_mbps")
@@ -150,6 +153,9 @@ class FritzBoxScanner:
                 fritzbox_model=router_info.get("model"),
                 fritzos_version=router_info.get("version"),
                 guest_network=is_guest,
+                vpn_connection=is_vpn_connection(connection_type, name, mac),
+                network_infrastructure=details.get("network_infrastructure"),
+                infrastructure_source=details.get("infrastructure_source"),
             )
         return hosts
 
@@ -177,12 +183,21 @@ class FritzBoxScanner:
         except Exception as err:
             # FRITZ!OS returns 714 when asked to remove a WAN block that no
             # longer has a HostFilter entry. Releasing access is idempotent:
-            # an absent block already represents the requested end state.
-            if not allowed or "errorCode: 714" not in str(err):
+            # an absent block already represents the requested end state. It
+            # returns 880 for infrastructure and other clients that cannot be
+            # managed by HostFilter at all. Such a client cannot carry a WAN
+            # block either, so an allow request has already reached its
+            # effective end state.
+            harmless_allow = allowed and (
+                has_upnp_error_code(err, 714)
+                or has_upnp_error_code(err, 880)
+            )
+            if not harmless_allow:
                 raise
             _LOGGER.debug(
-                "WAN access for %s was already granted (no HostFilter entry)",
+                "WAN access for %s is already effectively granted (%s)",
                 ip,
+                err,
             )
         return "granted" if allowed else "denied"
 
@@ -214,6 +229,14 @@ class FritzBoxScanner:
             topology = FritzMeshTopology(fc=hosts.fc)
             topology.load_topology()
             for device in topology.devices:
+                infrastructure = self._is_infrastructure(device)
+                for mac in self._device_macs(device):
+                    formatted = self._format_mac(mac)
+                    if formatted:
+                        topology_data.setdefault(formatted, {}).update({
+                            "network_infrastructure": infrastructure,
+                            "infrastructure_source": "mesh_topology",
+                        })
                 connections = [
                     connection
                     for connection in device.get_connections()

@@ -75,6 +75,10 @@ class NodarionView(HomeAssistantView):
         manager = self._manager(request)
         if manager is None:
             return self.json_message("Integration ist nicht geladen", 503)
+        if not self._is_admin(request):
+            return self.json_message(
+                "Nur Administratoren dürfen Nodarion verändern", 403
+            )
         try:
             data = await request.json()
         except ValueError:
@@ -87,7 +91,9 @@ class NodarionView(HomeAssistantView):
             coordinator = self._coordinator(request)
             if coordinator is None:
                 return self.json_message("Integration ist nicht geladen", 503)
-            removed = await coordinator.async_cleanup_inactive()
+            removed = await coordinator.async_cleanup_inactive(
+                forget=bool(data.get("forget", True))
+            )
             response = self._frontend_state(request, manager)
             response["cleanup_result"] = {"removed": removed}
             return self.json(response)
@@ -136,6 +142,10 @@ class NodarionView(HomeAssistantView):
             coordinator = self._coordinator(request)
             current_keys = set(coordinator.data) if coordinator and coordinator.data else set()
             await manager.async_restart_learning(current_keys)
+        elif action == "extend_learning":
+            await manager.async_extend_learning(7)
+        elif action == "end_learning":
+            await manager.async_end_learning()
         elif action == "acknowledge":
             alert_id = data.get("alert_id")
             if not isinstance(alert_id, str):
@@ -262,6 +272,8 @@ class NodarionView(HomeAssistantView):
                 attributes["ip_address"] = host.ip
                 attributes["mac_address"] = host.mac
                 attributes["detection_sources"] = list(host.sources)
+                attributes["trusted"] = manager.is_trusted(host)
+                attributes["trust_status"] = manager.trust_status(host)
                 attributes["connection_status"] = {
                     key: dict(status)
                     for key, status in coordinator.connection_status.items()

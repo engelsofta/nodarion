@@ -164,16 +164,22 @@ TR-064 application access must be enabled on the FRITZ!Box. A dedicated
 FRITZ!Box user for Nodarion is recommended. Internet protection uses the
 `X_AVM-DE_HostFilter` service: local network communication remains possible,
 while internet access is granted explicitly from the device table.
+Approvals are also tied to the confirmed MAC address, survive DHCP address
+changes and automatic stale-inventory cleanup, and are revoked only after a
+changed MAC has been observed twice. Trust, enforcement, cleanup, and failure
+reasons are recorded in the live log.
 
-To reduce network and system load, only ping/TCP discovery runs at the selected
-scan interval. FRITZ!Box and Mesh data is refreshed at most once per minute,
+To reduce network and system load, ping/TCP discovery checks known addresses at
+the selected interval and performs a full discovery every five cycles. Reverse
+DNS results are cached for one hour. FRITZ!Box and Mesh data is refreshed at most once per minute,
 AdGuard data every ten minutes, and FRITZ!Box device information once per hour.
 
 AdGuard Home analysis requires direct access to its web interface and an
 administrator account. The query log must be enabled. Devices using a VPN,
 Private DNS, or an external DNS server may not appear. Write operations are
 restricted to Home Assistant administrators and input is validated before it is
-sent to AdGuard Home.
+sent to AdGuard Home. All Nodarion write operations require a Home Assistant
+administrator account.
 
 AI analysis is disabled by default. With anonymized DNS privacy, only counters
 and stable, non-reversible domain identifiers are passed to the configured AI.

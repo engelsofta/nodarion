@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import ipaddress
 import logging
+import socket
 from time import perf_counter
 from typing import Any
 
@@ -50,9 +51,15 @@ from .const import (
     ADGUARD_SCAN_INTERVAL_SECONDS,
 )
 from .adguard import AdGuardScanner
-from .models import NetworkHost, preferred_hostname
+from .models import NetworkHost, is_network_infrastructure, preferred_hostname
 from .monitor import NetworkMonitor
 from .fritz import FritzBoxScanner
+from .trust import (
+    IdentityChangeTracker,
+    is_configured_router,
+    is_vpn_connection,
+    should_prune_offline,
+)
 from .scanner import NetworkScanner
 
 _LOGGER = logging.getLogger(__name__)
@@ -170,8 +177,15 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         self._next_fritz_scan = 0.0
         self._hostname_fallback_since: dict[str, float] = {}
         self._next_adguard_scan = 0.0
-        self._wan_access_by_ip: dict[str, str] = {}
+        self._wan_access_by_ip: dict[str, str] = {
+            str(item["ip"]): str(item["wan_access"])
+            for item in self.monitor.host_inventory.values()
+            if item.get("ip")
+            and item.get("wan_access") in {"granted", "denied"}
+        }
         self._wan_retry_after: dict[str, float] = {}
+        self._identity_changes = IdentityChangeTracker(confirmations=2)
+        self._protected_router_ips: set[str] = set()
         super().__init__(
             hass,
             _LOGGER,
@@ -184,6 +198,18 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
     async def _async_update_data(self) -> dict[str, NetworkHost]:
         """Fetch scan data and apply the offline threshold."""
         now_monotonic = perf_counter()
+        if self.fritz_scanner is not None and not self._protected_router_ips:
+            try:
+                router_ip = await asyncio.to_thread(
+                    socket.gethostbyname, self.fritz_scanner.address
+                )
+                ipaddress.ip_address(router_ip)
+                self._protected_router_ips.add(router_ip)
+            except (OSError, ValueError):
+                _LOGGER.debug(
+                    "Could not resolve configured FRITZ!Box address %s",
+                    self.fritz_scanner.address,
+                )
         restoring = self.data is None
         previous = self.monitor.restored_hosts() if restoring else self.data
         adguard_due = (
@@ -254,14 +280,21 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                     # Some clients, especially phones in power-saving mode,
                     # deliberately ignore ICMP and expose no TCP service. An
                     # active FRITZ!Box host entry is therefore authoritative.
-                    found[key] = (
-                        replace(fritz_host, access_point=old.access_point)
-                        if (
-                            old is not None
-                            and old.access_point
-                            and not fritz_host.access_point
-                        )
-                        else fritz_host
+                    found[key] = replace(
+                        fritz_host,
+                        access_point=(
+                            fritz_host.access_point
+                            or (old.access_point if old else None)
+                        ),
+                        network_infrastructure=(
+                            fritz_host.network_infrastructure
+                            if fritz_host.network_infrastructure is not None
+                            else (old.network_infrastructure if old else None)
+                        ),
+                        infrastructure_source=(
+                            fritz_host.infrastructure_source
+                            or (old.infrastructure_source if old else None)
+                        ),
                     )
                     continue
                 found[key] = NetworkHost(
@@ -270,6 +303,8 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                     mac=fritz_host.mac or probed.mac,
                     hostname=fritz_host.hostname or probed.hostname,
                     online=True,
+                    fritz_hostname=fritz_host.hostname,
+                    scanner_hostname=probed.hostname,
                     sources=(*probed.sources, "fritzbox"),
                     # A FRITZ!Box can occasionally return its host list before
                     # the mesh-topology document is ready. Keep the last valid
@@ -290,13 +325,36 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                     fritzbox_model=fritz_host.fritzbox_model,
                     fritzos_version=fritz_host.fritzos_version,
                     guest_network=fritz_host.guest_network,
+                    vpn_connection=fritz_host.vpn_connection,
+                    network_infrastructure=(
+                        fritz_host.network_infrastructure
+                        if fritz_host.network_infrastructure is not None
+                        else (old.network_infrastructure if old else None)
+                    ),
+                    infrastructure_source=(
+                        fritz_host.infrastructure_source
+                        or (old.infrastructure_source if old else None)
+                    ),
                 )
+
+        # Migrate legacy/offline entries and scanner-only observations before
+        # the internet guard evaluates them. Older FRITZ!OS versions expose
+        # VPN users without a dedicated InterfaceType.
+        for key, host in tuple(found.items()):
+            if not host.vpn_connection and is_vpn_connection(
+                host.connection_type, host.hostname, host.mac
+            ):
+                found[key] = replace(host, vpn_connection=True)
 
         if (
             self.fritz_scanner is not None
             and not self.monitor.internet_guard_initialized
         ):
-            await self.monitor.async_initialize_internet_guard(set(found))
+            await self.monitor.async_initialize_internet_guard({
+                key
+                for key, host in found.items()
+                if not host.guest_network and not host.vpn_connection
+            })
         if self.fritz_scanner is not None:
             await self._async_apply_internet_guard(found)
 
@@ -304,12 +362,35 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             old = previous.get(key)
             if old is None:
                 continue
+            preferred_source_name = (
+                host.fritz_hostname
+                or old.fritz_hostname
+                or host.scanner_hostname
+                or old.scanner_hostname
+            )
+            if preferred_source_name:
+                host = found[key] = replace(
+                    host,
+                    hostname=preferred_source_name,
+                    fritz_hostname=host.fritz_hostname or old.fritz_hostname,
+                    scanner_hostname=(
+                        host.scanner_hostname or old.scanner_hostname
+                    ),
+                )
+            fritz_name_temporarily_missing = bool(
+                self.fritz_scanner is not None
+                and "fritzbox" in old.sources
+                and "fritzbox" not in host.sources
+                and old.hostname
+            )
             scanner_fell_back_to_ip = (
                 (not host.hostname or _is_ip_hostname(host.hostname))
                 and old.hostname
                 and not _is_ip_hostname(old.hostname)
             )
-            if self.fritz_scanner is not None and scanner_fell_back_to_ip:
+            if self.fritz_scanner is not None and (
+                scanner_fell_back_to_ip or fritz_name_temporarily_missing
+            ):
                 fallback_since = self._hostname_fallback_since.setdefault(
                     key, now_monotonic
                 )
@@ -322,7 +403,8 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 fritz_name_grace_active = False
             stable_hostname = (
                 old.hostname
-                if fritz_name_grace_active and scanner_fell_back_to_ip
+                if fritz_name_grace_active
+                and (scanner_fell_back_to_ip or fritz_name_temporarily_missing)
                 else preferred_hostname(host.hostname, old.hostname)
             )
             if stable_hostname != host.hostname:
@@ -386,12 +468,11 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 except ValueError:
                     pass
             estimated_age = timedelta(seconds=missed * self.scan_interval)
-            if (
-                self.remove_after_days > 0
-                and key not in self.monitor.monitored
-                and key not in self.monitor.presence_devices
-                and max(offline_age or timedelta(0), estimated_age)
-                >= timedelta(days=self.remove_after_days)
+            if should_prune_offline(
+                max(offline_age or timedelta(0), estimated_age),
+                self.remove_after_days,
+                monitored=key in self.monitor.monitored,
+                presence=key in self.monitor.presence_devices,
             ):
                 forgotten.add(key)
                 continue
@@ -414,6 +495,22 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
 
         if forgotten:
             await self.monitor.async_forget_hosts(forgotten)
+
+        # Offline entries are reinserted only after the active-device guard
+        # has run. Remove legacy HostFilter state here as well so exempt VPN
+        # and guest entries never retain an approval action in the UI.
+        for key, host in tuple(found.items()):
+            if not host.guest_network and not host.vpn_connection:
+                continue
+            self._wan_access_by_ip.pop(host.ip, None)
+            self._wan_retry_after.pop(host.ip, None)
+            await self.monitor.async_untrust_host(key)
+            found[key] = replace(
+                host,
+                wan_access=None,
+                desired_wan_access=None,
+                internet_approval_required=False,
+            )
 
         if adguard_task is not None:
             scanned_dns = await adguard_task
@@ -495,7 +592,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             },
         }
 
-    async def async_cleanup_inactive(self) -> int:
+    async def async_cleanup_inactive(self, *, forget: bool = True) -> int:
         """Immediately remove every currently offline host."""
         if not self.data:
             return 0
@@ -504,7 +601,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         }
         if not offline:
             return 0
-        await self.monitor.async_forget_hosts(offline, force=True)
+        await self.monitor.async_forget_hosts(offline, force=forget)
         self.async_set_updated_data(
             {
                 key: host
@@ -524,6 +621,28 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             trustable_keys = set(hosts)
             release_failures: set[str] = set()
             for key, host in tuple(hosts.items()):
+                if host.guest_network or host.vpn_connection:
+                    trustable_keys.discard(key)
+                    self._wan_access_by_ip.pop(host.ip, None)
+                    self._wan_retry_after.pop(host.ip, None)
+                    await self.monitor.async_untrust_host(key)
+                    hosts[key] = replace(
+                        host,
+                        wan_access=None,
+                        desired_wan_access=None,
+                        internet_approval_required=False,
+                    )
+                    continue
+                if self._is_protected_infrastructure(host):
+                    self._wan_access_by_ip.pop(host.ip, None)
+                    self._wan_retry_after.pop(host.ip, None)
+                    hosts[key] = replace(
+                        host,
+                        wan_access="granted",
+                        desired_wan_access="granted",
+                        internet_approval_required=False,
+                    )
+                    continue
                 state = self._wan_access_by_ip.get(host.ip)
                 approval_required = False
                 if state == "denied" and "fritzbox" in host.sources:
@@ -555,50 +674,115 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 hosts[key] = replace(
                     host,
                     wan_access=state,
+                    desired_wan_access="granted",
                     internet_approval_required=approval_required,
                 )
-            await self.monitor.async_trust_hosts(trustable_keys)
+            await self.monitor.async_trust_hosts(
+                trustable_keys, hosts, reason="learning"
+            )
             for key in release_failures:
                 await self.monitor.async_untrust_host(key)
             return
         now = perf_counter()
         for key, host in tuple(hosts.items()):
-            state = self._wan_access_by_ip.get(host.ip)
-            if host.guest_network:
+            if self._is_protected_infrastructure(host):
+                self._wan_access_by_ip.pop(host.ip, None)
+                self._wan_retry_after.pop(host.ip, None)
                 hosts[key] = replace(
                     host,
-                    wan_access=state,
+                    wan_access="granted",
+                    desired_wan_access="granted",
+                    internet_approval_required=False,
+                )
+                continue
+            state = self._wan_access_by_ip.get(host.ip)
+            if host.guest_network or host.vpn_connection:
+                self._wan_access_by_ip.pop(host.ip, None)
+                self._wan_retry_after.pop(host.ip, None)
+                await self.monitor.async_untrust_host(key)
+                hosts[key] = replace(
+                    host,
+                    wan_access=None,
+                    desired_wan_access=None,
                     internet_approval_required=False,
                 )
                 continue
             inventory = self.monitor.host_inventory.get(key, {})
             previous_mac = inventory.get("mac")
+            trusted = self.monitor.is_trusted(host)
+            if trusted and key not in self.monitor.known_hosts:
+                # Carry a MAC-backed approval across DHCP/IP changes.
+                await self.monitor.async_trust_host(
+                    key, host, reason="known_mac_new_ip"
+                )
             if (
-                key in self.monitor.known_hosts
+                trusted
                 and previous_mac
                 and host.mac
                 and previous_mac != host.mac
             ):
-                await self.monitor.async_untrust_host(key)
-            if key in self.monitor.known_hosts:
+                if not self._identity_changes.observe(
+                    key, previous_mac, host.mac
+                ):
+                    # Do not let a single stale ARP/TR-064 sample replace the
+                    # approved identity in the persistent inventory.
+                    hosts[key] = host = replace(host, mac=previous_mac)
+                else:
+                    await self.monitor.async_untrust_host(
+                        key,
+                        host=host,
+                        previous_mac=previous_mac,
+                    )
+                    trusted = False
+            else:
+                self._identity_changes.clear(key)
+            if trusted:
+                if state is None and "fritzbox" in host.sources:
+                    try:
+                        state = await self.fritz_scanner.async_set_wan_access(
+                            host.ip, True
+                        )
+                        self._wan_access_by_ip[host.ip] = state
+                    except Exception as err:
+                        state = "error"
+                        self._wan_access_by_ip[host.ip] = state
+                        _LOGGER.warning(
+                            "Could not reconcile trusted WAN access for %s: %s",
+                            host.ip,
+                            err,
+                        )
+                        await self.monitor.async_record_internet_event(
+                            "internet_enforcement_failed",
+                            host,
+                            f"Gespeicherte Freigabe konnte nicht wiederhergestellt werden: {err}",
+                            desired="granted",
+                            actual="error",
+                        )
                 hosts[key] = replace(
                     host,
                     wan_access=state,
+                    desired_wan_access="granted",
                     internet_approval_required=False,
                 )
                 continue
-            if (
-                "fritzbox" not in host.sources
-                or self._is_protected_infrastructure(host)
-            ):
+            if "fritzbox" not in host.sources:
                 continue
             if state != "denied" and now >= self._wan_retry_after.get(host.ip, 0):
+                previous_state = state
                 try:
                     state = await self.fritz_scanner.async_set_wan_access(
                         host.ip, False
                     )
                     self._wan_access_by_ip[host.ip] = state
                     self._wan_retry_after.pop(host.ip, None)
+                    if previous_state != "denied":
+                        await self.monitor.async_record_internet_event(
+                            "internet_blocked",
+                            host,
+                            "Internetzugang für ein noch nicht freigegebenes Gerät gesperrt.",
+                            desired="denied",
+                            actual=state,
+                        )
                 except Exception as err:
                     state = "error"
                     self._wan_access_by_ip[host.ip] = state
@@ -611,6 +795,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             hosts[key] = replace(
                 host,
                 wan_access=state,
+                desired_wan_access="denied",
                 internet_approval_required=True,
             )
 
@@ -622,33 +807,31 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         state = await self.fritz_scanner.async_set_wan_access(host.ip, True)
         self._wan_access_by_ip[host.ip] = state
         self._wan_retry_after.pop(host.ip, None)
-        await self.monitor.async_trust_host(key)
+        await self.monitor.async_trust_host(key, host, reason="manual")
         self.async_set_updated_data(
             {
                 **self.data,
                 key: replace(
                     host,
                     wan_access=state,
+                    desired_wan_access="granted",
                     internet_approval_required=False,
                 ),
             }
         )
         return state
 
-    @staticmethod
-    def _is_protected_infrastructure(host: NetworkHost) -> bool:
+    def _is_protected_infrastructure(self, host: NetworkHost) -> bool:
         """Avoid attempting to block routers and mesh infrastructure."""
-        name = (host.hostname or "").lower()
-        return any(
-            marker in name
-            for marker in (
-                "fritz!box",
-                "fritzbox",
-                "fritz!repeater",
-                "fritzrepeater",
-                "repeater",
-                "powerline",
-                "access point",
-                "access-point",
-            )
+        if host.ip in self._protected_router_ips or is_network_infrastructure(host):
+            return True
+        configured = (
+            str(self.fritz_scanner.address)
+            if self.fritz_scanner is not None
+            else ""
+        )
+        # Exact-name fallback is used only until local DNS has resolved the
+        # configured address. Substring matches are deliberately forbidden.
+        return not self._protected_router_ips and is_configured_router(
+            host.ip, host.hostname, configured
         )

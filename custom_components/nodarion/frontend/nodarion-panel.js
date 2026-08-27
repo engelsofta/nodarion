@@ -1,3 +1,5 @@
+import { internetStatusFor } from "./internet-status.mjs?v=1.26.25";
+
 const esc = (value) =>
   String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -59,7 +61,7 @@ const EN = new Map(Object.entries({
   "24-Stunden-Bewertung mit Tagesvergleich": "24-hour rating with day-to-day comparison",
   "Neueste DNS-Anfragen": "Latest DNS requests",
   "automatisch alle 3 Sekunden": "automatically every 3 seconds",
-  "Netzwerkgeräte": "Network devices", "Gerätestatus": "Device status",
+  "Netzwerkgeräte": "Network devices", "Alle IP-Bereiche": "All IP ranges",
   "Teilnehmer": "Devices", "IP-Adresse": "IP address", "MAC-Adresse": "MAC address",
   "Verbindung": "Connection", "Verbindungen werden geladen": "Loading connections",
   "Mesh-Zugangspunkt": "Mesh access point", "Alle Mesh-Punkte": "All mesh points",
@@ -114,7 +116,7 @@ const EN = new Map(Object.entries({
   "Blockliste": "Blocklist", "Jugendschutz": "Parental control", "Gesperrter Dienst": "Blocked service",
   "Ungültige Anfrage": "Invalid request", "Nicht protokolliert": "Not logged",
   "Speichern fehlgeschlagen": "Save failed", "Speichert": "Saving", "Gespeichert": "Saved",
-  "Keine Funktion": "No function", "Alle Funktionen": "All functions", "Alle Gerätestatus": "All device statuses",
+  "Keine Funktion": "No function", "Alle Funktionen": "All functions",
   "Zeit unbekannt": "Time unknown", "Noch nicht geprüft": "Not checked yet", "Wird freigegeben": "Enabling access",
   "Gastzugang anzeigen": "Show guest access", "Nur Geräte im Gastzugang anzeigen": "Show guest access devices only",
   "Noch keine Bewertung": "No rating yet", "Einen kleinen Moment": "Just a moment",
@@ -134,7 +136,7 @@ const EN = new Map(Object.entries({
   "Für Geräte mit Stern gilt die Offline-Frist. Nach deren Ablauf erscheint eine Warnung, sofern das Gerät weiterhin nicht erreichbar ist.": "The offline grace period applies to starred devices. A warning appears when it expires if the device is still unreachable.",
   "Neue Geräte werden erst nach der Bestätigungszeit gemeldet. Kurze oder fehlerhafte Erkennungen lösen dadurch nicht sofort eine Warnung aus.": "New devices are reported only after the confirmation period, preventing brief or faulty detections from immediately triggering a warning.",
   "Haus-markierte Geräte melden sich sofort als anwesend. Erst wenn ein Gerät länger als das Anwesenheits-Timeout nicht erreichbar ist, gilt es als abwesend.": "Home-marked devices become present immediately and are considered away only after being unreachable for longer than the presence timeout.",
-  "Der Einrichtungsbereich kennzeichnet Geräte im angegebenen DHCP-Adressbereich als Neu. Nach der Vergabe einer festen Adresse außerhalb dieses Bereichs gelten sie als zugeordnet.": "The setup range marks devices in the specified DHCP address range as new. They are considered assigned after receiving a fixed address outside that range.",
+  "Der Einrichtungsbereich kennzeichnet Geräte im angegebenen DHCP-Adressbereich als neu. Adressen außerhalb dieses Bereichs erscheinen als regulärer Bereich.": "The setup range marks devices in the specified DHCP address range as new. Addresses outside this range are shown as the regular range.",
   "Bei automatischer Übernahme liest Nodarion Start und Ende direkt aus der FRITZ!Box. Optional können neue Geräte sofort überwacht oder zusätzlich in Home Assistant gemeldet werden.": "With automatic import, Nodarion reads the start and end directly from the FRITZ!Box. New devices can optionally be monitored immediately or also reported in Home Assistant.",
   "Gastnetz anzeigen und überwachen": "Show and monitor guest network",
   "Gastgeräte in Nodarion erfassen, anzeigen und protokollieren": "Detect, display, and log guest devices in Nodarion",
@@ -189,9 +191,71 @@ const EN = new Map(Object.entries({
   "KI-Analyse erklären": "Explain AI analysis", "Hilfe zur KI-Analyse": "AI analysis help",
   "Hilfe schließen": "Close help", "Hilfe": "Help", "Bereinigung": "Cleanup", "Löschen": "Delete",
   "Kein AdGuard-DNS": "No AdGuard DNS", "Nicht verwaltet": "Not managed",
+  "Vertrauenswürdig": "Trusted", "Noch nicht geprüft": "Not checked yet",
+  "VPN · Nicht verwaltet": "VPN · Not managed",
+  "Netzwerkinfrastruktur": "Network infrastructure",
+  "Router und Mesh-Komponenten werden nicht durch den FRITZ!Box-Hostfilter gesteuert.": "Routers and mesh components are not controlled by the FRITZ!Box host filter.",
+  "Einrichtungsbereich": "Setup range", "Regulärer Bereich": "Regular range",
+  "Einrichtung deaktiviert": "Setup disabled", "IP-Bereich": "IP range",
+  "Keine Angabe": "No information", "Nicht erkannt": "Not detected", "Keine Quelle": "No source",
+  "Freigabe gespeichert": "Approval saved", "Freigabe entzogen": "Approval revoked",
+  "Internetzugang gesperrt": "Internet access blocked", "Archiv bereinigt": "Inventory cleaned",
+  "Gerät vergessen": "Device forgotten", "Nodarion-Internetschutz": "Nodarion internet protection",
+  "Nodarion-Datenpflege": "Nodarion data maintenance",
+  "Internetfreigabe gespeichert.": "Internet approval saved.",
+  "Während der Lernphase automatisch freigegeben.": "Automatically approved during the learning phase.",
+  "Internetfreigabe automatisch entzogen: MAC-Adresse geändert": "Internet approval automatically revoked: MAC address changed",
+  "Internetzugang für ein noch nicht freigegebenes Gerät gesperrt.": "Internet access blocked for a device that has not yet been approved.",
+  "Veralteten Offline-Eintrag entfernt; Freigabe bleibt erhalten.": "Removed stale offline entry; approval was retained.",
+  "Gerät vollständig gelöscht; Freigabe entfernt.": "Device completely deleted; approval removed.",
+  "Gespeicherte Freigabe konnte nicht wiederhergestellt werden": "Saved approval could not be restored",
+  "Neue Geräte automatisch erkennen": "Detect new devices automatically",
+  "IP-Bereich aus FRITZ!Box übernehmen": "Import IP range from FRITZ!Box",
+  "Erste IP-Adresse": "First IP address", "Letzte IP-Adresse": "Last IP address",
+  "Erkennung neuer Geräte erklären": "Explain new-device detection", "Hilfe zur Erkennung neuer Geräte": "New-device detection help",
+  "Lernphase läuft bis": "Learning phase runs until", "Lernphase ist beendet": "Learning phase has ended",
+  "Aktuell erkannte Geräte werden automatisch übernommen. Danach müssen neue Geräte wieder geprüft werden.": "Currently detected devices are accepted automatically. New devices will require review afterwards.",
+  "Neue Geräte werden geprüft und bei aktiviertem Internetschutz zunächst gesperrt.": "New devices are reviewed and initially blocked when internet protection is enabled.",
+  "Neu beginnen": "Start again", "7 Tage verlängern": "Extend by 7 days", "Jetzt beenden": "End now",
+  "Dauer bei Neustart": "Duration after restart", "Maximal 30 Tage": "Maximum 30 days",
+  "Offline-Teilnehmer bereinigen": "Clean up offline devices", "Anzeige bereinigen": "Clean up display",
+  "Vollständig vergessen": "Forget completely", "mit Freigabe oder Überwachung": "with approval or monitoring",
+  "Freigaben oder Überwachungseinstellungen entfernt": "approvals or monitoring settings will be removed",
+  "Gespeicherte Gerätefreigaben bleiben erhalten": "Saved device approvals will be retained",
+  "VPN-Verbindungen werden nicht durch den FRITZ!Box-Hostfilter gesteuert.": "VPN connections are not controlled by the FRITZ!Box host filter.",
+  "Der Gastzugang wird durch die FRITZ!Box verwaltet.": "Guest access is managed by the FRITZ!Box.",
+  "Die FRITZ!Box konnte die gewünschte Änderung nicht ausführen.": "The FRITZ!Box could not perform the requested change.",
+  "Freigabe durch einen Administrator erforderlich.": "Approval by an administrator is required.",
+  "Nicht verfügbar": "Not available",
+  "Überwachen": "Monitor", "Erledigen": "Resolve", "Details": "Details",
+  "Weitere Gerätedetails anzeigen": "Show more device details",
+  "Wechsel/Std.": "changes/hour", "Aktuell": "Currently", "offline, davon": "offline, of which",
+  "Lernphase jetzt beenden? Neue Geräte werden danach wieder geprüft.": "End the learning phase now? New devices will be reviewed afterwards.",
+  "Offline-Anzeigen bereinigen?": "Clean up offline entries?",
+  "behält Freigaben": "retains approvals", "entfernt zusätzlich Freigaben und Markierungen": "also removes approvals and markers",
+  "Neue Geräte": "New devices",
+  "Teilnehmer in einem festgelegten IP-Bereich als neu kennzeichnen": "Mark devices in a defined IP range as new",
+  "DHCP-Start und -Ende automatisch abfragen": "Read DHCP start and end automatically",
+  "Neue Geräte direkt mit Stern markieren": "Mark new devices with a star automatically",
+  "Neue Geräte in Home Assistant melden": "Report new devices in Home Assistant",
+  "Markierte Geräte gehen sofort online und erst danach offline": "Marked devices go online immediately and offline only after the timeout",
+  "Danach eine Warnung anzeigen": "Show a warning afterwards",
+  "Der Bereich für neue Geräte kennzeichnet Teilnehmer im angegebenen DHCP-Adressbereich als neu. Adressen außerhalb dieses Bereichs erscheinen als regulärer Bereich.": "The new-device range marks devices in the specified DHCP address range as new. Addresses outside this range are shown as the regular range.",
+  "Anzeige bereinigen entfernt alte Offline-Einträge, behält aber gespeicherte Gerätefreigaben. Vollständig vergessen entfernt zusätzlich Überwachungs- und Anwesenheitsmarkierungen.": "Clean up display removes old offline entries but retains saved device approvals. Forget completely also removes monitoring and presence markers.",
+  "Vor beiden Aktionen zeigt Nodarion die Anzahl betroffener und geschützter Teilnehmer an und fragt nochmals nach.": "Before either action, Nodarion shows the number of affected and protected devices and asks for confirmation.",
   "Nicht bewertet": "Not rated", "Anfragen": "queries", "blockiert": "blocked",
   "Gesperrt / frei": "Blocked / allowed", "Gesperrt": "Blocked",
-  "Freigabe ausstehend": "Approval pending", "Lernphase · automatisch freigegeben": "Learning phase · automatically allowed",
+  "Alle Internetstatus": "All internet statuses",
+  "Alle Verbindungen": "All connections", "Alle Adressvergaben": "All address assignments",
+  "Alle Erkennungsquellen": "All detection sources", "Aktive Filter": "Active filters",
+  "Alle Filter zurücksetzen": "Reset all filters", "Filter entfernen": "Remove filter",
+  "ungespeicherte Änderung": "unsaved change", "ungespeicherte Änderungen": "unsaved changes",
+  "Verwerfen": "Discard", "IP-Bereich manuell festlegen": "Set IP range manually",
+  "Erweiterte Prüfungen": "Advanced checks", "Erweiterter Datenschutz": "Advanced privacy",
+  "Änderung bestätigen": "Confirm change", "Änderung fehlgeschlagen": "Change failed",
+  "Lernphase beenden": "End learning phase", "Offline-Geräte bereinigen": "Clean up offline devices",
+  "Gerät freigeben": "Approve device", "Ausführen": "Proceed", "Schließen": "Close",
+  "Gesperrt · Freigabe ausstehend": "Blocked · approval pending", "Freigabe ausstehend": "Approval pending", "Lernphase · automatisch freigegeben": "Learning phase · automatically allowed",
   "Anteil blockierter DNS-Anfragen": "Share of blocked DNS queries",
   "Nur Offline-Geräte anzeigen": "Show offline devices only",
   "DNS-Live-Log für": "Open DNS Live log for", "öffnen": "open",
@@ -331,8 +395,24 @@ const formatStateChanged = (value) => {
   return `${day}\n${time} Uhr`;
 };
 
+const isRootRouter = (entity) => ["fritz.box", "fritz!box", "fritzbox"].includes(
+  String(entity.attributes?.hostname || entity.attributes?.friendly_name || "")
+    .trim().replace(/\.$/, "").toLocaleLowerCase("de-DE")
+);
+
+const isNetworkInfrastructure = (entity) => {
+  const attr = entity.attributes || {};
+  const hostname = String(attr.fritz_hostname || attr.hostname || attr.friendly_name || "")
+    .trim().replace(/\.$/, "").toLocaleLowerCase("de-DE");
+  if (typeof attr.network_infrastructure === "boolean") return attr.network_infrastructure;
+  if (["fritz.box", "fritz!box", "fritzbox"].includes(hostname)) return true;
+  const tokens = new Set(hostname.split(/[^a-z0-9!]+/).filter(Boolean));
+  return ["router", "repeater", "powerline", "accesspoint"].some((marker) => tokens.has(marker));
+};
+
 const deviceIcon = (entity) => {
   const attr = entity.attributes || {};
+  if (attr.vpn_connection || /^(vpn|wireguard)/i.test(String(attr.hostname || attr.friendly_name || ""))) return "mdi:vpn";
   const name = [
     attr.hostname,
     attr.friendly_name,
@@ -341,6 +421,8 @@ const deviceIcon = (entity) => {
     attr.mac_vendor,
   ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
   const matches = (...terms) => terms.some((term) => name.includes(term));
+
+  if (isNetworkInfrastructure(entity) && !isRootRouter(entity)) return "mdi:access-point-network";
 
   if (matches("iphone", "android", "smartphone", "telefon", "phone", "pixel")) return "mdi:cellphone";
   if (matches("ipad", "tablet", "galaxy tab", "surface")) return "mdi:tablet";
@@ -352,8 +434,8 @@ const deviceIcon = (entity) => {
   if (matches("camera", "kamera", "doorbell", "ring ", "reolink", "tapo c")) return "mdi:cctv";
   if (matches("speaker", "lautsprecher", "sonos", "homepod", "echo", "alexa")) return "mdi:speaker";
   if (matches("nas", "synology", "qnap", "server", "proxmox", "raspberry")) return "mdi:server";
+  if (matches("repeater", "powerline", "access point", "access-point", "fritz!repeater")) return "mdi:access-point-network";
   if (matches("router", "fritz!box", "gateway")) return "mdi:router-wireless";
-  if (matches("repeater", "access point", "access-point", "fritz!repeater")) return "mdi:access-point";
   if (matches("thermostat", "sensor", "steckdose", "plug", "shelly", "tuya", "esp", "zigbee", "iot")) return "mdi:chip";
   if (String(attr.connection_type || "").toUpperCase() === "WLAN") return "mdi:wifi";
   return "mdi:lan";
@@ -414,6 +496,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._settingsTab = this._loadSettingsTab();
     this._notifyTargetQuery = "";
     this._notifyTargetsDirty = false;
+    this._settingsDraft = null;
+    this._dirtyRules = new Set();
     this._dnsLive = {
       entries: [], series: [], client: null, name: null, updated_at: null,
     };
@@ -626,6 +710,60 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }
   }
 
+  _captureSettingsDraft(settingsView) {
+    const rules = {};
+    settingsView.querySelectorAll(".watch-settings-panel [data-rule]").forEach((input) => {
+      rules[input.dataset.rule] = input.type === "checkbox"
+        ? input.checked
+        : input.type === "number" ? Number(input.value) : input.value;
+    });
+    rules.notify_targets = [...settingsView.querySelectorAll(
+      ".watch-settings-panel [data-notify-target]:checked"
+    )].map((input) => input.dataset.notifyTarget);
+    this._settingsDraft = rules;
+  }
+
+  _updateSettingsDirtyUi(settingsView) {
+    const dirty = settingsView.querySelector(".settings-dirty");
+    const save = settingsView.querySelector(".save-watch-rules");
+    if (dirty) {
+      dirty.hidden = this._dirtyRules.size === 0;
+      const label = dirty.querySelector("span");
+      if (label) label.textContent = `${this._dirtyRules.size} ungespeicherte ${this._dirtyRules.size === 1 ? "Änderung" : "Änderungen"}`;
+    }
+    if (save) save.disabled = this._dirtyRules.size === 0;
+  }
+
+  _confirm({ title, message, confirmLabel = "Bestätigen", danger = false, showCancel = true }) {
+    const host = this.shadowRoot.querySelector(".confirm-host");
+    if (!host) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const previousFocus = this.shadowRoot.activeElement;
+      const close = (accepted) => {
+        host.replaceChildren();
+        previousFocus?.focus?.();
+        resolve(accepted);
+      };
+      host.innerHTML = `<div class="confirm-backdrop"><section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message"><div class="confirm-icon ${danger ? "danger" : ""}"><ha-icon icon="${danger ? "mdi:alert-outline" : "mdi:help-circle-outline"}"></ha-icon></div><h2 id="confirm-title">${esc(title)}</h2><p id="confirm-message">${esc(message)}</p><div class="confirm-actions">${showCancel ? '<button class="confirm-cancel" type="button">Abbrechen</button>' : ""}<button class="confirm-accept ${danger ? "danger" : ""}" type="button">${esc(confirmLabel)}</button></div></section></div>`;
+      const backdrop = host.querySelector(".confirm-backdrop");
+      const keyHandler = (event) => {
+        if (event.key === "Escape") close(false);
+        if (event.key === "Tab") {
+          const buttons = [...host.querySelectorAll("button")];
+          const index = buttons.indexOf(this.shadowRoot.activeElement);
+          if (event.shiftKey && index <= 0) { event.preventDefault(); buttons.at(-1)?.focus(); }
+          if (!event.shiftKey && index === buttons.length - 1) { event.preventDefault(); buttons[0]?.focus(); }
+        }
+      };
+      backdrop.addEventListener("keydown", keyHandler);
+      backdrop.addEventListener("click", (event) => {
+        if (event.target.closest(".confirm-accept")) close(true);
+        else if (event.target.closest(".confirm-cancel") || event.target === backdrop) close(false);
+      });
+      (host.querySelector(".confirm-cancel") || host.querySelector(".confirm-accept"))?.focus();
+    });
+  }
+
   async _saveRuleSettings(button, rules, kind) {
     const selector = ".save-watch-rules";
     const defaultLabel = "Alle Einstellungen speichern";
@@ -639,6 +777,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         "POST", "nodarion/monitor", { action: "set_rules", rules }
       );
       this._notifyTargetsDirty = false;
+      this._settingsDraft = null;
+      this._dirtyRules.clear();
       this._render();
       const savedButton = this.shadowRoot.querySelector(selector);
       if (!savedButton) return;
@@ -756,7 +896,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
   }
 
   async _adguardAction(payload, confirmation = null) {
-    if (confirmation && !window.confirm(confirmation)) return;
+    if (confirmation && !await this._confirm({ title:"Änderung bestätigen", message:confirmation, confirmLabel:"Ausführen", danger:true })) return;
     this._dnsLivePaused = true;
     try {
       const result = await this._hass.callApi(
@@ -771,7 +911,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._dnsRenderedSignature = "";
       this._renderDnsLive();
     } catch (error) {
-      window.alert(error?.message || "AdGuard-Änderung fehlgeschlagen.");
+      await this._confirm({ title:"Änderung fehlgeschlagen", message:error?.message || "AdGuard-Änderung fehlgeschlagen.", confirmLabel:"Schließen", danger:true, showCancel:false });
     }
   }
 
@@ -904,8 +1044,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .device-count + .device-count { padding-left:12px; border-left:1px solid var(--ns-line); }
         .device-count strong { display:block; font-size:31px; line-height:1; letter-spacing:-1px; }
         .device-count.online strong { color:var(--ns-green); }
-        .device-count.offline strong { color:var(--ns-red); }
-        .device-count.new strong { color:#ffd766; }
+        .device-count.offline strong { color:#91a29c; }
+        .device-count.new strong { color:var(--ns-cyan); }
         .device-count span { display:block; margin-top:6px; color:#8eaea4; font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.8px; }
         .function-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:9px; }
         .function-count { appearance:none; min-width:0; border:0; outline:0; padding:5px 8px; color:inherit; background:transparent; text-align:left; font:inherit; cursor:pointer; border-radius:8px; transition:color .18s ease, background .18s ease, transform .18s ease; }
@@ -963,6 +1103,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .cleanup.busy ha-icon { animation:spin .8s linear infinite; }
         .cleanup-result { display:none; margin:-7px 0 18px; padding:11px 14px; border-radius:11px; color:#cce5dc; background:rgba(80,215,255,.07); border:1px solid rgba(80,215,255,.18); font-size:13px; }
         .cleanup-result.visible { display:block; }
+        .cleanup-summary { margin:5px 0 9px; color:#9dbbb1; font-size:11px; line-height:1.45; }
+        .cleanup-actions { display:grid; gap:7px; width:100%; }
+        .cleanup.preserve { color:#bcecff; background:rgba(80,215,255,.07); border-color:rgba(80,215,255,.22); }
         .tab-view[data-view="participants"] { position:relative; }
         .column-config-head { width:48px; min-width:48px; padding:6px !important; text-align:center; }
         .column-picker-button { width:35px; height:35px; display:grid; place-items:center; padding:0; border-radius:9px; color:#dff7ed; background:rgba(80,215,255,.08); border:1px solid rgba(80,215,255,.25); font:inherit; cursor:pointer; }
@@ -1080,12 +1223,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .dns-status-select .custom-filter-option, .settings-select .custom-filter-option { grid-template-columns:18px minmax(0,1fr); }
         .marker-filter { width:100%; min-width:165px !important; }
         .onboarding-state { display:inline-flex; align-items:center; gap:6px; padding:6px 9px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
-        .onboarding-state.onboarding { color:#2b2115; background:#f0b94f; }
+        .onboarding-state.onboarding { color:#bcecff; background:rgba(80,215,255,.10); border:1px solid rgba(80,215,255,.28); }
         .onboarding-state.assigned { color:#d9f5e7; background:rgba(86,190,130,.18); border:1px solid rgba(86,190,130,.32); }
         .onboarding-state.unknown { color:#c5beb4; background:rgba(255,255,255,.06); }
         td { padding:15px 16px; border-bottom:1px solid var(--ns-line); color:#d4ebe3; font-size:14px; line-height:1.4; vertical-align:middle; }
-        tbody tr { --state:#b8b1a7; transition:background .15s ease; }
-        tbody tr.off { --state:var(--ns-red); opacity:.76; }
+        tbody tr { --state:var(--ns-green); transition:background .15s ease; }
+        tbody tr.off { --state:#82968f; opacity:.76; }
+        tbody tr.off.important-offline { --state:var(--ns-red); }
         tbody tr:nth-child(even) { background:rgba(255,255,255,.018); }
         tbody tr:hover { background:rgba(85,242,162,.065); }
         tbody tr:last-child td { border-bottom:0; }
@@ -1114,6 +1258,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .device-cell { display:flex; align-items:center; gap:11px; min-width:0; }
         .device-icon { flex:0 0 auto; width:35px; height:35px; display:grid; place-items:center; color:var(--ns-cyan); background:rgba(80,215,255,.08); border:1px solid rgba(80,215,255,.16); border-radius:10px; }
         .device-icon ha-icon { --mdc-icon-size:20px; }
+        .device-icon.vpn { color:#c8a7ff; background:rgba(182,140,255,.1); border-color:rgba(182,140,255,.28); }
+        .device-icon.guest { color:#ffe08a; background:rgba(255,215,102,.09); border-color:rgba(255,215,102,.27); }
+        .device-icon.router { color:#aaffd0; background:rgba(85,242,162,.09); border-color:rgba(85,242,162,.25); }
+        .device-icon.mesh { color:#d4b9ff; background:rgba(182,140,255,.1); border-color:rgba(182,140,255,.28); }
         .device-label { min-width:0; }
         .entity { display:block; color:#73958a; font:500 11px ui-monospace,SFMono-Regular,Consolas,monospace; margin-top:4px; }
         .entity-id-link { display:block; margin-top:4px; padding:0; border:0; color:#73958a; background:transparent; font:500 11px ui-monospace,SFMono-Regular,Consolas,monospace; text-align:left; cursor:pointer; }
@@ -1153,10 +1301,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .log-event { display:flex; align-items:center; gap:10px; color:var(--log-color); font-weight:750; white-space:nowrap; }
         .log-icon { width:28px; height:28px; border-radius:9px; display:grid; place-items:center; background:rgba(80,215,255,.09); color:var(--ns-cyan); }
         .log-icon ha-icon { --mdc-icon-size:16px; }
-        .log-entry.offline { --log-color:var(--ns-red); }
+        .log-entry.offline { --log-color:#82968f; }
         .log-entry.online { --log-color:var(--ns-green); }
         .log-entry.discovered { --log-color:var(--ns-cyan); }
-        .log-entry.renamed { --log-color:#ffd766; }
+        .log-entry.renamed { --log-color:var(--ns-cyan); }
+        .log-entry.internet_approval_revoked { --log-color:var(--ns-red); }
+        .log-entry.internet_approval_granted { --log-color:var(--ns-green); }
+        .log-entry.inventory_pruned { --log-color:#8ea6bd; }
+        .log-entry.device_forgotten { --log-color:var(--ns-red); }
+        .log-entry.internet_blocked { --log-color:var(--ns-red); }
+        .log-entry.internet_enforcement_failed { --log-color:#ffd766; }
         .log-entry.mesh_changed { --log-color:#b68cff; }
         .log-entry .log-icon { color:var(--log-color); background:color-mix(in srgb,var(--log-color) 12%,transparent); }
         .log-message { color:#cce5dc; font-size:14px; line-height:1.45; }
@@ -1261,9 +1415,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .watch.presence.active { color:#8fffc2; border-color:rgba(143,255,194,.38); background:rgba(143,255,194,.10); }
         .internet-state { display:grid; gap:7px; min-width:125px; }
         .internet-label { width:max-content; padding:4px 8px; border-radius:999px; color:#9bb8af; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); font-size:11px; font-weight:750; }
-        .internet-label.granted { color:#c8c1b7; background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.08); }
+        .internet-label.trusted,
+        .internet-label.allowed { color:#aaffd0; background:rgba(85,242,162,.08); border-color:rgba(85,242,162,.25); }
+        .internet-label.learning { color:#bcecff; background:rgba(80,215,255,.09); border-color:rgba(80,215,255,.27); }
+        .internet-label.unchecked,
+        .internet-label.unmanaged,
+        .internet-label.infrastructure { color:#9bb0a9; background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.08); }
+        .internet-label.pending { color:#ffe08a; background:rgba(255,215,102,.09); border-color:rgba(255,215,102,.28); }
         .internet-label.denied { color:var(--ns-red); background:rgba(255,107,120,.08); border-color:rgba(255,107,120,.24); }
         .internet-label.error { color:#ffd766; }
+        .internet-hint { max-width:210px; color:#819d94; font-size:9px; line-height:1.3; }
         .approve-internet { padding:7px 9px; border-radius:8px; color:#092018; background:var(--ns-green); border:0; font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
         .approve-internet:disabled { opacity:.55; cursor:wait; }
         .status { display:flex; align-items:center; gap:8px; color:var(--state); font-size:12px; text-transform:uppercase; letter-spacing:1px; font-weight:800; white-space:nowrap; }
@@ -1273,8 +1434,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .private-mac ha-icon { --mdc-icon-size:13px; }
         .mac-vendor { display:flex; align-items:center; gap:5px; max-width:240px; margin-top:5px; color:var(--ns-cyan); font:700 10px Inter,Roboto,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:help; }
         .mac-vendor ha-icon { flex:0 0 auto; --mdc-icon-size:13px; }
-        .guest-badge { display:inline-flex; align-items:center; gap:4px; width:max-content; margin-top:5px; padding:3px 7px; border-radius:999px; color:#8ee8ff; background:rgba(80,215,255,.1); border:1px solid rgba(80,215,255,.3); font:800 9px Inter,Roboto,sans-serif; letter-spacing:.5px; cursor:pointer; }
-        .guest-badge ha-icon { --mdc-icon-size:12px; }
         .guest-metric { cursor:pointer; }
         .guest-metric .metric-value { display:flex; align-items:center; gap:9px; }
         .guest-metric .metric-value ha-icon { color:var(--ns-cyan); --mdc-icon-size:25px; }
@@ -1331,7 +1490,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .clients { position:relative; display:grid; gap:11px; }
         .clients::before { content:""; position:absolute; top:-26px; bottom:50%; left:18px; border-left:1px solid rgba(85,242,162,.23); }
         .client { --client-state:var(--ns-green); position:relative; display:grid; grid-template-columns:8px 34px minmax(0,1fr); align-items:center; gap:11px; min-width:0; padding:14px 15px 14px 35px; border-radius:13px; background:rgba(2,10,8,.5); border:1px solid rgba(139,255,210,.16); box-shadow:0 8px 20px rgba(0,0,0,.12); }
-        .client.off { --client-state:var(--ns-red); opacity:.67; }
+        .client.off { --client-state:#82968f; opacity:.67; }
         .client::before { content:""; position:absolute; left:18px; top:50%; width:12px; border-top:1px solid rgba(85,242,162,.28); }
         .client .dot { flex:0 0 auto; background:var(--client-state); box-shadow:0 0 9px var(--client-state); }
         .client ha-icon { color:var(--ns-cyan); --mdc-icon-size:25px; }
@@ -1377,6 +1536,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .learning-actions { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
         .restart-learning { display:flex; align-items:center; gap:6px; padding:7px 10px; border-radius:9px; color:#ffd766; background:rgba(255,215,102,.06); border:1px solid rgba(255,215,102,.25); font:inherit; font-size:10px; font-weight:750; cursor:pointer; white-space:nowrap; }
         .restart-learning ha-icon { --mdc-icon-size:15px; }
+        .learning-card { display:grid; gap:9px; padding:12px; border-radius:12px; background:rgba(80,215,255,.055); border:1px solid rgba(80,215,255,.16); }
+        .learning-card strong { color:#eafff6; font-size:13px; }
+        .learning-card p { margin:0; color:#91afa6; font-size:10px; line-height:1.45; }
+        .learning-card .learning-actions { justify-content:flex-start; }
+        .learning-action { padding:7px 9px; border-radius:8px; color:#bcecff; background:rgba(80,215,255,.07); border:1px solid rgba(80,215,255,.22); font:inherit; font-size:10px; font-weight:750; cursor:pointer; }
         .security-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px; }
         .security-card { padding:14px; border-radius:13px; background:rgba(2,10,8,.35); border:1px solid var(--ns-line); }
         .security-card span { display:block; color:#78998f; font-size:9px; text-transform:uppercase; letter-spacing:.9px; }
@@ -1419,6 +1583,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .alert-message { color:#9dbbb1; font-size:11px; margin-top:3px; line-height:1.35; }
         .alert-time { color:#58776e; font-size:9px; margin-top:4px; }
         .ack { border:1px solid rgba(85,242,162,.25); color:var(--ns-green); background:rgba(85,242,162,.07); border-radius:9px; padding:8px 10px; font:inherit; font-size:10px; font-weight:750; cursor:pointer; }
+        .alert-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+        .alert-action { padding:7px 9px; border-radius:8px; color:#bcecff; background:rgba(80,215,255,.06); border:1px solid rgba(80,215,255,.2); font:inherit; font-size:9px; font-weight:750; cursor:pointer; }
         .rule-list { display:grid; gap:10px; }
         .watch-settings-panel .rule-list {
           grid-template-columns:repeat(3,minmax(0,1fr)); align-items:start;
@@ -1434,6 +1600,35 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .settings-view .rule small { margin-top:3px; font-size:10px; line-height:1.3; }
         .settings-view .rule input { min-height:36px; padding:7px 10px; font-size:13px; }
         .settings-view .rule input[type="checkbox"] { width:22px; height:22px; min-height:22px; }
+        .dependent-settings[hidden] { display:none; }
+        .unit-input { display:grid; grid-template-columns:minmax(70px,1fr) auto; align-items:center; overflow:hidden; border-radius:10px; border:1px solid var(--ns-line); background:rgba(2,10,8,.35); }
+        .unit-input input { border:0 !important; border-radius:0; background:transparent; box-shadow:none !important; }
+        .unit-input span { padding:0 10px; color:#91afa6; font-size:10px; white-space:nowrap; }
+        .mobile-details { display:none; }
+        .filter-chips { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:10px 54px 8px 12px; background:rgba(2,10,8,.25); border-bottom:1px solid var(--ns-line); }
+        .filter-chips:empty { display:none; }
+        .filter-chip { display:inline-flex; align-items:center; gap:5px; padding:6px 8px; border-radius:999px; color:#cce5dc; background:rgba(80,215,255,.07); border:1px solid rgba(80,215,255,.2); font:inherit; font-size:10px; cursor:pointer; }
+        .filter-reset { margin-left:auto; padding:6px 8px; color:#ffe08a; background:transparent; border:0; font:inherit; font-size:10px; font-weight:750; cursor:pointer; }
+        .settings-dirty { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:9px 11px; border-radius:11px; color:#ffe5a5; background:rgba(255,215,102,.08); border:1px solid rgba(255,215,102,.24); font-size:10px; }
+        .settings-save-area { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
+        .settings-dirty[hidden] { display:none; }
+        .settings-dirty-actions { display:flex; gap:6px; margin-left:auto; }
+        .discard-settings { padding:7px 9px; border-radius:8px; color:#c9d8d3; background:rgba(255,255,255,.04); border:1px solid var(--ns-line); font:inherit; font-size:10px; cursor:pointer; }
+        .advanced-settings { grid-column:1 / -1; padding:8px; border-radius:11px; border:1px dashed rgba(182,140,255,.24); }
+        .advanced-settings > summary { padding:6px; color:#d4b9ff; font-size:11px; font-weight:800; cursor:pointer; }
+        .advanced-settings > *:not(summary) { margin-top:8px; }
+        .confirm-backdrop { position:fixed; z-index:1200; inset:0; display:grid; place-items:center; padding:18px; background:rgba(0,8,7,.78); backdrop-filter:blur(8px); }
+        .confirm-dialog { width:min(460px,100%); padding:23px; border-radius:18px; color:#eafff6; background:#13231f; border:1px solid rgba(80,215,255,.26); box-shadow:0 28px 80px rgba(0,0,0,.58); }
+        .confirm-dialog h2 { margin:12px 0 8px; font-size:19px; }
+        .confirm-dialog p { margin:0; color:#9dbbb1; font-size:12px; line-height:1.55; white-space:pre-line; }
+        .confirm-icon { display:grid; place-items:center; width:38px; height:38px; border-radius:11px; color:#bcecff; background:rgba(80,215,255,.09); }
+        .confirm-icon.danger { color:#ff9ca7; background:rgba(255,107,120,.1); }
+        .confirm-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+        .confirm-actions button { padding:9px 12px; border-radius:9px; font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
+        .confirm-cancel { color:#c9d8d3; background:rgba(255,255,255,.04); border:1px solid var(--ns-line); }
+        .confirm-accept { color:#082018; background:var(--ns-green); border:0; }
+        .confirm-accept.danger { color:#fff; background:#b8404d; }
+        button:focus-visible, summary:focus-visible, input:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:2px; }
         .settings-view .danger-zone { margin-top:14px; padding:12px 14px; }
         .settings-view .cleanup-settings { margin:0 0 10px; padding:5px 10px; }
         .settings-view .cleanup-settings .cleanup { min-height:36px; padding:7px 11px; justify-self:end; font-size:12px; }
@@ -1680,6 +1875,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
           color:var(--ns-cyan); background:rgba(240,161,59,.10);
           border-color:rgba(240,161,59,.18);
         }
+        .device-icon.vpn { color:#d4b9ff; background:rgba(182,140,255,.12); border-color:rgba(182,140,255,.3); }
+        .device-icon.guest { color:#ffe08a; background:rgba(255,215,102,.1); border-color:rgba(255,215,102,.3); }
+        .device-icon.router { color:#aaffd0; background:rgba(85,242,162,.1); border-color:rgba(85,242,162,.28); }
+        .device-icon.mesh { color:#d4b9ff; background:rgba(182,140,255,.12); border-color:rgba(182,140,255,.3); }
         .column-picker-button {
           color:#f4dfbd; background:rgba(240,161,59,.08); border-color:rgba(240,161,59,.25);
         }
@@ -1827,6 +2026,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .log-route span,
         :host([data-theme="light"]) .dns-chip,
         :host([data-theme="light"]) .internet-label { color:#625a51; background:rgba(91,72,48,.06); border-color:rgba(91,72,48,.11); }
+        :host([data-theme="light"]) .internet-label.trusted,
+        :host([data-theme="light"]) .internet-label.allowed { color:#237448; background:#e8f5ec; border-color:#b9dcc5; }
+        :host([data-theme="light"]) .internet-label.learning { color:#246c86; background:#e5f4f9; border-color:#b8dce8; }
+        :host([data-theme="light"]) .internet-label.pending { color:#805b12; background:#fff4d5; border-color:#ead49a; }
+        :host([data-theme="light"]) .internet-label.denied { color:#b42318; background:#fdecea; border-color:#efc1bc; }
+        :host([data-theme="light"]) .internet-label.error { color:#8a5b08; background:#fff4d5; border-color:#ead49a; }
         :host([data-theme="light"]) .dns-chart,
         :host([data-theme="light"]) .adguard-config,
         :host([data-theme="light"]) .ai-prompt,
@@ -1872,7 +2077,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .log-entry { background:color-mix(in srgb,var(--log-color) 4%,#fffdf9); }
         :host([data-theme="light"]) .log-entry:hover { background:color-mix(in srgb,var(--log-color) 10%,#fffaf4); }
         :host([data-theme="light"]) .log-entry.discovered { --log-color:#28748d; }
-        :host([data-theme="light"]) .log-entry.renamed { --log-color:#9b6a11; }
+        :host([data-theme="light"]) .log-entry.renamed { --log-color:#28748d; }
+        :host([data-theme="light"]) .log-entry.internet_approval_revoked { --log-color:#b42318; }
+        :host([data-theme="light"]) .log-entry.internet_approval_granted { --log-color:#18794e; }
+        :host([data-theme="light"]) .log-entry.inventory_pruned { --log-color:#536b7d; }
+        :host([data-theme="light"]) .log-entry.device_forgotten { --log-color:#b42318; }
+        :host([data-theme="light"]) .log-entry.internet_blocked { --log-color:#b42318; }
+        :host([data-theme="light"]) .log-entry.internet_enforcement_failed { --log-color:#9b6a11; }
         :host([data-theme="light"]) .log-entry.mesh_changed { --log-color:#7650ce; }
         :host([data-theme="light"]) .log-message { color:#5c554e; }
         :host([data-theme="light"]) .log-device-filter ha-icon { color:#397e98; opacity:1; }
@@ -2002,7 +2213,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         :host([data-theme="light"]) .column-filter.has-value::placeholder { color:#77552d; }
         :host([data-theme="light"]) tbody tr { --state:#2d7b4c; }
-        :host([data-theme="light"]) tbody tr.off { --state:#b33e3e; opacity:.88; }
+        :host([data-theme="light"]) tbody tr.off { --state:#7b817e; opacity:.88; }
+        :host([data-theme="light"]) tbody tr.off.important-offline { --state:#b33e3e; }
         :host([data-theme="light"]) .status { text-shadow:none; }
         :host([data-theme="light"]) .status .dot { box-shadow:0 0 0 3px color-mix(in srgb,var(--state) 14%,transparent); }
         :host([data-theme="light"]) .dns-row.allowed { --dns-color:#287347; }
@@ -2180,7 +2392,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .device-list td[data-column="state"]::before { display:none; }
           .device-list .status-cell { flex-direction:row; align-items:center; justify-content:space-between; gap:10px; }
           .device-list .card-actions { justify-content:flex-end; }
+          .device-list .mobile-details { display:grid; }
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="onboarding"],
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="mac"],
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="connection"],
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="mesh"],
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="rate"],
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="address"],
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="dns"],
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="source"] { display:none; }
+          .device-list tbody tr.mobile-expanded { border-color:rgba(80,215,255,.35); }
           .device-list .internet-state { min-width:0; }
+          .alert-item { grid-template-columns:36px minmax(0,1fr); }
+          .alert-actions { grid-column:1 / -1; justify-content:flex-start; }
           .log-panel, .dns-panel, .mesh-panel, .watch-panel, .ai-panel { padding:13px; border-radius:14px; }
           .log-table tbody td:first-child { grid-template-columns:1fr; }
           .log-table tbody td:first-child::before { display:none; }
@@ -2252,7 +2476,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <section class="tab-view" data-view="watch" hidden>
           <section class="watch-view"></section>
         </section>
-      </div><div class="guest-modal-host"></div>`;
+      </div><div class="guest-modal-host"></div><div class="confirm-host"></div>`;
 
     this.shadowRoot.querySelector(".scan").addEventListener("click", async () => {
       const button = this.shadowRoot.querySelector(".scan");
@@ -2296,8 +2520,14 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._navigateTo(navigation.dataset.navTab);
     });
     this.shadowRoot.querySelector(".device-list").addEventListener("click", (event) => {
-      if (event.target.closest(".guest-badge")) {
-        this._columnFilters.state = "guest";
+      const clearFilter = event.target.closest("[data-clear-column-filter]");
+      if (clearFilter) {
+        delete this._columnFilters[clearFilter.dataset.clearColumnFilter];
+        this._renderCards();
+        return;
+      }
+      if (event.target.closest("[data-clear-all-filters]")) {
+        this._columnFilters = {};
         this._renderCards();
         return;
       }
@@ -2349,6 +2579,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const dnsLink = event.target.closest(".dns-live-link");
       if (dnsLink) {
         this._openDnsLive(dnsLink.dataset.ip, dnsLink.dataset.name);
+        return;
+      }
+      const mobileDetails = event.target.closest(".mobile-details");
+      if (mobileDetails) {
+        const row = mobileDetails.closest("tr");
+        row?.classList.toggle("mobile-expanded");
+        mobileDetails.setAttribute("aria-expanded", String(row?.classList.contains("mobile-expanded")));
+        mobileDetails.querySelector("ha-icon")?.setAttribute(
+          "icon",
+          row?.classList.contains("mobile-expanded")
+            ? "mdi:chevron-up"
+            : "mdi:chevron-down"
+        );
         return;
       }
       const button = event.target.closest(".watch");
@@ -2736,6 +2979,34 @@ class EngelsoftNodarionPanel extends HTMLElement {
         this._monitorAction({ action: "restart_learning" });
         return;
       }
+      if (event.target.closest(".extend-learning")) {
+        this._monitorAction({ action: "extend_learning" });
+        return;
+      }
+      if (event.target.closest(".end-learning")) {
+        this._confirm({ title:"Lernphase beenden", message:"Neue Geräte werden danach wieder geprüft.", confirmLabel:"Jetzt beenden" }).then((confirmed) => {
+          if (confirmed) {
+          this._monitorAction({ action: "end_learning" });
+          }
+        });
+        return;
+      }
+      const alertMonitor = event.target.closest(".alert-monitor");
+      if (alertMonitor) {
+        const key = alertMonitor.dataset.key;
+        this._monitorAction({
+          key,
+          monitored: true,
+          notify: this._monitor.notifications.includes(key),
+          presence: this._monitor.presence_devices.includes(key),
+        });
+        return;
+      }
+      const alertApprove = event.target.closest(".alert-approve");
+      if (alertApprove) {
+        this._approveInternet(alertApprove);
+        return;
+      }
       const acknowledge = event.target.closest(".ack");
       if (acknowledge) {
         this._monitorAction({
@@ -2783,11 +3054,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
           basics:["Grundlagen", "Mit Überwachung aktiv werden sämtliche Warn- und Prüfregeln gemeinsam geschaltet. Die Erkennung und Anzeige der Teilnehmer läuft unabhängig davon weiter.", "Die Lernphase behandelt bereits vorhandene Teilnehmer vorübergehend als bekannt. Neue Warnungen greifen nach Ablauf der eingestellten Tage."],
           presence:["Anwesenheit", "Haus-markierte Geräte melden sich sofort als anwesend. Erst wenn ein Gerät länger als das Anwesenheits-Timeout nicht erreichbar ist, gilt es als abwesend.", "Der optionale Home-Assistant-Binary-Sensor ist aktiv, sobald mindestens eines dieser Geräte zuhause ist. Er eignet sich beispielsweise für Licht-, Heizungs- oder Alarm-Automationen."],
           devices:["Geräteüberwachung", "Neue Geräte werden erst nach der Bestätigungszeit gemeldet. Kurze oder fehlerhafte Erkennungen lösen dadurch nicht sofort eine Warnung aus.", "Für Geräte mit Stern gilt die Offline-Frist. Nach deren Ablauf erscheint eine Warnung, sofern das Gerät weiterhin nicht erreichbar ist."],
-          onboarding:["Geräte-Einrichtung", "Der Einrichtungsbereich kennzeichnet Geräte im angegebenen DHCP-Adressbereich als Neu. Nach der Vergabe einer festen Adresse außerhalb dieses Bereichs gelten sie als zugeordnet.", "Bei automatischer Übernahme liest Nodarion Start und Ende direkt aus der FRITZ!Box. Optional können neue Geräte sofort überwacht oder zusätzlich in Home Assistant gemeldet werden."],
+          onboarding:["Neue Geräte", "Der Bereich für neue Geräte kennzeichnet Teilnehmer im angegebenen DHCP-Adressbereich als neu. Adressen außerhalb dieses Bereichs erscheinen als regulärer Bereich.", "Bei automatischer Übernahme liest Nodarion Start und Ende direkt aus der FRITZ!Box. Optional können neue Geräte sofort überwacht oder zusätzlich in Home Assistant gemeldet werden."],
           quiet:["Ruhezeiten", "Während der Ruhezeit kann das Aktivwerden eines Geräts als Auffälligkeit gemeldet werden. Zeiträume über Mitternacht, beispielsweise 23:00 bis 06:00 Uhr, werden automatisch korrekt behandelt.", "Ist die Prüfung deaktiviert, beeinflusst die Ruhezeit weder Erkennung noch Anwesenheitssteuerung."],
           notifications:["Benachrichtigungen und Prüfungen", "Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln gewarnt wird.", "Die HA-Glocke zeigt Meldungen direkt in Home Assistant. Ausgewählte Benachrichtigungsziele senden Warnungen zusätzlich etwa an die Companion App oder einen eingerichteten Telegram Bot.", "Unabhängig von diesen Schaltern erzeugt jede neue Warnung das Home-Assistant-Ereignis nodarion_alert. Damit lassen sich eigene Automationen und weitere Eskalationswege bauen."],
           ai:["KI-Analyse", "Die tägliche Auswertung fasst Netzwerkzustand, Änderungen und Auffälligkeiten nach dem gewählten Zeitpunkt zusammen. Eine manuelle Analyse bleibt im KI-Reiter jederzeit möglich.", "Mit anonymisiertem DNS-Datenschutz werden keine lesbaren Domainnamen an die KI übergeben. Domainnamen mitsenden ermöglicht detailliertere Bewertungen, gibt aber entsprechend mehr Informationen weiter."],
-          cleanup:["Bereinigung", "Offline-Teilnehmer löschen entfernt alle derzeit offline geführten Geräte samt gespeicherter Markierungen und Überwachungseinstellungen.", "Diese Aktion ist bewusst nicht Teil des normalen Speicherns und wird erst nach einer zusätzlichen Bestätigung ausgeführt."],
+          cleanup:["Bereinigung", "Anzeige bereinigen entfernt alte Offline-Einträge, behält aber gespeicherte Gerätefreigaben. Vollständig vergessen entfernt zusätzlich Überwachungs- und Anwesenheitsmarkierungen.", "Vor beiden Aktionen zeigt Nodarion die Anzahl betroffener und geschützter Teilnehmer an und fragt nochmals nach."],
         }[helpButton.dataset.settingsHelp];
         if (!help) return;
         this._settingsHelp = help;
@@ -2815,6 +3086,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
         const total = settingsView.querySelectorAll("[data-notify-target]").length;
         const count = settingsView.querySelector(".notify-target-count");
         if (count) count.textContent = `${selected} von ${total} ausgewählt`;
+        this._dirtyRules.add("notify_targets");
+        this._captureSettingsDraft(settingsView);
+        this._updateSettingsDirtyUi(settingsView);
         return;
       }
       const settingOption = event.target.closest("[data-setting-rule]");
@@ -2830,11 +3104,22 @@ class EngelsoftNodarionPanel extends HTMLElement {
           option.classList.toggle("active", option === settingOption)
         );
         details?.removeAttribute("open");
+        this._dirtyRules.add(rule);
+        this._captureSettingsDraft(settingsView);
+        this._updateSettingsDirtyUi(settingsView);
+        return;
+      }
+      if (event.target.closest(".discard-settings")) {
+        this._settingsDraft = null;
+        this._dirtyRules.clear();
+        this._notifyTargetsDirty = false;
+        this._renderWatch();
+        this._renderSettings();
         return;
       }
       const cleanup = event.target.closest(".cleanup");
       if (cleanup) {
-        this._cleanupOffline(cleanup);
+        this._cleanupOffline(cleanup, cleanup.dataset.forget !== "false");
         return;
       }
       const watchSave = event.target.closest(".save-watch-rules");
@@ -2861,24 +3146,31 @@ class EngelsoftNodarionPanel extends HTMLElement {
         const total = settingsView.querySelectorAll("[data-notify-target]").length;
         const count = settingsView.querySelector(".notify-target-count");
         if (count) count.textContent = `${selected} von ${total} ausgewählt`;
+        this._dirtyRules.add("notify_targets");
       }
       const rule = event.target?.dataset?.rule;
-      if (rule === "onboarding_auto_range") {
-        settingsView.querySelectorAll(
-          '[data-rule="onboarding_start"], [data-rule="onboarding_end"]'
-        ).forEach((input) => {
-          input.disabled = event.target.checked;
+      if (rule) this._dirtyRules.add(rule);
+      if (["onboarding_enabled", "guest_monitoring_enabled", "quiet_hours_enabled", "ai_analysis_enabled"].includes(rule)) {
+        settingsView.querySelectorAll(`[data-depends-on="${rule}"]`).forEach((group) => {
+          group.hidden = !event.target.checked;
         });
       }
-      if (rule === "guest_monitoring_enabled") {
-        settingsView.querySelectorAll(
-          '[data-rule="guest_new_enabled"], [data-rule="guest_quiet_enabled"], [data-rule="guest_max_hours"]'
-        ).forEach((input) => {
-          input.disabled = !event.target.checked;
+      if (rule === "onboarding_auto_range") {
+        settingsView.querySelectorAll("[data-manual-range]").forEach((group) => {
+          group.hidden = event.target.checked;
         });
+      }
+      if (rule || event.target?.matches?.("[data-notify-target]")) {
+        this._captureSettingsDraft(settingsView);
+        this._updateSettingsDirtyUi(settingsView);
       }
     });
     settingsView.addEventListener("input", (event) => {
+      if (event.target?.dataset?.rule) {
+        this._dirtyRules.add(event.target.dataset.rule);
+        this._captureSettingsDraft(settingsView);
+        this._updateSettingsDirtyUi(settingsView);
+      }
       if (!event.target?.matches?.(".notify-target-search")) return;
       this._notifyTargetQuery = event.target.value;
       const query = event.target.value.trim().toLocaleLowerCase("de-DE");
@@ -2887,6 +3179,17 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .toLocaleLowerCase("de-DE");
         target.hidden = Boolean(query && !searchable.includes(query));
       });
+    });
+    settingsView.addEventListener("keydown", (event) => {
+      const tab = event.target.closest?.("[data-settings-tab]");
+      if (!tab || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      const tabs = [...settingsView.querySelectorAll("[data-settings-tab]")];
+      const index = tabs.indexOf(tab);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
+        : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      event.preventDefault();
+      tabs[next]?.focus();
+      tabs[next]?.click();
     });
   }
 
@@ -3096,15 +3399,23 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }
   }
 
-  async _cleanupOffline(button) {
-    if (!window.confirm(
-      "Wirklich ALLE derzeit offline angezeigten Geräte sofort entfernen? Offline überwachte Geräte und deren Überwachungseinstellungen werden ebenfalls gelöscht."
-    )) return;
+  async _cleanupOffline(button, forget) {
+    const offline = this._entities().filter((entity) => entity.state !== "on");
+    const protectedCount = offline.filter((entity) => {
+      const key = entity.attributes.nodarion_key;
+      return this._monitor.monitored.includes(key)
+        || this._monitor.presence_devices.includes(key)
+        || this._monitor.known_hosts.includes(key);
+    }).length;
+    const question = forget
+      ? `${offline.length} Offline-Teilnehmer vollständig vergessen? Bei ${protectedCount} davon werden auch Freigaben oder Überwachungseinstellungen entfernt.`
+      : `${offline.length} Offline-Anzeigen bereinigen? Gespeicherte Gerätefreigaben bleiben erhalten.`;
+    if (!offline.length || !await this._confirm({ title:"Offline-Geräte bereinigen", message:question, confirmLabel:forget ? "Vollständig vergessen" : "Anzeige bereinigen", danger:forget })) return;
     button.classList.add("busy");
     button.disabled = true;
     try {
       const response = await this._hass.callApi(
-        "POST", "nodarion/monitor", { action: "cleanup_inactive" }
+        "POST", "nodarion/monitor", { action: "cleanup_inactive", forget }
       );
       const removed = Number(response.cleanup_result?.removed || 0);
       this._monitor = response;
@@ -3119,17 +3430,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
       result.textContent = "Bereinigung konnte nicht ausgeführt werden.";
       result.classList.add("visible");
     } finally {
-      const currentButton = this.shadowRoot.querySelector(".danger-zone .cleanup");
-      currentButton?.classList.remove("busy");
-      if (currentButton) currentButton.disabled = false;
+      this.shadowRoot.querySelectorAll(".danger-zone .cleanup").forEach((currentButton) => {
+        currentButton.classList.remove("busy");
+        currentButton.disabled = false;
+      });
     }
   }
 
   async _approveInternet(button) {
     const name = button.dataset.name || button.dataset.key;
-    if (!window.confirm(
-      `Internetzugang für „${name}“ freigeben und das Gerät dauerhaft bestätigen?`
-    )) return;
+    if (!await this._confirm({ title:"Gerät freigeben", message:`Internetzugang für „${name}“ freigeben und das Gerät dauerhaft bestätigen?`, confirmLabel:"Freigeben" })) return;
     button.disabled = true;
     const original = button.textContent;
     button.textContent = "Wird freigegeben …";
@@ -3142,11 +3452,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       button.textContent = "Freigegeben";
     } catch (error) {
       const detail = error?.body?.message || error?.message;
-      window.alert(
-        detail
-          ? `Die FRITZ!Box konnte den Internetzugang nicht freigeben:\n\n${detail}`
-          : "Die FRITZ!Box konnte den Internetzugang nicht freigeben. Bitte Benutzerrechte und TR-064-Unterstützung prüfen."
-      );
+      await this._confirm({ title:"Freigabe fehlgeschlagen", message:detail ? `Die FRITZ!Box konnte den Internetzugang nicht freigeben: ${detail}` : "Die FRITZ!Box konnte den Internetzugang nicht freigeben. Bitte Benutzerrechte und TR-064-Unterstützung prüfen.", confirmLabel:"Schließen", danger:true, showCancel:false });
       button.disabled = false;
       button.textContent = original;
     }
@@ -3164,13 +3470,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
       entity.state === "on" && entity.attributes.guest_network
     );
     const since = this._monitor.guest_since || {};
-    const detail = (label, value) => `<div class="guest-status-card"><span>${esc(label)}</span><strong>${esc(value ?? "–")}</strong></div>`;
+    const detail = (label, value) => `<div class="guest-status-card"><span>${esc(label)}</span><strong>${esc(value ?? "Nicht verfügbar")}</strong></div>`;
     const clients = guests.map((entity) => {
       const attr = entity.attributes;
       const key = attr.nodarion_key || `ip_${attr.ip_address}`;
       const name = attr.hostname || attr.friendly_name || attr.ip_address;
       const connected = since[key] ? formatStateChanged(since[key]) : "Online";
-      return `<div class="guest-client"><div><strong>${esc(name)}</strong><small>${esc(attr.ip_address || "–")} · ${esc(attr.mac_address || "MAC unbekannt")}${attr.mac_vendor ? ` · ${esc(attr.mac_vendor)}` : ""}</small></div><small>${esc(connected)}</small></div>`;
+      return `<div class="guest-client"><div><strong>${esc(name)}</strong><small>${esc(attr.ip_address || "Nicht verfügbar")} · ${esc(attr.mac_address || "MAC nicht erkannt")}${attr.mac_vendor ? ` · ${esc(attr.mac_vendor)}` : ""}</small></div><small>${esc(connected)}</small></div>`;
     }).join("");
     const remaining = Number(info.time_remaining_seconds);
     const qrCode = String(info.qr_code || "");
@@ -3281,6 +3587,35 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .replaceAll("?", ".");
       return new RegExp(`^${expression}$`, "i").test(haystack);
     };
+    const internetPresentation = (entity) => {
+      const attr = entity.attributes;
+      const key = attr.nodarion_key || `ip_${attr.ip_address}`;
+      const name = attr.hostname || attr.friendly_name || attr.ip_address;
+      const isRouter = ["fritz.box", "fritz!box", "fritzbox"].includes(
+        String(attr.hostname || name || "").trim().replace(/\.$/, "").toLocaleLowerCase("de-DE")
+      );
+      const vpn = Boolean(attr.vpn_connection)
+        || /^(vpn|wireguard)/i.test(String(attr.hostname || name));
+      const infrastructure = isNetworkInfrastructure(entity);
+      return internetStatusFor({
+        approvalRequired: !isRouter && !infrastructure && !vpn && !attr.guest_network
+          && Boolean(attr.internet_approval_required),
+        wanAccess: isRouter ? "granted" : attr.wan_access,
+        learningActive: Boolean(this._monitor.learning?.active),
+        knownHost: Boolean(attr.trusted) || this._monitor.known_hosts.includes(key),
+        guestNetwork: Boolean(attr.guest_network),
+        vpnConnection: vpn,
+        networkInfrastructure: infrastructure,
+      });
+    };
+    const connectionValue = (entity) => {
+      const attr = entity.attributes;
+      const name = attr.hostname || attr.friendly_name || "";
+      if (attr.vpn_connection || /^(vpn|wireguard)/i.test(String(name))) return "VPN";
+      return [attr.connection_type, attr.wifi_band].filter(Boolean).join(" · ") || "Nicht verfügbar";
+    };
+    const addressValue = (entity) => entity.attributes.address_source || "Nicht verfügbar";
+    const sourceValues = (entity) => entity.attributes.detection_sources || [];
     let entities = this._entities().filter((entity) => {
       const attr = entity.attributes;
       const filters = this._columnFilters;
@@ -3312,6 +3647,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
           || this._monitor.presence_devices.includes(key)
         )
       ) return false;
+      if (
+        filters.internet
+        && internetPresentation(entity).cssClass !== filters.internet
+      ) return false;
+      if (filters.connection && connectionValue(entity) !== filters.connection) return false;
+      if (filters.address && addressValue(entity) !== filters.address) return false;
+      if (filters.source && !sourceValues(entity).includes(filters.source)) return false;
       return (
         (
           matches(entity.entity_id, filters.name)
@@ -3323,16 +3665,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
           [attr.mac_address, attr.mac_vendor, attr.mac_vendor_prefix].join(" "),
           filters.mac
         )
-        && matches([attr.connection_type, attr.wifi_band, attr.access_point].join(" "), filters.connection)
         && matches(attr.access_point, filters.mesh)
         && matches([attr.link_rate_mbps, attr.link_rate_rx_mbps, attr.link_rate_tx_mbps, attr.signal_strength_percent, attr.signal_strength_dbm].join(" "), filters.rate)
-        && matches([attr.address_source, formatLease(attr.lease_time_remaining)].join(" "), filters.address)
         && matches([attr.dns_queries, attr.dns_blocked, attr.dns_blocked_ratio, attr.dns_last_domain].join(" "), filters.dns)
-        && matches((attr.detection_sources || []).join(" "), filters.source)
-        && matches(
-          [attr.wan_access, attr.internet_approval_required ? "freigabe ausstehend gesperrt" : "bestätigt"].join(" "),
-          filters.internet
-        )
       );
     });
     const ipNumber = (ip) => (ip || "0.0.0.0").split(".").reduce((sum, part) => sum * 256 + Number(part), 0);
@@ -3375,35 +3710,62 @@ class EngelsoftNodarionPanel extends HTMLElement {
         attr.ip_address, this._monitor.rules
       );
       const lifecycleLabel = lifecycle === "onboarding"
-        ? "Neu"
-        : lifecycle === "assigned" ? "Zugeordnet" : "Unbekannt";
-      const stateChanged = entity.last_changed || (this._monitor.events || []).find(
-        (item) => item.key === key && ["online", "offline"].includes(item.type)
-      )?.timestamp;
+        ? "Einrichtungsbereich"
+        : lifecycle === "assigned" ? "Regulärer Bereich" : "Einrichtung deaktiviert";
+      const transitionEvent = (this._monitor.events || []).find(
+        (item) => item.key === key && item.type === (online ? "online" : "offline")
+      );
+      const stateChanged = online
+        ? this._monitor.online_since?.[key] || transitionEvent?.timestamp || entity.last_changed
+        : this._monitor.offline_since?.[key] || transitionEvent?.timestamp || entity.last_changed;
       const privateMac = isPrivateMac(attr.mac_address);
       const vendorTitle = attr.mac_vendor ? [
         `Hersteller: ${attr.mac_vendor}`,
-        `Registrierter Präfix: ${attr.mac_vendor_prefix || "–"}`,
-        `Zuteilung: ${attr.mac_vendor_block_type || "–"}`,
-        `Registerstand: ${attr.mac_vendor_last_update || "–"}`,
+        `Registrierter Präfix: ${attr.mac_vendor_prefix || "Nicht verfügbar"}`,
+        `Zuteilung: ${attr.mac_vendor_block_type || "Nicht verfügbar"}`,
+        `Registerstand: ${attr.mac_vendor_last_update || "Nicht verfügbar"}`,
         "Quelle: lokale MAC-Vendor-Datei",
       ].join("\n") : privateMac
         ? "Lokale bzw. randomisierte MAC-Adresse – eine Herstellerzuordnung ist nicht zuverlässig möglich."
         : "Für diesen MAC-Präfix wurde in der lokalen Datei kein Hersteller gefunden.";
-      const approvalRequired = Boolean(attr.internet_approval_required);
-      const wanAccess = attr.wan_access;
+      const isFritzRouter = ["fritz.box", "fritz!box", "fritzbox"].includes(
+        String(attr.hostname || name || "").trim().replace(/\.$/, "").toLocaleLowerCase("de-DE")
+      );
+      const vpnConnection = Boolean(attr.vpn_connection)
+        || /^(vpn|wireguard)/i.test(String(attr.hostname || name));
+      const networkInfrastructure = isNetworkInfrastructure(entity);
+      const approvalRequired = !isFritzRouter
+        && !networkInfrastructure
+        && !vpnConnection
+        && !attr.guest_network
+        && Boolean(attr.internet_approval_required);
+      const wanAccess = isFritzRouter ? "granted" : attr.wan_access;
       const learningActive = Boolean(this._monitor.learning?.active);
-      const learnedFritzDevice = learningActive
-        && (attr.detection_sources || []).includes("fritzbox");
-      const internetLabel = approvalRequired
-        ? wanAccess === "denied" ? "Gesperrt · Freigabe ausstehend"
-          : wanAccess === "error" ? "Freigabe fehlgeschlagen"
-            : "Freigabe ausstehend"
-        : learnedFritzDevice ? "Lernphase · automatisch freigegeben"
-        : wanAccess === "granted" ? "Freigegeben" : "Nicht verwaltet";
-      const internetClass = learnedFritzDevice && !approvalRequired
-        ? "granted"
-        : (wanAccess || "");
+      const knownHost = Boolean(attr.trusted)
+        || this._monitor.known_hosts.includes(key);
+      const internetStatus = internetStatusFor({
+        approvalRequired,
+        wanAccess,
+        learningActive,
+        knownHost,
+        guestNetwork: Boolean(attr.guest_network),
+        vpnConnection,
+        networkInfrastructure,
+      });
+      const internetLabel = internetStatus.label;
+      const internetClass = internetStatus.cssClass;
+      const internetHint = networkInfrastructure
+        ? "Router und Mesh-Komponenten werden nicht durch den FRITZ!Box-Hostfilter gesteuert."
+        : vpnConnection
+        ? "VPN-Verbindungen werden nicht durch den FRITZ!Box-Hostfilter gesteuert."
+        : attr.guest_network
+          ? "Der Gastzugang wird durch die FRITZ!Box verwaltet."
+          : internetClass === "error"
+            ? "Die FRITZ!Box konnte die gewünschte Änderung nicht ausführen."
+            : approvalRequired ? "Freigabe durch einen Administrator erforderlich." : "";
+      const specialDeviceClass = vpnConnection
+        ? "vpn"
+        : attr.guest_network ? "guest" : isFritzRouter ? "router" : networkInfrastructure ? "mesh" : "";
       const sources = (attr.detection_sources || [])
         .map((source) => ({
           fritzbox: "FRITZ!Box",
@@ -3411,9 +3773,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
           tcp: "TCP",
           ping_tcp: "Ping/TCP",
         })[source] || source)
-        .join(" + ") || "Unbekannt";
-      const accessPoint = attr.access_point || "–";
-      const connection = [attr.connection_type, attr.wifi_band].filter(Boolean).join(" · ") || "Unbekannt";
+        .join(" + ") || "Nicht erkannt";
+      const accessPoint = attr.access_point || "Nicht verfügbar";
+      const connection = vpnConnection
+        ? "VPN"
+        : [attr.connection_type, attr.wifi_band].filter(Boolean).join(" · ") || "Nicht verfügbar";
       const rates = attr.link_rate_mbps !== null && attr.link_rate_mbps !== undefined
         ? `${attr.link_rate_mbps} Mbit/s`
         : [
@@ -3436,12 +3800,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         `Zeitraum: ${attr.adguard_period_hours} Stunden`,
         `Daten vollständig: ${attr.adguard_data_complete === false ? "Nein (Abfragelimit erreicht)" : "Ja"}`,
         `Letzte Aktivität: ${formatDateTime(attr.dns_last_activity)}`,
-        `Letzte Domain: ${attr.dns_last_domain || "–"}`,
-        `Zuletzt blockiert: ${attr.dns_last_blocked_domain || "–"}`,
+        `Letzte Domain: ${attr.dns_last_domain || "Nicht verfügbar"}`,
+        `Zuletzt blockiert: ${attr.dns_last_blocked_domain || "Nicht verfügbar"}`,
         `Treffergrund: ${blockReason(attr.dns_last_block_reason)}`,
-        `DNS-Protokoll: ${attr.dns_last_protocol || "–"}`,
-        `Häufig abgefragt: ${topDomains(attr.dns_top_queried_domains) || "–"}`,
-        `Häufig blockiert: ${topDomains(attr.dns_top_blocked_domains) || "–"}`,
+        `DNS-Protokoll: ${attr.dns_last_protocol || "Nicht verfügbar"}`,
+        `Häufig abgefragt: ${topDomains(attr.dns_top_queried_domains) || "Nicht verfügbar"}`,
+        `Häufig blockiert: ${topDomains(attr.dns_top_blocked_domains) || "Nicht verfügbar"}`,
       ].join("\n") : "AdGuard Home ist in Nodarion nicht aktiviert oder nicht erreichbar";
       const dnsPrimary = attr.adguard_bypass_suspected
         ? "Kein AdGuard-DNS"
@@ -3450,35 +3814,36 @@ class EngelsoftNodarionPanel extends HTMLElement {
         ? `${attr.dns_blocked || 0} blockiert · ${attr.dns_blocked_ratio || 0} %`
         : "";
       const dnsAssessment = hasAdGuard ? dnsRating(attr.dns_blocked_ratio) : null;
-      return `<tr class="${online ? "on" : "off"} ${lifecycle === "onboarding" ? "onboarding-row" : ""} ${attr.guest_network ? "guest-row" : ""}" ${lifecycle === "onboarding" ? 'title="Gerät im DHCP-Einrichtungsbereich"' : ""}>
+      return `<tr class="${online ? "on" : "off"} ${!online && monitored ? "important-offline" : ""} ${lifecycle === "onboarding" ? "onboarding-row" : ""} ${attr.guest_network ? "guest-row" : ""}" ${lifecycle === "onboarding" ? 'title="Gerät im DHCP-Einrichtungsbereich"' : ""}>
         <td data-column="state" data-label="Status"><div class="status-cell"><div class="status"><i class="dot"></i>${online ? "Online" : "Offline"}</div><span class="status-time">${esc(formatStateChanged(stateChanged))}</span></div></td>
-        <td data-column="onboarding" data-label="Gerätestatus"><span class="onboarding-state ${lifecycle}">${esc(lifecycleLabel)}</span></td>
+        <td data-column="onboarding" data-label="IP-Bereich"><span class="onboarding-state ${lifecycle}">${esc(lifecycleLabel)}</span></td>
         <td data-column="name" data-label="Teilnehmer"><div class="device-cell">
-          <span class="device-icon" title="Automatisch erkannter Gerätetyp"><ha-icon icon="${deviceIcon(entity)}"></ha-icon></span>
+          <span class="device-icon ${specialDeviceClass}" title="Automatisch erkannter Gerätetyp"><ha-icon icon="${deviceIcon(entity)}"></ha-icon></span>
           <div class="device-label"><button class="entity-link" data-key="${esc(key)}" data-name="${esc(name)}" title="Live-Log dieses Geräts anzeigen">${esc(name)}</button>
-          ${attr.guest_network ? `<button class="guest-badge" type="button" title="Nur Geräte im Gastzugang anzeigen"><ha-icon icon="mdi:wifi-star"></ha-icon>GAST</button>` : ""}<button class="entity-id-link" data-entity-id="${esc(entity.entity_id)}" title="Home-Assistant-Dialog öffnen">${esc(entity.entity_id)}</button></div>
+          <button class="entity-id-link" data-entity-id="${esc(entity.entity_id)}" title="Home-Assistant-Dialog öffnen">${esc(entity.entity_id)}</button></div>
         </div>
         </td>
-        <td data-column="ip" data-label="IP-Adresse" class="mono">${esc(attr.ip_address || "–")}</td>
-        <td data-column="mac" data-label="MAC-Adresse" class="mono" title="${esc(vendorTitle)}">${esc(attr.mac_address || "Unbekannt")}${attr.mac_vendor ? `<span class="mac-vendor" title="${esc(vendorTitle)}"><ha-icon icon="mdi:factory"></ha-icon>${esc(attr.mac_vendor)}</span>` : ""}${privateMac ? `<span class="private-mac" title="Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus"><ha-icon icon="mdi:incognito"></ha-icon>Privat / randomisiert</span>` : ""}</td>
+        <td data-column="ip" data-label="IP-Adresse" class="mono">${esc(attr.ip_address || "Nicht verfügbar")}</td>
+        <td data-column="mac" data-label="MAC-Adresse" class="mono" title="${esc(vendorTitle)}">${esc(attr.mac_address || "Nicht erkannt")}${attr.mac_vendor ? `<span class="mac-vendor" title="${esc(vendorTitle)}"><ha-icon icon="mdi:factory"></ha-icon>${esc(attr.mac_vendor)}</span>` : ""}${privateMac ? `<span class="private-mac" title="Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus"><ha-icon icon="mdi:incognito"></ha-icon>Privat / randomisiert</span>` : ""}</td>
         <td data-column="connection" data-label="Verbindung"><div class="detail-stack"><strong>${esc(connection)}</strong></div></td>
         <td data-column="mesh" data-label="Mesh-Punkt"><div class="detail-stack"><strong>${esc(accessPoint)}</strong></div></td>
-        <td data-column="rate" data-label="WLAN"><div class="detail-stack"><strong>${esc(rates || "–")}</strong>${signal ? `<span class="rating ${signalAssessment?.level || "okay"}" title="WLAN-Empfang: ${esc(signalAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(signal)} · ${esc(signalAssessment?.label || "")}</span></span>` : ""}</div></td>
-        <td data-column="address" data-label="Adressvergabe"><div class="detail-stack"><strong>${esc(addressSource || "–")}</strong>${addressSource === "DHCP" && lease ? `<small>Noch ${esc(lease)}</small>` : ""}</div></td>
+        <td data-column="rate" data-label="WLAN"><div class="detail-stack"><strong>${esc(rates || "Nicht verfügbar")}</strong>${signal ? `<span class="rating ${signalAssessment?.level || "okay"}" title="WLAN-Empfang: ${esc(signalAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(signal)} · ${esc(signalAssessment?.label || "")}</span></span>` : ""}</div></td>
+        <td data-column="address" data-label="Adressvergabe"><div class="detail-stack"><strong>${esc(addressSource || "Nicht verfügbar")}</strong>${addressSource === "DHCP" && lease ? `<small>Noch ${esc(lease)}</small>` : ""}</div></td>
         <td data-column="dns" data-label="AdGuard DNS" title="${esc(dnsTitle)}"><button class="dns-live-link" type="button" data-ip="${esc(attr.ip_address)}" data-name="${esc(name)}" title="DNS-Live-Log für ${esc(name)} öffnen"><span class="detail-stack"><strong class="${attr.adguard_bypass_suspected ? "dns-alert" : ""}">${esc(dnsPrimary)}</strong>${dnsSecondary ? `<span class="rating ${dnsAssessment?.level || "okay"}" title="Anteil blockierter DNS-Anfragen: ${esc(dnsAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(dnsSecondary)} · ${esc(dnsAssessment?.label || "")}</span></span>` : ""}</span></button></td>
         <td data-column="source" data-label="Erkannt durch">${esc(sources)}</td>
-        <td data-column="internet" data-label="Internetzugang"><div class="internet-state"><span class="internet-label ${esc(internetClass)}">${esc(internetLabel)}</span>${approvalRequired ? `<button class="approve-internet" data-key="${esc(key)}" data-name="${esc(name)}" data-entity-id="${esc(entity.entity_id)}">Freigeben</button>` : ""}</div></td>
+        <td data-column="internet" data-label="Internetzugang"><div class="internet-state"><span class="internet-label ${esc(internetClass)}">${esc(internetLabel)}</span>${internetHint ? `<small class="internet-hint">${esc(internetHint)}</small>` : ""}${approvalRequired ? `<button class="approve-internet" data-key="${esc(key)}" data-name="${esc(name)}" data-entity-id="${esc(entity.entity_id)}">Freigeben</button>` : ""}</div></td>
         <td data-column="watch" data-label="Überwachung">
           <div class="card-actions">
             <button class="watch ${monitored ? "active" : ""}" data-key="${esc(key)}" title="${monitored ? "Überwachung beenden" : "Als wichtig überwachen"}"><ha-icon icon="${monitored ? "mdi:star" : "mdi:star-outline"}"></ha-icon></button>
             <button class="watch notify ${notify ? "active" : ""}" data-key="${esc(key)}" title="${notify ? "Offline-Meldung deaktivieren" : "Bei Offline melden"}"><ha-icon icon="${notify ? "mdi:bell" : "mdi:bell-outline"}"></ha-icon></button>
             <button class="watch presence ${presence ? "active" : ""}" data-key="${esc(key)}" title="${presence ? "Aus Anwesenheitssteuerung entfernen" : `Für Anwesenheitssteuerung verwenden · Offline nach ${Number(this._monitor.rules?.presence_timeout_minutes || 5)} Min.`}"><ha-icon icon="mdi:home-account"></ha-icon></button>
+            <button class="watch mobile-details" type="button" aria-expanded="false" title="Weitere Gerätedetails anzeigen"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
           </div>
         </td>
       </tr>`;
     }).join("");
     const columns = [
-      ["state", "Status"], ["onboarding", "Gerätestatus"],
+      ["state", "Status"], ["onboarding", "IP-Bereich"],
       ["name", "Teilnehmer"], ["ip", "IP-Adresse"],
       ["mac", "MAC-Adresse"], ["connection", "Verbindung"], ["mesh", "Mesh-Zugangspunkt"],
       ["rate", "WLAN-Daten"], ["address", "Adressvergabe"], ["dns", "AdGuard DNS"],
@@ -3497,8 +3862,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const customFilter = (key, options, minWidth = "") => {
       const value = this._columnFilters[key] || "";
       const selected = options.find((option) => option.value === value) || options[0];
-      const buttons = options.map((option) => `<button type="button" class="custom-filter-option ${value === option.value ? "active" : ""}" data-column-filter-key="${key}" data-column-filter-value="${esc(option.value)}"><ha-icon icon="${value === option.value ? "mdi:check" : option.icon}"></ha-icon><span>${esc(option.label)}</span><span class="custom-filter-count">${Number(option.count || 0)}</span></button>`).join("");
-      return `<details class="custom-column-filter ${value ? "has-value" : ""}" data-column-filter-key="${key}" ${minWidth ? `style="min-width:${minWidth}"` : ""}><summary>${esc(selected.label)}</summary><div class="custom-filter-menu">${buttons}</div></details>`;
+      const buttons = options.map((option) => `<button type="button" role="option" aria-selected="${value === option.value}" class="custom-filter-option ${value === option.value ? "active" : ""}" data-column-filter-key="${key}" data-column-filter-value="${esc(option.value)}"><ha-icon icon="${value === option.value ? "mdi:check" : option.icon}"></ha-icon><span>${esc(option.label)}</span><span class="custom-filter-count">${Number(option.count || 0)}</span></button>`).join("");
+      return `<details class="custom-column-filter ${value ? "has-value" : ""}" data-column-filter-key="${key}" ${minWidth ? `style="min-width:${minWidth}"` : ""}><summary aria-label="${esc(`${selected.label}; Filter ${key}`)}">${esc(selected.label)}</summary><div class="custom-filter-menu" role="listbox">${buttons}</div></details>`;
     };
     const stateFilter = customFilter("state", [
       { value:"", label:"Alle", icon:"mdi:lan", count:allEntities.length },
@@ -3507,10 +3872,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
       { value:"guest", label:"Gastzugang", icon:"mdi:wifi-star", count:countWhere((entity) => Boolean(entity.attributes.guest_network)) },
     ], "150px");
     const onboardingFilter = customFilter("onboarding", [
-      { value:"", label:"Alle Gerätestatus", icon:"mdi:tag-multiple-outline", count:allEntities.length },
-      { value:"onboarding", label:"Neu", icon:"mdi:star-four-points-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "onboarding") },
-      { value:"assigned", label:"Zugeordnet", icon:"mdi:check-decagram-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "assigned") },
-      { value:"unknown", label:"Unbekannt", icon:"mdi:help-circle-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "unknown") },
+      { value:"", label:"Alle IP-Bereiche", icon:"mdi:tag-multiple-outline", count:allEntities.length },
+      { value:"onboarding", label:"Einrichtungsbereich", icon:"mdi:star-four-points-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "onboarding") },
+      { value:"assigned", label:"Regulärer Bereich", icon:"mdi:check-decagram-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "assigned") },
+      { value:"unknown", label:"Einrichtung deaktiviert", icon:"mdi:minus-circle-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "unknown") },
     ]);
     const watchFilter = customFilter("watch", [
       { value:"", label:"Alle Funktionen", icon:"mdi:tune-variant", count:allEntities.length },
@@ -3519,6 +3884,44 @@ class EngelsoftNodarionPanel extends HTMLElement {
       { value:"presence", label:"Anwesenheit", icon:"mdi:home-account", count:countWhere((entity) => this._monitor.presence_devices.includes(entity.attributes.nodarion_key)) },
       { value:"none", label:"Keine Funktion", icon:"mdi:minus-circle-outline", count:countWhere((entity) => { const key = entity.attributes.nodarion_key; return !this._monitor.monitored.includes(key) && !this._monitor.notifications.includes(key) && !this._monitor.presence_devices.includes(key); }) },
     ], "180px");
+    const internetCounts = new Map();
+    allEntities.forEach((entity) => {
+      const status = internetPresentation(entity);
+      const current = internetCounts.get(status.cssClass) || {
+        value: status.cssClass,
+        label: status.label,
+        count: 0,
+      };
+      current.count += 1;
+      internetCounts.set(status.cssClass, current);
+    });
+    const internetOrder = ["denied", "pending", "error", "unchecked", "unmanaged", "infrastructure", "learning", "trusted", "allowed"];
+    const internetFilter = customFilter("internet", [
+      { value:"", label:"Alle Internetstatus", icon:"mdi:web", count:allEntities.length },
+      ...[...internetCounts.values()]
+        .sort((a, b) => internetOrder.indexOf(a.value) - internetOrder.indexOf(b.value))
+        .map((option) => ({ ...option, icon:"mdi:shield-outline" })),
+    ], "210px");
+    const countedOptions = (values, allLabel, icon) => {
+      const counts = new Map();
+      values.forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
+      return [
+        { value:"", label:allLabel, icon, count:values.length },
+        ...[...counts.entries()].sort(([a], [b]) => a.localeCompare(b, "de"))
+          .map(([value, count]) => ({ value, label:value, icon, count })),
+      ];
+    };
+    const connectionFilter = customFilter("connection", countedOptions(
+      allEntities.map(connectionValue), "Alle Verbindungen", "mdi:lan-connect"
+    ), "180px");
+    const addressFilter = customFilter("address", countedOptions(
+      allEntities.map(addressValue), "Alle Adressvergaben", "mdi:ip-network-outline"
+    ), "185px");
+    const sourceLabels = { fritzbox:"FRITZ!Box", ping:"Ping", tcp:"TCP", ping_tcp:"Ping/TCP" };
+    const sourceOptions = countedOptions(
+      allEntities.flatMap(sourceValues), "Alle Erkennungsquellen", "mdi:radar"
+    ).map((option) => ({ ...option, label:sourceLabels[option.value] || option.label }));
+    const sourceFilter = customFilter("source", sourceOptions, "190px");
     const meshCounts = new Map();
     allEntities.filter((entity) => entity.state === "on").forEach((entity) => {
       const accessPoint = entity.attributes.access_point;
@@ -3529,23 +3932,27 @@ class EngelsoftNodarionPanel extends HTMLElement {
       .map(([name, count]) => `<button type="button" class="custom-filter-option ${this._columnFilters.mesh === name ? "active" : ""}" data-column-filter-key="mesh" data-column-filter-value="${esc(name)}"><ha-icon icon="${this._columnFilters.mesh === name ? "mdi:check" : "mdi:access-point"}"></ha-icon><span>${esc(name)}</span><span class="custom-filter-count">${count}</span></button>`)
       .join("");
     const selectedMesh = this._columnFilters.mesh || "Alle Mesh-Punkte";
+    const filterNames = { state:"Status", onboarding:"IP-Bereich", name:"Teilnehmer", ip:"IP-Adresse", mac:"MAC-Adresse", connection:"Verbindung", mesh:"Mesh", rate:"WLAN", address:"Adressvergabe", dns:"AdGuard DNS", source:"Erkannt durch", internet:"Internetzugang", watch:"Überwachung" };
+    const filterValueNames = { on:"Online", off:"Offline", guest:"Gastzugang", onboarding:"Einrichtungsbereich", assigned:"Regulärer Bereich", unknown:"Einrichtung deaktiviert", monitored:"Überwacht", notify:"Offline-Meldung", presence:"Anwesenheit", none:"Keine Funktion", denied:"Gesperrt", pending:"Freigabe ausstehend", error:"Freigabe fehlgeschlagen", unchecked:"Noch nicht geprüft", unmanaged:"Nicht verwaltet", infrastructure:"Netzwerkinfrastruktur", learning:"Lernphase", trusted:"Vertrauenswürdig", allowed:"Freigegeben", ...sourceLabels };
+    const activeFilters = Object.entries(this._columnFilters).filter(([, value]) => value);
+    const filterChips = activeFilters.length ? `<div class="filter-chips" role="status" aria-label="Aktive Filter">${activeFilters.map(([key, value]) => `<button class="filter-chip" type="button" data-clear-column-filter="${esc(key)}" aria-label="Filter ${esc(filterNames[key] || key)} entfernen"><span>${esc(filterNames[key] || key)}: ${esc(filterValueNames[value] || value)}</span><ha-icon icon="mdi:close"></ha-icon></button>`).join("")}<button class="filter-reset" type="button" data-clear-all-filters>Alle Filter zurücksetzen</button></div>` : "";
     const emptyRow = `<tr><td colspan="13"><div class="empty"><ha-icon icon="mdi:filter-off-outline"></ha-icon><strong>Keine passenden Geräte</strong>Filter ändern oder leeren.</div></td></tr>`;
-    grid.innerHTML = `<table>
+    grid.innerHTML = `${filterChips}<table aria-label="Netzwerkgeräte">
       <thead>
-        <tr>${heading("Status", "state")}${heading("Gerätestatus", "onboarding")}${heading("Teilnehmer", "name")}${heading("IP-Adresse", "ip")}${heading("MAC-Adresse", "mac")}${heading("Verbindung", "connection")}${heading("Mesh-Zugangspunkt", "mesh")}${heading("WLAN-Daten", "rate")}${heading("Adressvergabe", "address")}${heading("AdGuard DNS", "dns")}${heading("Erkannt durch", "source")}<th data-column="internet" class="no-sort">Internetzugang</th><th data-column="watch" class="no-sort">Überwachung</th></tr>
+        <tr>${heading("Status", "state")}${heading("IP-Bereich", "onboarding")}${heading("Teilnehmer", "name")}${heading("IP-Adresse", "ip")}${heading("MAC-Adresse", "mac")}${heading("Verbindung", "connection")}${heading("Mesh-Zugangspunkt", "mesh")}${heading("WLAN-Daten", "rate")}${heading("Adressvergabe", "address")}${heading("AdGuard DNS", "dns")}${heading("Erkannt durch", "source")}<th data-column="internet" class="no-sort">Internetzugang</th><th data-column="watch" class="no-sort">Überwachung</th></tr>
         <tr class="column-filters">
           <th data-column="state">${stateFilter}</th>
           <th data-column="onboarding">${onboardingFilter}</th>
           ${filterInput("name", "Name oder *")}
           ${filterInput("ip", "IP oder *")}
           ${filterInput("mac", "MAC oder *")}
-          ${filterInput("connection", "z. B. WLAN")}
+          <th data-column="connection">${connectionFilter}</th>
           <th data-column="mesh"><details class="custom-column-filter ${this._columnFilters.mesh ? "has-value" : ""}" data-column-filter-key="mesh"><summary>${esc(selectedMesh)}</summary><div class="custom-filter-menu"><button type="button" class="custom-filter-option ${this._columnFilters.mesh ? "" : "active"}" data-column-filter-key="mesh" data-column-filter-value=""><ha-icon icon="${this._columnFilters.mesh ? "mdi:access-point-network" : "mdi:check"}"></ha-icon><span>Alle Mesh-Punkte</span><span class="custom-filter-count">${[...meshCounts.values()].reduce((sum, count) => sum + count, 0)}</span></button>${meshOptions}</div></details></th>
           ${filterInput("rate", "Rate / Signal")}
-          ${filterInput("address", "DHCP / statisch")}
+          <th data-column="address">${addressFilter}</th>
           ${filterInput("dns", "DNS / Domain")}
-          ${filterInput("source", "Ping / TCP")}
-          ${filterInput("internet", "Gesperrt / frei")}
+          <th data-column="source">${sourceFilter}</th>
+          <th data-column="internet">${internetFilter}</th>
           <th data-column="watch">${watchFilter}</th>
         </tr>
       </thead>
@@ -3592,6 +3999,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
       online: "mdi:lan-connect",
       offline: "mdi:lan-disconnect",
       renamed: "mdi:rename-box",
+      internet_approval_revoked: "mdi:shield-lock-outline",
+      internet_approval_granted: "mdi:shield-check-outline",
+      inventory_pruned: "mdi:archive-arrow-down-outline",
+      device_forgotten: "mdi:delete-forever-outline",
+      internet_blocked: "mdi:shield-lock-outline",
+      internet_enforcement_failed: "mdi:shield-alert-outline",
       discovered: "mdi:radar",
       mesh_changed: "mdi:access-point-network",
       guest_joined: "mdi:wifi-star",
@@ -3601,6 +4014,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
       online: "Online",
       offline: "Offline",
       renamed: "Umbenannt",
+      internet_approval_revoked: "Freigabe entzogen",
+      internet_approval_granted: "Freigabe gespeichert",
+      inventory_pruned: "Archiv bereinigt",
+      device_forgotten: "Gerät vergessen",
+      internet_blocked: "Internetzugang gesperrt",
+      internet_enforcement_failed: "Freigabe fehlgeschlagen",
       discovered: "Neu erkannt",
       mesh_changed: "Mesh-Wechsel",
       guest_joined: "Gast verbunden",
@@ -3737,7 +4156,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
             maximumFractionDigits: 2,
           }).format(elapsed)
         : null;
-      const hostname = hostnames.get(String(item.client || "")) || "Unbekannt";
+      const hostname = hostnames.get(String(item.client || "")) || "Nicht erkannt";
       const domain = String(item.domain || "");
       const policyActions = this._hass?.user?.is_admin && domain
         ? item.blocked
@@ -3976,6 +4395,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ai_analysis_time: "03:15",
       ai_privacy: "anonymized",
       ...(this._monitor.rules || {}),
+      ...(this._settingsDraft || {}),
     };
     const selectedNotifyTargets = new Set(rules.notify_targets || []);
     const notifyEntities = Object.values(this._hass?.states || {})
@@ -4031,6 +4451,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
       entity.attributes.nodarion_key || `ip_${entity.attributes.ip_address}`,
       entity.entity_id,
     ]));
+    const entityByKey = new Map(participantEntities.map((entity) => [
+      entity.attributes.nodarion_key || `ip_${entity.attributes.ip_address}`,
+      entity,
+    ]));
     const guestKeys = new Set((this._monitor.participants || [])
       .filter((participant) => participant.attributes?.guest_network)
       .map((participant) => participant.attributes?.nodarion_key || `ip_${participant.attributes?.ip_address}`));
@@ -4042,6 +4466,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const alertHtml = alerts.length ? alerts.map((alert) => {
       const active = alert.active && !alert.acknowledged;
       const alertEntityId = entityIdByKey.get(alert.key);
+      const alertEntity = entityByKey.get(alert.key);
+      const canApprove = active
+        && alert.type === "new_device"
+        && Boolean(alertEntity?.attributes?.internet_approval_required)
+        && !alertEntity?.attributes?.guest_network
+        && !alertEntity?.attributes?.vpn_connection;
       const time = new Intl.DateTimeFormat(activeLocale(), {
         dateStyle: "short", timeStyle: "short",
       }).format(new Date(alert.timestamp));
@@ -4052,7 +4482,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <div class="alert-message">${esc(alert.message)}</div>
           <div class="alert-time">${esc(time)} · ${esc(alert.ip)}${active ? "" : " · Erledigt"}</div>
         </div>
-        ${active ? `<button class="ack" data-alert-id="${esc(alert.id)}">Bestätigen</button>` : ""}
+        ${active ? `<div class="alert-actions">${canApprove ? `<button class="alert-action alert-approve" data-key="${esc(alert.key)}" data-name="${esc(alert.name || alert.ip)}">Freigeben</button>` : ""}${alertEntityId ? `<button class="alert-action watch-entity-link" data-entity-id="${esc(alertEntityId)}">Details</button>` : ""}${alert.key && !this._monitor.monitored.includes(alert.key) ? `<button class="alert-action alert-monitor" data-key="${esc(alert.key)}">Überwachen</button>` : ""}<button class="ack" data-alert-id="${esc(alert.id)}">Erledigen</button></div>` : ""}
       </article>`;
     }).join("") : `<div class="empty"><ha-icon icon="mdi:shield-check-outline"></ha-icon><strong>Alles ruhig im Netz</strong>Erkannte Auffälligkeiten erscheinen automatisch hier.</div>`;
 
@@ -4119,6 +4549,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
         ${presenceSensorButton ? `<div class="watch-heading"><div><h2>Anwesenheit</h2><p>Der Anwesenheitssensor ist aktiviert.</p></div>${presenceSensorButton}</div>` : ""}<div class="empty"><ha-icon icon="mdi:home-plus-outline"></ha-icon><strong>Noch keine Anwesenheitsgeräte</strong>Markiere Teilnehmer in der Tabelle mit dem Haus-Symbol.</div>
       </section>`;
 
+    const offlineEntities = participantEntities.filter((entity) => entity.state !== "on");
+    const offlineKeys = new Set(offlineEntities.map((entity) => entity.attributes.nodarion_key));
+    const protectedOffline = [...offlineKeys].filter((key) =>
+      this._monitor.monitored.includes(key)
+      || this._monitor.presence_devices.includes(key)
+      || this._monitor.known_hosts.includes(key)
+    ).length;
     const checked = (value) => value ? "checked" : "";
     panel.innerHTML = `
       <div class="security-metrics">
@@ -4133,14 +4570,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <div class="watch-heading">
             <div><h2>Warnungen und Auffälligkeiten</h2><p>Aktive Hinweise stehen oben, erledigte bleiben als Verlauf erhalten.</p></div>
             <div class="learning-actions">
-              ${learning.active ? `<span class="learning" title="Endet am ${esc(learningEnd)}"><ha-icon icon="mdi:school-outline"></ha-icon>Noch ${esc(learningRemaining)}</span>` : `<span class="learning"><ha-icon icon="mdi:school-outline"></ha-icon>Lernphase beendet</span>`}
-              <button class="restart-learning" type="button" title="Aktuelle Teilnehmer übernehmen und Lernzeit ab jetzt neu beginnen"><ha-icon icon="mdi:restart"></ha-icon>Neu starten</button>
+              ${learning.active ? `<span class="learning" title="Endet am ${esc(learningEnd)}"><ha-icon icon="mdi:school-outline"></ha-icon>Lernphase · noch ${esc(learningRemaining)}</span>` : `<span class="learning"><ha-icon icon="mdi:school-outline"></ha-icon>Lernphase beendet</span>`}
             </div>
           </div>
           <div class="alert-list">${alertHtml}</div>
         </section>
         <section class="watch-panel watch-settings-panel">
-          <div class="watch-heading"><div><h2>Einstellungen</h2><p>Änderungen gelten ab dem nächsten Netzwerkscan.</p></div><button class="save-rules save-watch-rules" type="button"><ha-icon icon="mdi:content-save-outline"></ha-icon>Alle Einstellungen speichern</button></div>
+          <div class="watch-heading"><div><h2>Einstellungen</h2><p>Änderungen gelten ab dem nächsten Netzwerkscan.</p></div><div class="settings-save-area"><div class="settings-dirty" role="status" aria-live="polite" ${this._dirtyRules.size ? "" : "hidden"}><span>${this._dirtyRules.size} ungespeicherte ${this._dirtyRules.size === 1 ? "Änderung" : "Änderungen"}</span><button class="discard-settings" type="button">Verwerfen</button></div><button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>Alle Einstellungen speichern</button></div></div>
           <nav class="settings-tabs" role="tablist" aria-label="Einstellungsbereiche">
             <button class="settings-tab ${this._settingsTab === "general" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "general"}" data-settings-tab="general"><ha-icon icon="mdi:tune-variant"></ha-icon>Allgemein</button>
             <button class="settings-tab ${this._settingsTab === "devices" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "devices"}" data-settings-tab="devices"><ha-icon icon="mdi:devices"></ha-icon>Geräte</button>
@@ -4153,36 +4589,34 @@ class EngelsoftNodarionPanel extends HTMLElement {
             <section class="rule-group basics">
               <h3>Grundlagen<button class="settings-help-button" type="button" data-settings-help="basics" title="Grundlagen erklären" aria-label="Hilfe zu Grundlagen">?</button></h3>
               <div class="rule"><label>Überwachung aktiv<small>Alle Regeln gemeinsam ein- oder ausschalten</small></label><input type="checkbox" data-rule="enabled" ${checked(rules.enabled)}></div>
-              <div class="rule"><label>Lernphase<small>Tage, in denen aktuelle Geräte als bekannt gelten</small></label><input type="number" min="0" max="30" data-rule="learning_days" value="${Number(rules.learning_days)}"></div>
+              <div class="learning-card"><strong>${learning.active ? `Lernphase läuft bis ${esc(learningEnd)}` : "Lernphase ist beendet"}</strong><p>${learning.active ? "Aktuell erkannte Geräte werden automatisch übernommen. Danach müssen neue Geräte wieder geprüft werden." : "Neue Geräte werden geprüft und bei aktiviertem Internetschutz zunächst gesperrt."}</p><div class="learning-actions"><button class="learning-action restart-learning" type="button">Neu beginnen</button><button class="learning-action extend-learning" type="button">7 Tage verlängern</button>${learning.active ? `<button class="learning-action end-learning" type="button">Jetzt beenden</button>` : ""}</div><label class="rule"><span>Dauer bei Neustart<small>Maximal 30 Tage</small></span><span class="unit-input"><input type="number" min="0" max="30" data-rule="learning_days" value="${Number(rules.learning_days)}"><span>Tage</span></span></label></div>
             </section>
             <section class="rule-group presence-settings">
               <h3>Anwesenheit<button class="settings-help-button" type="button" data-settings-help="presence" title="Anwesenheit erklären" aria-label="Hilfe zu Anwesenheit">?</button></h3>
-              <div class="rule"><label>Anwesenheits-Timeout<small>Markierte Geräte gehen sofort online und erst nach dieser Zeit offline (Minuten)</small></label><input type="number" min="1" max="1440" data-rule="presence_timeout_minutes" value="${Number(rules.presence_timeout_minutes)}"></div>
+              <div class="rule"><label>Anwesenheits-Timeout<small>Markierte Geräte gehen sofort online und erst danach offline</small></label><span class="unit-input"><input type="number" min="1" max="1440" data-rule="presence_timeout_minutes" value="${Number(rules.presence_timeout_minutes)}"><span>Minuten</span></span></div>
               <div class="rule"><label>Anwesenheitssensor<small>Binary Sensor &bdquo;Anwesenheit&ldquo; f&uuml;r Automationen aktivieren</small></label><input type="checkbox" data-rule="presence_sensor_enabled" ${checked(rules.presence_sensor_enabled)}></div>
             </section>
             </div>
             <div class="settings-tab-panel devices-panel" role="tabpanel" data-settings-panel="devices" ${this._settingsTab === "devices" ? "" : "hidden"}>
             <section class="rule-group onboarding-settings">
-              <h3>Geräte-Einrichtung<button class="settings-help-button" type="button" data-settings-help="onboarding" title="Geräte-Einrichtung erklären" aria-label="Hilfe zu Geräte-Einrichtung">?</button></h3>
-              <div class="rule"><label>Einrichtungsbereich aktiv<small>Geräte in diesem IP-Bereich als neu kennzeichnen</small></label><input type="checkbox" data-rule="onboarding_enabled" ${checked(rules.onboarding_enabled)}></div>
-              <div class="rule"><label>Von FRITZ!Box übernehmen<small>DHCP-Start und -Ende automatisch per TR-064 abfragen</small></label><input type="checkbox" data-rule="onboarding_auto_range" ${checked(rules.onboarding_auto_range)}></div>
-              <div class="rule"><label>Bereich beginnt<small>${rules.onboarding_auto_range ? "Automatisch von der FRITZ!Box erkannt" : "Erste DHCP-Adresse für neue Geräte"}</small></label><input type="text" data-rule="onboarding_start" value="${esc(rules.onboarding_start)}" placeholder="192.168.178.200" ${rules.onboarding_auto_range ? "disabled" : ""}></div>
-              <div class="rule"><label>Bereich endet<small>${rules.onboarding_auto_range ? "Automatisch von der FRITZ!Box erkannt" : "Letzte DHCP-Adresse für neue Geräte"}</small></label><input type="text" data-rule="onboarding_end" value="${esc(rules.onboarding_end)}" placeholder="192.168.178.250" ${rules.onboarding_auto_range ? "disabled" : ""}></div>
-              <div class="rule"><label>Automatisch überwachen<small>Neue Geräte im Einrichtungsbereich direkt mit Stern markieren</small></label><input type="checkbox" data-rule="onboarding_auto_monitor" ${checked(rules.onboarding_auto_monitor)}></div>
-              <div class="rule"><label>Benachrichtigung<small>Neue Geräte im Einrichtungsbereich in Home Assistant melden</small></label><input type="checkbox" data-rule="onboarding_notify" ${checked(rules.onboarding_notify)}></div>
+              <h3>Neue Geräte<button class="settings-help-button" type="button" data-settings-help="onboarding" title="Erkennung neuer Geräte erklären" aria-label="Hilfe zur Erkennung neuer Geräte">?</button></h3>
+              <div class="rule"><label>Neue Geräte automatisch erkennen<small>Teilnehmer in einem festgelegten IP-Bereich als neu kennzeichnen</small></label><input type="checkbox" data-rule="onboarding_enabled" ${checked(rules.onboarding_enabled)}></div>
+              <div class="dependent-settings" data-depends-on="onboarding_enabled" ${rules.onboarding_enabled ? "" : "hidden"}><div class="rule"><label>IP-Bereich aus FRITZ!Box übernehmen<small>DHCP-Start und -Ende automatisch abfragen</small></label><input type="checkbox" data-rule="onboarding_auto_range" ${checked(rules.onboarding_auto_range)}></div>
+              <details class="advanced-settings dependent-settings" data-manual-range ${rules.onboarding_auto_range ? "hidden" : ""}><summary>IP-Bereich manuell festlegen</summary><div><div class="rule"><label>Erste IP-Adresse</label><input type="text" data-rule="onboarding_start" value="${esc(rules.onboarding_start)}" placeholder="192.168.178.200"></div><div class="rule"><label>Letzte IP-Adresse</label><input type="text" data-rule="onboarding_end" value="${esc(rules.onboarding_end)}" placeholder="192.168.178.250"></div></div></details>
+              <div class="rule"><label>Automatisch überwachen<small>Neue Geräte direkt mit Stern markieren</small></label><input type="checkbox" data-rule="onboarding_auto_monitor" ${checked(rules.onboarding_auto_monitor)}></div>
+              <div class="rule"><label>Benachrichtigung<small>Neue Geräte in Home Assistant melden</small></label><input type="checkbox" data-rule="onboarding_notify" ${checked(rules.onboarding_notify)}></div></div>
             </section>
             <section class="rule-group guest-settings">
               <h3>Gastzugang</h3>
-              <div class="rule"><label>Gastnetz anzeigen und überwachen<small>Gastgeräte in Nodarion erfassen, anzeigen und protokollieren</small></label><input type="checkbox" data-rule="guest_monitoring_enabled" ${checked(rules.guest_monitoring_enabled)}></div>
-              <div class="rule"><label>Neue Gäste melden<small>Beim erstmaligen Verbinden mit dem FRITZ!Box-Gastzugang warnen</small></label><input type="checkbox" data-rule="guest_new_enabled" ${checked(rules.guest_new_enabled)} ${rules.guest_monitoring_enabled ? "" : "disabled"}></div>
-              <div class="rule"><label>Gäste zur Ruhezeit melden<small>Verbindungen im eingestellten Ruhezeitraum hervorheben</small></label><input type="checkbox" data-rule="guest_quiet_enabled" ${checked(rules.guest_quiet_enabled)} ${rules.guest_monitoring_enabled ? "" : "disabled"}></div>
-              <div class="rule"><label>Maximale Gastdauer<small>Nach dieser Anzahl Stunden eine Warnung anzeigen</small></label><input type="number" min="1" max="168" data-rule="guest_max_hours" value="${Number(rules.guest_max_hours)}" ${rules.guest_monitoring_enabled ? "" : "disabled"}></div>
+              <div class="rule"><label>Gastnetz anzeigen und überwachen<small>Gastgeräte in Nodarion erfassen, anzeigen und protokollieren</small></label><input type="checkbox" data-rule="guest_monitoring_enabled" ${checked(rules.guest_monitoring_enabled)}></div><div class="dependent-settings" data-depends-on="guest_monitoring_enabled" ${rules.guest_monitoring_enabled ? "" : "hidden"}>
+              <div class="rule"><label>Neue Gäste melden<small>Beim erstmaligen Verbinden mit dem FRITZ!Box-Gastzugang warnen</small></label><input type="checkbox" data-rule="guest_new_enabled" ${checked(rules.guest_new_enabled)}></div>
+              <div class="rule"><label>Gäste zur Ruhezeit melden<small>Verbindungen im eingestellten Ruhezeitraum hervorheben</small></label><input type="checkbox" data-rule="guest_quiet_enabled" ${checked(rules.guest_quiet_enabled)}></div>
+              <div class="rule"><label>Maximale Gastdauer<small>Danach eine Warnung anzeigen</small></label><span class="unit-input"><input type="number" min="1" max="168" data-rule="guest_max_hours" value="${Number(rules.guest_max_hours)}"><span>Stunden</span></span></div></div>
             </section>
             <section class="rule-group danger-zone cleanup-settings">
               <h3>Bereinigung<button class="settings-help-button" type="button" data-settings-help="cleanup" title="Bereinigung erklären" aria-label="Hilfe zur Bereinigung">?</button></h3>
               <div class="rule">
-                <label>Offline-Teilnehmer löschen<small>Entfernt alle aktuell offline geführten Geräte einschließlich ihrer gespeicherten Einstellungen.</small></label>
-                <button class="cleanup" type="button" title="Alle derzeit offline geführten Geräte sofort entfernen"><ha-icon icon="mdi:broom"></ha-icon>Löschen</button>
+                <label>Offline-Teilnehmer bereinigen<small>Aktuell ${offlineEntities.length} offline, davon ${protectedOffline} mit Freigabe oder Überwachung.</small></label><div class="cleanup-summary">„Anzeige bereinigen“ behält Freigaben. „Vollständig vergessen“ entfernt zusätzlich Freigaben und Markierungen.</div><div class="cleanup-actions"><button class="cleanup preserve" data-forget="false" type="button"><ha-icon icon="mdi:broom"></ha-icon>Anzeige bereinigen</button><button class="cleanup" data-forget="true" type="button"><ha-icon icon="mdi:delete-forever-outline"></ha-icon>Vollständig vergessen</button></div>
               </div>
               <div class="cleanup-result" role="status"></div>
             </section>
@@ -4190,20 +4624,20 @@ class EngelsoftNodarionPanel extends HTMLElement {
             <div class="settings-tab-panel rules-panel" role="tabpanel" data-settings-panel="rules" ${this._settingsTab === "rules" ? "" : "hidden"}>
             <section class="rule-group device-settings">
               <h3>Geräteüberwachung<button class="settings-help-button" type="button" data-settings-help="devices" title="Geräteüberwachung erklären" aria-label="Hilfe zu Geräteüberwachung">?</button></h3>
-              <div class="rule"><label>Neue Geräte bestätigen<small>Erst nach dieser Online-Zeit warnen (Minuten)</small></label><input type="number" min="1" max="1440" data-rule="new_device_minutes" value="${Number(rules.new_device_minutes)}"></div>
-              <div class="rule"><label>Wichtiges Gerät offline<small>Warnung nach Minuten</small></label><input type="number" min="1" max="10080" data-rule="offline_minutes" value="${Number(rules.offline_minutes)}"></div>
+              <div class="rule"><label>Neue Geräte bestätigen<small>Erst nach dieser Online-Zeit warnen</small></label><span class="unit-input"><input type="number" min="1" max="1440" data-rule="new_device_minutes" value="${Number(rules.new_device_minutes)}"><span>Minuten</span></span></div>
+              <div class="rule"><label>Wichtiges Gerät offline<small>Danach eine Warnung anzeigen</small></label><span class="unit-input"><input type="number" min="1" max="10080" data-rule="offline_minutes" value="${Number(rules.offline_minutes)}"><span>Minuten</span></span></div>
             </section>
             <section class="rule-group detection-settings">
               <h3>Ruhezeiten<button class="settings-help-button" type="button" data-settings-help="quiet" title="Ruhezeiten erklären" aria-label="Hilfe zu Ruhezeiten">?</button></h3>
-              <div class="rule"><label>Ruhezeit überwachen<small>Aktivierungen in diesem Zeitraum melden</small></label><input type="checkbox" data-rule="quiet_hours_enabled" ${checked(rules.quiet_hours_enabled)}></div>
+              <div class="rule"><label>Ruhezeit überwachen<small>Aktivierungen in diesem Zeitraum melden</small></label><input type="checkbox" data-rule="quiet_hours_enabled" ${checked(rules.quiet_hours_enabled)}></div><div class="dependent-settings" data-depends-on="quiet_hours_enabled" ${rules.quiet_hours_enabled ? "" : "hidden"}>
               <div class="rule"><label>Ruhezeit beginnt</label><input type="time" data-rule="quiet_start" value="${esc(rules.quiet_start)}"></div>
-              <div class="rule"><label>Ruhezeit endet</label><input type="time" data-rule="quiet_end" value="${esc(rules.quiet_end)}"></div>
+              <div class="rule"><label>Ruhezeit endet</label><input type="time" data-rule="quiet_end" value="${esc(rules.quiet_end)}"></div></div>
             </section>
-            <section class="rule-group alert-rule-settings">
+            <details class="advanced-settings"><summary>Erweiterte Prüfungen</summary><section class="rule-group alert-rule-settings">
               <h3>Weitere Prüfungen<button class="settings-help-button" type="button" data-settings-help="notifications" title="Prüfungen erklären" aria-label="Hilfe zu weiteren Prüfungen">?</button></h3>
-              <div class="rule"><label>Statuswechsel pro Stunde<small>Ab dieser Anzahl als instabil melden</small></label><input type="number" min="2" max="100" data-rule="flap_limit" value="${Number(rules.flap_limit)}"></div>
+              <div class="rule"><label>Statuswechsel pro Stunde<small>Ab dieser Anzahl als instabil melden</small></label><span class="unit-input"><input type="number" min="2" max="100" data-rule="flap_limit" value="${Number(rules.flap_limit)}"><span>Wechsel/Std.</span></span></div>
               <div class="rule"><label>Identitätswechsel melden<small>Andere MAC-Adresse am gleichen IP-Platz</small></label><input type="checkbox" data-rule="identity_changes" ${checked(rules.identity_changes)}></div>
-            </section>
+            </section></details>
             </div>
             <div class="settings-tab-panel notifications-panel" role="tabpanel" data-settings-panel="notifications" ${this._settingsTab === "notifications" ? "" : "hidden"}>
             <section class="rule-group notification-settings">
@@ -4222,9 +4656,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
             <div class="settings-tab-panel ai-maintenance-panel" role="tabpanel" data-settings-panel="ai-maintenance" ${this._settingsTab === "ai-maintenance" ? "" : "hidden"}>
             <section class="rule-group ai-config-settings">
               <h3>KI-Analyse<button class="settings-help-button" type="button" data-settings-help="ai" title="KI-Analyse erklären" aria-label="Hilfe zur KI-Analyse">?</button></h3>
-              <div class="rule"><label>Tägliche KI-Auswertung<small>Automatisch einmal täglich einen Bericht erstellen</small></label><input type="checkbox" data-rule="ai_analysis_enabled" ${checked(rules.ai_analysis_enabled)}></div>
+              <div class="rule"><label>Tägliche KI-Auswertung<small>Automatisch einmal täglich einen Bericht erstellen</small></label><input type="checkbox" data-rule="ai_analysis_enabled" ${checked(rules.ai_analysis_enabled)}></div><div class="dependent-settings" data-depends-on="ai_analysis_enabled" ${rules.ai_analysis_enabled ? "" : "hidden"}>
               <div class="rule"><label>KI-Auswertung um<small>Erster Netzwerkscan nach diesem Zeitpunkt</small></label><input type="time" data-rule="ai_analysis_time" value="${esc(rules.ai_analysis_time)}"></div>
-              <div class="rule"><label>DNS-Datenschutz<small>Anonymisiert überträgt nur Zähler und stabile, neutrale Domain-IDs</small></label><input type="hidden" data-rule="ai_privacy" value="${esc(rules.ai_privacy)}"><details class="custom-column-filter settings-select"><summary>${rules.ai_privacy === "domains" ? "Domainnamen mitsenden" : "Domains anonymisieren"}</summary><div class="custom-filter-menu"><button type="button" class="custom-filter-option ${rules.ai_privacy === "anonymized" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="anonymized"><ha-icon icon="${rules.ai_privacy === "anonymized" ? "mdi:check" : "mdi:incognito"}"></ha-icon><span>Domains anonymisieren</span></button><button type="button" class="custom-filter-option ${rules.ai_privacy === "domains" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="domains"><ha-icon icon="${rules.ai_privacy === "domains" ? "mdi:check" : "mdi:web"}"></ha-icon><span>Domainnamen mitsenden</span></button></div></details></div>
+              <details class="advanced-settings"><summary>Erweiterter Datenschutz</summary><div class="rule"><label>DNS-Datenschutz<small>Anonymisiert überträgt nur Zähler und stabile, neutrale Domain-IDs</small></label><input type="hidden" data-rule="ai_privacy" value="${esc(rules.ai_privacy)}"><details class="custom-column-filter settings-select"><summary>${rules.ai_privacy === "domains" ? "Domainnamen mitsenden" : "Domains anonymisieren"}</summary><div class="custom-filter-menu"><button type="button" class="custom-filter-option ${rules.ai_privacy === "anonymized" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="anonymized"><ha-icon icon="${rules.ai_privacy === "anonymized" ? "mdi:check" : "mdi:incognito"}"></ha-icon><span>Domains anonymisieren</span></button><button type="button" class="custom-filter-option ${rules.ai_privacy === "domains" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="domains"><ha-icon icon="${rules.ai_privacy === "domains" ? "mdi:check" : "mdi:web"}"></ha-icon><span>Domainnamen mitsenden</span></button></div></details></div></details></div>
             </section>
             </div>
           </div>
@@ -4290,7 +4724,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <i class="dot"></i><ha-icon icon="${deviceIcon(entity)}"></ha-icon>
               <div class="client-info">
                 <div class="client-name">${esc(name)}</div>
-                <div class="client-ip">${esc(attr.ip_address || "–")}</div>
+                <div class="client-ip">${esc(attr.ip_address || "Nicht verfügbar")}</div>
                 <div class="client-details">
                   ${connection ? `<span class="client-detail">${esc(connection)}</span>` : ""}
                   ${rate ? `<span class="client-detail">${esc(rate)}</span>` : ""}
