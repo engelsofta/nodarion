@@ -1,4 +1,4 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.28.0";
+import { internetStatusFor } from "./internet-status.mjs?v=1.28.1";
 
 const esc = (value) =>
   String(value ?? "")
@@ -1059,13 +1059,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
           --ns-bg: #181716;
           --ns-panel: rgba(76, 72, 67, .50);
           --ns-line: rgba(255, 246, 229, .10);
+          --ns-text: #fffaf1;
+          --ns-muted: #a9b6b1;
+          --ns-subtle: #87958f;
+          --ns-surface: rgba(255,255,255,.035);
+          --ns-surface-raised: rgba(255,255,255,.055);
+          --ns-field: rgba(16,15,14,.46);
           --ns-green: #f0a13b;
           --ns-cyan: #f5d7a3;
           --ns-red: #ff786f;
           display: block;
           min-height: 100%;
           color-scheme: dark;
-          color: #fffaf1;
+          color: var(--ns-text);
           background:
             radial-gradient(ellipse at 54% 42%, rgba(212, 139, 43, .29), transparent 31rem),
             radial-gradient(ellipse at 16% 76%, rgba(158, 104, 40, .15), transparent 28rem),
@@ -1213,13 +1219,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .column-picker-button ha-icon { --mdc-icon-size:19px; }
         .column-picker { position:absolute; z-index:20; right:8px; top:48px; display:grid; grid-template-columns:repeat(2,minmax(150px,1fr)); gap:7px; width:min(390px,calc(100vw - 36px)); padding:12px; border-radius:13px; background:#0b211b; border:1px solid rgba(80,215,255,.25); box-shadow:0 18px 45px rgba(0,0,0,.42); }
         .column-picker[hidden] { display:none; }
-        .column-picker label { display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:8px; color:#cce5dc; font-size:13px; cursor:pointer; }
-        .column-picker label:hover { background:rgba(85,242,162,.06); }
+        .column-picker label { display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:8px; color:var(--ns-text); font-size:13px; font-weight:600; cursor:pointer; }
+        .column-picker label:hover { color:#fff7e9; background:rgba(240,161,59,.11); }
         .column-picker input { width:17px; height:17px; padding:0; accent-color:var(--ns-green); }
         .column-picker-head {
           grid-column:1/-1; display:flex; align-items:center;
           justify-content:space-between; gap:12px; padding:2px 4px 8px;
-          color:#fffaf1; font-size:12px; font-weight:800;
+          color:var(--ns-text); font-size:12px; font-weight:800;
           border-bottom:1px solid var(--ns-line);
         }
         .column-picker-close {
@@ -2021,11 +2027,43 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         ::selection { color:#2b2115; background:#f0a13b; }
 
+        /* Shared settings design: one visual language across every section. */
+        .settings-view .watch-panel { background:var(--ns-panel); border-color:var(--ns-line); box-shadow:0 16px 42px rgba(10,8,5,.18),inset 0 1px rgba(255,255,255,.04); }
+        .settings-view .rule-group,
+        .settings-view .rule-group.basics,
+        .settings-view .rule-group.vlan-settings,
+        .settings-view .rule-group.presence-settings,
+        .settings-view .rule-group.device-settings,
+        .settings-view .rule-group.onboarding-settings,
+        .settings-view .rule-group.detection-settings,
+        .settings-view .rule-group.alert-rule-settings,
+        .settings-view .rule-group.notification-settings,
+        .settings-view .rule-group.notification-target-settings,
+        .settings-view .rule-group.ai-config-settings { background:var(--ns-surface); border:1px solid var(--ns-line); border-radius:13px; }
+        .settings-view .rule-group h3 { color:var(--ns-subtle); }
+        .settings-view .rule label, .settings-view .adguard-feature strong { color:var(--ns-text); }
+        .settings-view .rule small, .settings-view .watch-heading p, .settings-view .adguard-feature small,
+        .settings-view .notification-target-description, .settings-view .vlan-empty-note { color:var(--ns-muted); }
+        .settings-view .adguard-feature, .settings-view .vlan-row, .settings-view .notify-target,
+        .settings-view .learning-card, .settings-view .security-card { color:var(--ns-text); background:var(--ns-surface-raised); border-color:var(--ns-line); }
+        .settings-view input:not([type="checkbox"]):not([type="color"]), .settings-view select,
+        .settings-view .unit-input { color:var(--ns-text); background:var(--ns-field); border-color:var(--ns-line); }
+        .settings-view .unit-input span { color:var(--ns-muted); }
+        .settings-view .adguard-feature-state { color:var(--ns-muted); background:var(--ns-surface-raised); }
+        .settings-view .adguard-feature.active .adguard-feature-state, .settings-view .save-rules { color:#2d1b09; background:#e6a23f; }
+        .settings-view .query-log-warning { color:#f2d798; background:rgba(230,162,63,.09); border:1px solid rgba(230,162,63,.2); }
+
         /* Light theme follows Home Assistant's active light/dark setting. */
         :host([data-theme="light"]) {
           --ns-bg:#f6f3ee;
           --ns-panel:rgba(255,255,255,.78);
           --ns-line:rgba(91,72,48,.14);
+          --ns-text:#2d2925;
+          --ns-muted:#655f58;
+          --ns-subtle:#746c62;
+          --ns-surface:#fffdfa;
+          --ns-surface-raised:#ffffff;
+          --ns-field:#ffffff;
           --ns-green:#a85b17;
           --ns-cyan:#8d5a1f;
           --ns-red:#c43f3f;
@@ -2122,6 +2160,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .settings-help-dialog {
           color:#302a24; background:#fffaf3; border-color:rgba(168,91,23,.24);
           box-shadow:0 24px 60px rgba(82,61,36,.20);
+        }
+        :host([data-theme="light"]) .column-picker-head { color:#302b26; border-bottom-color:#ded7ce; }
+        :host([data-theme="light"]) .column-picker label { color:#423c35; }
+        :host([data-theme="light"]) .column-picker label:hover { color:#653b12; background:#fff3df; }
+        :host([data-theme="light"]) .column-picker input { accent-color:#a85b17; }
+        :host([data-theme="light"]) .column-picker-close {
+          color:#625b53; background:#f4f0ea; border-color:#d7cfc5;
+        }
+        :host([data-theme="light"]) .column-picker-close:hover {
+          color:#633a13; background:#fff2df; border-color:#d49a53;
         }
         :host([data-theme="light"]) .dns-policy-modal-backdrop,
         :host([data-theme="light"]) .guest-modal-backdrop,
@@ -2378,6 +2426,106 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .header-action.active { color:#643b16; background:#fff7ea; border-color:#d99a4c; }
         :host([data-theme="light"]) .metric-settings,
         :host([data-theme="light"]) .settings-back { color:#6d665e; background:rgba(255,255,255,.55); border-color:#d7d0c7; }
+        :host([data-theme="light"]) .metric-status-value,
+        :host([data-theme="light"]) .adguard-stat strong,
+        :host([data-theme="light"]) .learning-card strong { color:#29251f; }
+        :host([data-theme="light"]) .adguard-stat,
+        :host([data-theme="light"]) .dns-live-stats { color:#625c54; background:#fff; border-color:#d9d2c9; }
+        :host([data-theme="light"]) .adguard-stat span,
+        :host([data-theme="light"]) .dns-live-stats h3 { color:#625c54; }
+        :host([data-theme="light"]) .settings-view .watch-panel {
+          color:var(--ns-text); background:#fbfaf7; border-color:#d8d1c8;
+          box-shadow:0 14px 34px rgba(74,57,37,.08),inset 0 1px rgba(255,255,255,.9);
+        }
+        :host([data-theme="light"]) .settings-view .rule-group,
+        :host([data-theme="light"]) .settings-view .rule-group.basics,
+        :host([data-theme="light"]) .settings-view .rule-group.vlan-settings,
+        :host([data-theme="light"]) .settings-view .rule-group.presence-settings,
+        :host([data-theme="light"]) .settings-view .rule-group.device-settings,
+        :host([data-theme="light"]) .settings-view .rule-group.onboarding-settings,
+        :host([data-theme="light"]) .settings-view .rule-group.detection-settings,
+        :host([data-theme="light"]) .settings-view .rule-group.alert-rule-settings,
+        :host([data-theme="light"]) .settings-view .rule-group.notification-settings,
+        :host([data-theme="light"]) .settings-view .rule-group.notification-target-settings,
+        :host([data-theme="light"]) .settings-view .rule-group.ai-config-settings { background:#fff; border-color:#ded8cf; }
+        :host([data-theme="light"]) .settings-view .rule-group h3,
+        :host([data-theme="light"]) .settings-view .vlan-field { color:#6d6255; }
+        :host([data-theme="light"]) .settings-view .rule label,
+        :host([data-theme="light"]) .settings-view .adguard-feature strong { color:#302b26; }
+        :host([data-theme="light"]) .settings-view .rule small,
+        :host([data-theme="light"]) .settings-view .watch-heading p,
+        :host([data-theme="light"]) .settings-view .adguard-feature small,
+        :host([data-theme="light"]) .settings-view .notification-target-description,
+        :host([data-theme="light"]) .settings-view .vlan-empty-note { color:#655f58; }
+        :host([data-theme="light"]) .settings-view .adguard-feature,
+        :host([data-theme="light"]) .settings-view .vlan-row,
+        :host([data-theme="light"]) .settings-view .notify-target,
+        :host([data-theme="light"]) .settings-view .learning-card,
+        :host([data-theme="light"]) .settings-view .security-card { color:#302b26; background:#faf8f4; border-color:#ddd6cd; }
+        :host([data-theme="light"]) .settings-view .adguard-feature:hover,
+        :host([data-theme="light"]) .settings-view .notify-target:hover { background:#fff7e9; border-color:#d49a53; }
+        :host([data-theme="light"]) .settings-view input:not([type="checkbox"]):not([type="color"]),
+        :host([data-theme="light"]) .settings-view select,
+        :host([data-theme="light"]) .settings-view .unit-input { color:#302b26; background:#fff; border-color:#cec6bc; }
+        :host([data-theme="light"]) .settings-view .unit-input span { color:#5f5952; background:#f0ece6; }
+        :host([data-theme="light"]) .settings-view .adguard-feature-state { color:#5f5952; background:#ece8e2; }
+        :host([data-theme="light"]) .settings-view .adguard-feature.active .adguard-feature-state,
+        :host([data-theme="light"]) .settings-view .save-rules { color:#2e1c09; background:#e5aa47; box-shadow:0 5px 14px rgba(166,101,25,.18); }
+        :host([data-theme="light"]) .settings-view .query-log-warning { color:#73500d; background:#fff7df; border-color:#e7d49e; }
+        :host([data-theme="light"]) .settings-view .learning-card p { color:#625c54; }
+        :host([data-theme="light"]) .settings-view .learning-action { color:#65400f; background:#fff5e3; border-color:#ddbd8d; }
+        :host([data-theme="light"]) .column-picker-button {
+          color:#65400f; background:#fff7e9; border-color:#d9b680;
+        }
+        :host([data-theme="light"]) .column-picker-button:hover {
+          color:#48280b; background:#ffedcf; border-color:#c98535;
+        }
+        :host([data-theme="light"]) .confirm-backdrop { background:rgba(72,60,47,.38); }
+        :host([data-theme="light"]) .confirm-dialog {
+          color:#302b26; background:#fffaf3; border-color:#d9bd91;
+          box-shadow:0 28px 72px rgba(82,61,36,.22);
+        }
+        :host([data-theme="light"]) .confirm-dialog p { color:#625a52; }
+        :host([data-theme="light"]) .confirm-icon { color:#74501d; background:#fff1d9; }
+        :host([data-theme="light"]) .confirm-cancel,
+        :host([data-theme="light"]) .discard-settings {
+          color:#514b44; background:#f4f0ea; border-color:#d5cdc3;
+        }
+        :host([data-theme="light"]) .confirm-cancel:hover,
+        :host([data-theme="light"]) .discard-settings:hover { color:#302b26; background:#eae4dc; }
+        :host([data-theme="light"]) .settings-dirty {
+          color:#704b0c; background:#fff4d8; border-color:#e3cb91;
+        }
+        :host([data-theme="light"]) .advanced-settings {
+          background:#faf8f4; border-color:#cfc3b5;
+        }
+        :host([data-theme="light"]) .advanced-settings > summary { color:#65429b; }
+        :host([data-theme="light"]) .vlan-add,
+        :host([data-theme="light"]) .notify-target-action {
+          color:#65400f; background:#fff6e7; border-color:#ddbc8a;
+        }
+        :host([data-theme="light"]) .vlan-add:hover,
+        :host([data-theme="light"]) .notify-target-action:hover {
+          color:#432608; background:#ffebca; border-color:#cc8b3e;
+        }
+        :host([data-theme="light"]) .notify-target-count { color:#704b16; }
+        :host([data-theme="light"]) .filter-chip,
+        :host([data-theme="light"]) .cleanup-result {
+          color:#315d6b; background:#edf7fa; border-color:#bfdde5;
+        }
+        :host([data-theme="light"]) .cleanup-summary { color:#625b53; }
+        :host([data-theme="light"]) .filter-reset { color:#75500d; }
+        :host([data-theme="light"]) .log-clear,
+        :host([data-theme="light"]) .dns-client-filter button {
+          color:#4f4942; background:#e9e5df; border:1px solid #d4cdc4;
+        }
+        :host([data-theme="light"]) .log-clear:hover,
+        :host([data-theme="light"]) .dns-client-filter button:hover {
+          color:#2f2a25; background:#ddd7cf;
+        }
+        :host([data-theme="light"]) .vlan-remove {
+          color:#a93630; background:#fff0ee; border-color:#e7bbb6;
+        }
         :host([data-theme="light"]) ::selection { color:#fff; background:#a85b17; }
 
         @media (max-width:1100px) {

@@ -77,8 +77,36 @@ class GuiContractTests(unittest.TestCase):
         const_source = (
             ROOT / "custom_components" / "nodarion" / "const.py"
         ).read_text(encoding="utf-8")
-        self.assertIn('FRONTEND_VERSION = "1.28.0"', const_source)
-        self.assertIn('internet-status.mjs?v=1.28.0', PANEL)
+        self.assertIn('FRONTEND_VERSION = "1.28.1"', const_source)
+        self.assertIn('internet-status.mjs?v=1.28.1', PANEL)
+
+    def test_light_and_dark_settings_share_contrast_tokens(self) -> None:
+        for token in (
+            "--ns-text:",
+            "--ns-muted:",
+            "--ns-surface:",
+            "--ns-field:",
+        ):
+            self.assertGreaterEqual(PANEL.count(token), 2)
+        self.assertIn("Shared settings design", PANEL)
+        self.assertIn('.settings-view .adguard-feature strong { color:#302b26; }', PANEL)
+        self.assertIn('.adguard-stat strong,', PANEL)
+
+    def test_light_column_picker_has_explicit_contrast_styles(self) -> None:
+        self.assertIn(':host([data-theme="light"]) .column-picker label { color:#423c35; }', PANEL)
+        self.assertIn(':host([data-theme="light"]) .column-picker-head { color:#302b26;', PANEL)
+        self.assertIn(':host([data-theme="light"]) .column-picker-close {', PANEL)
+
+    def test_light_theme_covers_secondary_controls_and_modals(self) -> None:
+        for selector in (
+            '.confirm-dialog {',
+            '.settings-dirty {',
+            '.advanced-settings > summary {',
+            '.vlan-add,',
+            '.filter-chip,',
+            '.log-clear,',
+        ):
+            self.assertIn(f':host([data-theme="light"]) {selector}', PANEL)
 
     def test_dns_metric_opens_the_native_sensor_dialog(self) -> None:
         self.assertIn('this._hass.states["sensor.nodarion_dns_blockquote"]', PANEL)

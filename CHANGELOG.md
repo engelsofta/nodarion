@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.23.1 — Same network, now with the lights on
+
+This visual maintenance release gives every Nodarion settings page one shared,
+modern design language while keeping the major VLAN and native AdGuard changes
+from 1.23.0 intact.
+
+### Improved
+
+- Unified cards, spacing, fields, switches, buttons, and status colours across
+  all separately opened settings pages.
+- Added explicit high-contrast design tokens for light and dark themes.
+- Improved readability of AdGuard DNS Live statistics, protection controls,
+  VLAN configuration, monitoring settings, notifications, and AI settings.
+- Restyled the table-column picker, confirmation dialogs, unsaved-change
+  notices, advanced settings, filter chips, and secondary actions.
+- Added consistent hover, focus, active, warning, destructive, and disabled
+  states without removing their semantic colour distinctions.
+- Added regression checks for shared theme tokens and light-theme coverage.
+
+### Fixed
+
+- Fixed several pale labels and values that inherited dark-theme colours on
+  light backgrounds.
+- Defined the previously missing shared text-colour variables used by multiple
+  settings controls.
+
+### Versions
+
+- Integration: `1.23.1`
+- Frontend: `1.28.1`
+
+---
+
 ## 1.23.0 — More lanes, fewer integrations
 
 > [!IMPORTANT]
