@@ -31,16 +31,20 @@ class FritzBoxScanner:
         address: str,
         user: str,
         password: str,
-        network: str,
+        networks: list[str] | tuple[str, ...] | str,
         excluded: set[str],
     ) -> None:
         self.hass = hass
         self.address = address
         self.user = user
         self.password = password
-        self.network = ipaddress.ip_network(network, strict=False)
+        network_values = [networks] if isinstance(networks, str) else networks
+        self.networks = tuple(
+            ipaddress.ip_network(network, strict=False) for network in network_values
+        )
         self.excluded = excluded
         self.available = False
+        self.auth_failed = False
         self._router_info: dict[str, str] = {}
         self._router_info_checked = 0.0
         self._scan_future: asyncio.Future[
@@ -95,6 +99,14 @@ class FritzBoxScanner:
                 return {}
             except Exception as err:
                 self.available = False
+                error_text = f"{type(err).__name__} {err}".casefold()
+                self.auth_failed = any(
+                    marker in error_text
+                    for marker in (
+                        "authorization", "authentication", "unauthorized",
+                        "forbidden", "401", "403",
+                    )
+                )
                 _LOGGER.warning("FRITZ!Box scan failed: %s", err)
                 return {}
             finally:
@@ -102,6 +114,7 @@ class FritzBoxScanner:
                     self._scan_future = None
 
         self.available = True
+        self.auth_failed = False
         self.dhcp_start = router_info.get("dhcp_start")
         self.dhcp_end = router_info.get("dhcp_end")
         self.guest_info = guest_info
@@ -112,7 +125,10 @@ class FritzBoxScanner:
             if not ip or ip in self.excluded:
                 continue
             try:
-                if ipaddress.ip_address(ip) not in self.network and not is_guest:
+                if (
+                    not any(ipaddress.ip_address(ip) in network for network in self.networks)
+                    and not is_guest
+                ):
                     continue
             except ValueError:
                 continue
@@ -158,6 +174,11 @@ class FritzBoxScanner:
                 infrastructure_source=details.get("infrastructure_source"),
             )
         return hosts
+
+    async def async_validate_connection(self) -> None:
+        """Validate TR-064 reachability and credentials without changing state."""
+        async with asyncio.timeout(30):
+            await self.hass.async_add_executor_job(self._get_fritz_data)
 
     async def async_set_wan_access(self, ip: str, allowed: bool) -> str:
         """Allow or deny one LAN device's internet access through TR-064."""

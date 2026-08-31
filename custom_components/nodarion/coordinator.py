@@ -51,7 +51,13 @@ from .const import (
     ADGUARD_SCAN_INTERVAL_SECONDS,
 )
 from .adguard import AdGuardScanner
-from .models import NetworkHost, is_network_infrastructure, preferred_hostname
+from .models import (
+    NetworkHost,
+    NetworkSegment,
+    is_network_infrastructure,
+    normalize_network_segments,
+    preferred_hostname,
+)
 from .monitor import NetworkMonitor
 from .fritz import FritzBoxScanner
 from .trust import (
@@ -85,6 +91,9 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
     ) -> None:
         """Initialize coordinator."""
         options = {**entry.data, **entry.options}
+        self.entry = entry
+        self._reauth_started = False
+        self._options = options
         self.monitor = monitor
         self.offline_after = int(options.get(CONF_OFFLINE_AFTER, DEFAULT_OFFLINE_AFTER))
         self.remove_after_days = int(
@@ -108,20 +117,20 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             for item in str(options.get(CONF_EXCLUDE, "")).split(",")
             if item.strip()
         }
-        self.scanner = NetworkScanner(
-            options[CONF_NETWORK],
-            float(options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)),
-            int(options.get(CONF_CONCURRENCY, DEFAULT_CONCURRENCY)),
-            ports,
-            excluded,
+        self._ports = ports
+        self._excluded = excluded
+        self.segments: list[NetworkSegment] = normalize_network_segments(
+            monitor.rules["network_segments"]
         )
+        self.scanners: dict[str, NetworkScanner] = {}
+        self._configure_scanners()
         self.fritz_scanner = (
             FritzBoxScanner(
                 hass,
                 str(options.get(CONF_FRITZ_HOST, DEFAULT_FRITZ_HOST)),
                 str(options.get(CONF_FRITZ_USER, "")),
                 str(options.get(CONF_FRITZ_PASSWORD, "")),
-                options[CONF_NETWORK],
+                [segment.network for segment in self.segments],
                 excluded,
             )
             if options.get(CONF_FRITZ_ENABLED)
@@ -146,6 +155,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             if options.get(CONF_ADGUARD_ENABLED)
             else None
         )
+        self.adguard_status_coordinator = None
         self.connection_status: dict[str, dict[str, Any]] = {
             "scanner": {
                 "label": "Ping/TCP-Scanner",
@@ -225,7 +235,14 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         )
         try:
             started = perf_counter()
-            found = await self.scanner.async_scan()
+            scan_results = await asyncio.gather(
+                *(scanner.async_scan() for scanner in self.scanners.values())
+            )
+            found = {
+                key: host
+                for result in scan_results
+                for key, host in result.items()
+            }
             self._record_connection(
                 "scanner", True, (perf_counter() - started) * 1000
             )
@@ -243,6 +260,9 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         ):
             started = perf_counter()
             scanned_fritz_hosts = await self.fritz_scanner.async_scan()
+            if self.fritz_scanner.auth_failed and not self._reauth_started:
+                self._reauth_started = True
+                self.entry.async_start_reauth(self.hass)
             self._record_connection(
                 "fritzbox",
                 self.fritz_scanner.available,
@@ -345,6 +365,9 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 host.connection_type, host.hostname, host.mac
             ):
                 found[key] = replace(host, vpn_connection=True)
+        found = {
+            key: self._assign_segment(host) for key, host in found.items()
+        }
 
         if (
             self.fritz_scanner is not None
@@ -353,7 +376,11 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             await self.monitor.async_initialize_internet_guard({
                 key
                 for key, host in found.items()
-                if not host.guest_network and not host.vpn_connection
+                if (
+                    not host.guest_network
+                    and not host.vpn_connection
+                    and host.segment_role not in {"guest", "infrastructure"}
+                )
             })
         if self.fritz_scanner is not None:
             await self._async_apply_internet_guard(found)
@@ -434,13 +461,12 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         for key, old in previous.items():
             if key in found:
                 continue
+            old = self._assign_segment(old)
             try:
-                in_network = (
-                    ipaddress.ip_address(old.ip) in self.scanner.network
-                )
+                in_network = self._segment_for_ip(old.ip) is not None
             except ValueError:
                 in_network = False
-            if (not in_network and not old.guest_network) or old.ip in self.scanner.excluded:
+            if (not in_network and not old.guest_network) or old.ip in self._excluded:
                 continue
             missed = (
                 max(self.offline_after, old.missed_scans + 1)
@@ -621,7 +647,12 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             trustable_keys = set(hosts)
             release_failures: set[str] = set()
             for key, host in tuple(hosts.items()):
-                if host.guest_network or host.vpn_connection:
+                if (
+                    host.guest_network
+                    or host.vpn_connection
+                    or host.segment_role == "guest"
+                    or not host.segment_monitoring
+                ):
                     trustable_keys.discard(key)
                     self._wan_access_by_ip.pop(host.ip, None)
                     self._wan_retry_after.pop(host.ip, None)
@@ -696,7 +727,12 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 )
                 continue
             state = self._wan_access_by_ip.get(host.ip)
-            if host.guest_network or host.vpn_connection:
+            if (
+                host.guest_network
+                or host.vpn_connection
+                or host.segment_role == "guest"
+                or not host.segment_monitoring
+            ):
                 self._wan_access_by_ip.pop(host.ip, None)
                 self._wan_retry_after.pop(host.ip, None)
                 await self.monitor.async_untrust_host(key)
@@ -834,4 +870,70 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         # configured address. Substring matches are deliberately forbidden.
         return not self._protected_router_ips and is_configured_router(
             host.ip, host.hostname, configured
+        )
+
+    def _configure_scanners(self) -> None:
+        """Build one active scanner for every monitored segment."""
+        monitored_segments = [
+            segment for segment in self.segments if segment.monitoring
+        ]
+        global_concurrency = int(
+            self._options.get(CONF_CONCURRENCY, DEFAULT_CONCURRENCY)
+        )
+        shared_semaphore = asyncio.Semaphore(global_concurrency)
+        per_segment_batch = max(
+            1,
+            (global_concurrency + max(1, len(monitored_segments)) - 1)
+            // max(1, len(monitored_segments)),
+        )
+        self.scanners = {
+            segment.id: NetworkScanner(
+                segment.network,
+                float(self._options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)),
+                global_concurrency,
+                self._ports,
+                self._excluded,
+                segment,
+                shared_semaphore=shared_semaphore,
+                batch_size=per_segment_batch,
+            )
+            for segment in monitored_segments
+        }
+        # Kept as a compatibility alias for code and third-party consumers
+        # that previously accessed the single scanner directly.
+        self.scanner = next(iter(self.scanners.values()), None)
+
+    async def async_apply_network_segments(self) -> None:
+        """Apply an edited segment list and refresh discovery immediately."""
+        self.segments = normalize_network_segments(
+            self.monitor.rules["network_segments"]
+        )
+        self._configure_scanners()
+        if self.fritz_scanner is not None:
+            self.fritz_scanner.networks = tuple(
+                segment.ip_network for segment in self.segments
+            )
+        await self.async_request_refresh()
+
+    def _segment_for_ip(self, address: str) -> NetworkSegment | None:
+        """Return the configured segment containing an IP address."""
+        return next(
+            (segment for segment in self.segments if segment.contains(address)),
+            None,
+        )
+
+    def _assign_segment(self, host: NetworkHost) -> NetworkHost:
+        """Attach the current segment metadata to a discovered host."""
+        segment = self._segment_for_ip(host.ip)
+        if segment is None:
+            return host
+        return replace(
+            host,
+            segment_id=segment.id,
+            segment_name=segment.name,
+            vlan_id=segment.vlan_id,
+            segment_network=segment.network,
+            segment_role=segment.role,
+            segment_color=segment.color,
+            segment_monitoring=segment.monitoring,
         )

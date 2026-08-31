@@ -17,7 +17,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
-from .models import NetworkHost, canonical_hostname
+from .models import NetworkHost, canonical_hostname, normalize_network_segments
+from .monitor_storage import MonitorStoreWriter
 from .trust import is_trusted_identity, is_vpn_connection, normalize_mac
 
 STORAGE_VERSION = 1
@@ -122,12 +123,14 @@ class NetworkMonitor:
         self.ai_last_run_date: str | None = None
         self.ai_last_error: str | None = None
         self._ai_running = False
-        self._save_lock = asyncio.Lock()
         self._store = Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
+        self._store_writer = MonitorStoreWriter(
+            hass, self._store, self._storage_payload
+        )
 
     async def async_load(self) -> None:
         """Load saved preferences, rules, alerts, and history."""
-        data = await self._store.async_load() or {}
+        data = await self._store_writer.async_load() or {}
         self.monitored = set(data.get("monitored", []))
         self.notifications = set(data.get("notifications", []))
         self.presence_devices = set(data.get("presence_devices", []))
@@ -246,7 +249,11 @@ class NetworkMonitor:
         """Return the single persisted-policy status exposed to consumers."""
         if host.internet_approval_required:
             return "pending"
-        if host.guest_network or host.vpn_connection:
+        if (
+            host.guest_network
+            or host.vpn_connection
+            or host.segment_role in {"guest", "infrastructure"}
+        ):
             return "exempt"
         return "trusted" if self.is_trusted(host) else "unverified"
 
@@ -343,10 +350,15 @@ class NetworkMonitor:
             service="Nodarion-Internetschutz",
             **details,
         )
-        await self._async_save()
+        await self._async_save(immediate=False)
 
     async def async_set_rules(self, values: dict[str, Any]) -> None:
         """Validate and save anomaly detection rules."""
+        if "network_segments" in values:
+            self.rules["network_segments"] = [
+                segment.as_dict()
+                for segment in normalize_network_segments(values["network_segments"])
+            ]
         for key in (
             "enabled",
             "quiet_hours_enabled",
@@ -416,6 +428,13 @@ class NetworkMonitor:
             )
         self._resolve_disabled_rule_alerts(_now())
         self._refresh_alert_notification()
+        await self._async_save()
+
+    async def async_set_network_segments(self, values: list[dict[str, Any]]) -> None:
+        """Persist the initial or edited network segment list."""
+        self.rules["network_segments"] = [
+            segment.as_dict() for segment in normalize_network_segments(values)
+        ]
         await self._async_save()
 
     def async_maybe_schedule_ai_analysis(
@@ -772,6 +791,25 @@ class NetworkMonitor:
                 self.host_inventory[key] = inventory_entry
                 changed = True
             old = previous.get(key)
+            if not host.segment_monitoring:
+                if old is None:
+                    self.first_seen.setdefault(key, now.isoformat())
+                    if host.online:
+                        self.online_since.setdefault(key, now.isoformat())
+                        self.offline_since.pop(key, None)
+                    else:
+                        self.offline_since.setdefault(key, now.isoformat())
+                        self.online_since.pop(key, None)
+                    changed = True
+                elif old.online != host.online:
+                    if host.online:
+                        self.online_since[key] = now.isoformat()
+                        self.offline_since.pop(key, None)
+                    else:
+                        self.online_since.pop(key, None)
+                        self.offline_since[key] = now.isoformat()
+                    changed = True
+                continue
             if old is None:
                 prior = previous_by_mac.get(host.mac) if host.mac else None
                 if prior and prior[0] != key:
@@ -806,6 +844,44 @@ class NetworkMonitor:
                             new_ip=host.ip,
                             service="Geräte-Einrichtung",
                         )
+                    if (
+                        prior_host.segment_id
+                        and host.segment_id
+                        and prior_host.segment_id != host.segment_id
+                    ):
+                        self._add_event(
+                            "vlan_changed",
+                            host,
+                            (
+                                f"{host.display_name} wechselte von "
+                                f"{prior_host.segment_name or prior_host.segment_id} zu "
+                                f"{host.segment_name or host.segment_id}."
+                            ),
+                            old_segment_id=prior_host.segment_id,
+                            old_segment_name=prior_host.segment_name,
+                            old_vlan_id=prior_host.vlan_id,
+                            new_segment_id=host.segment_id,
+                            new_segment_name=host.segment_name,
+                            new_vlan_id=host.vlan_id,
+                            service="VLAN-Überwachung",
+                        )
+                        if self.rules["enabled"]:
+                            self._add_alert(
+                                "vlan_changed",
+                                "critical" if host.segment_role == "isolated" else "warning",
+                                host,
+                                (
+                                    f"Gerät wechselte das VLAN: "
+                                    f"{prior_host.segment_name or prior_host.segment_id} → "
+                                    f"{host.segment_name or host.segment_id}."
+                                ),
+                                now,
+                                old_segment_id=prior_host.segment_id,
+                                old_vlan_id=prior_host.vlan_id,
+                                new_segment_id=host.segment_id,
+                                new_vlan_id=host.vlan_id,
+                                service="VLAN-Überwachung",
+                            )
                 self.first_seen.setdefault(key, now.isoformat())
                 if host.online:
                     self.online_since.setdefault(key, now.isoformat())
@@ -1032,7 +1108,7 @@ class NetworkMonitor:
                     )
 
         if changed:
-            await self._async_save()
+            await self._async_save(immediate=False)
 
     def restored_hosts(self) -> dict[str, NetworkHost]:
         """Recreate the last known participants after a Home Assistant restart."""
@@ -1072,6 +1148,13 @@ class NetworkMonitor:
                 ),
                 network_infrastructure=item.get("network_infrastructure"),
                 infrastructure_source=item.get("infrastructure_source"),
+                segment_id=item.get("segment_id"),
+                segment_name=item.get("segment_name"),
+                vlan_id=item.get("vlan_id"),
+                segment_network=item.get("segment_network"),
+                segment_role=item.get("segment_role"),
+                segment_color=item.get("segment_color"),
+                segment_monitoring=bool(item.get("segment_monitoring", True)),
             )
         return restored
 
@@ -1165,6 +1248,13 @@ class NetworkMonitor:
             "vpn_connection": host.vpn_connection,
             "network_infrastructure": host.network_infrastructure,
             "infrastructure_source": host.infrastructure_source,
+            "segment_id": host.segment_id,
+            "segment_name": host.segment_name,
+            "vlan_id": host.vlan_id,
+            "segment_network": host.segment_network,
+            "segment_role": host.segment_role,
+            "segment_color": host.segment_color,
+            "segment_monitoring": host.segment_monitoring,
         }
 
     def _restore_monitored_inventory_from_history(self) -> bool:
@@ -1633,30 +1723,36 @@ class NetworkMonitor:
             return "Ping/TCP-Scanner"
         return "Nodarion-Überwachung"
 
-    async def _async_save(self) -> None:
-        async with self._save_lock:
-            await self._store.async_save(
-                {
-                "monitored": sorted(self.monitored),
-                "notifications": sorted(self.notifications),
-                "presence_devices": sorted(self.presence_devices),
-                "events": self.events,
-                "alerts": self.alerts,
-                "rules": self.rules,
-                "known_hosts": sorted(self.known_hosts),
-                "trusted_macs": sorted(self.trusted_macs),
-                "host_inventory": self.host_inventory,
-                "first_seen": self.first_seen,
-                "online_since": self.online_since,
-                "offline_since": self.offline_since,
-                "transitions": self.transitions,
-                "guest_since": self.guest_since,
-                "started_at": self.started_at,
-                "alert_sequence": self._alert_sequence,
-                "internet_guard_initialized": self.internet_guard_initialized,
-                "ai_reports": self.ai_reports,
-                "ai_last_snapshot": self.ai_last_snapshot,
-                "ai_last_run_date": self.ai_last_run_date,
-                "ai_last_error": self.ai_last_error,
-                }
-            )
+    def _storage_payload(self) -> dict[str, Any]:
+        """Return one current storage snapshot."""
+        return {
+            "monitored": sorted(self.monitored),
+            "notifications": sorted(self.notifications),
+            "presence_devices": sorted(self.presence_devices),
+            "events": self.events,
+            "alerts": self.alerts,
+            "rules": self.rules,
+            "known_hosts": sorted(self.known_hosts),
+            "trusted_macs": sorted(self.trusted_macs),
+            "host_inventory": self.host_inventory,
+            "first_seen": self.first_seen,
+            "online_since": self.online_since,
+            "offline_since": self.offline_since,
+            "transitions": self.transitions,
+            "guest_since": self.guest_since,
+            "started_at": self.started_at,
+            "alert_sequence": self._alert_sequence,
+            "internet_guard_initialized": self.internet_guard_initialized,
+            "ai_reports": self.ai_reports,
+            "ai_last_snapshot": self.ai_last_snapshot,
+            "ai_last_run_date": self.ai_last_run_date,
+            "ai_last_error": self.ai_last_error,
+        }
+
+    async def _async_save(self, *, immediate: bool = True) -> None:
+        """Persist now, or coalesce non-critical scan changes."""
+        await self._store_writer.async_save(immediate=immediate)
+
+    async def async_shutdown(self) -> None:
+        """Flush pending monitor data before unload."""
+        await self._store_writer.async_flush()

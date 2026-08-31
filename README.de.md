@@ -17,7 +17,7 @@
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
 </p>
 
-> **Ein Netzwerk, ein Gesamtbild:** Nodarion führt aktive Ping-/TCP-Scans,
+> **Mehrere Netze, ein Gesamtbild:** Nodarion führt aktive Ping-/TCP-Scans,
 > FRITZ!Box- und Mesh-Daten sowie die DNS-Aktivitäten aus AdGuard Home pro
 > Teilnehmer zusammen. Statt drei voneinander getrennten Datenquellen entsteht
 > eine gemeinsame, verständliche Sicht auf Geräte, Verbindungen und
@@ -30,25 +30,31 @@ nicht nur, **ob** ein Gerät erreichbar ist, sondern hilft auch zu verstehen,
 **wo** es verbunden ist, **wie** es kommuniziert und **ob** sein Verhalten
 auffällig erscheint.
 
-Nodarion arbeitet als lokale Home-Assistant-Custom-Integration, scannt ein
-einstellbares IPv4-Netz und legt pro gefundenem Teilnehmer einen
+Nodarion arbeitet als lokale Home-Assistant-Custom-Integration, scannt ein oder
+mehrere einstellbare IPv4-Netze und legt pro gefundenem Teilnehmer einen
 Konnektivitäts-Binärsensor an.
 
 ## Neu im aktuellen Build
 
-- Die komplette Nodarion-Oberfläche folgt jetzt der in Home Assistant gewählten
-  Sprache: Deutsch wird vollständig unterstützt, alle anderen Sprachen erhalten
-  die englische Oberfläche als Fallback.
-- Datums-, Zeit- und Zahlenformate sowie manuell und täglich erzeugte
-  KI-Netzwerkanalysen werden passend auf Deutsch oder Englisch ausgegeben.
-- Aktive Auffälligkeiten werden in einer einzigen, laufend aktualisierten
-  Home-Assistant-Meldung gebündelt. Das hält die Benachrichtigungen auch in
-  lebhaften Netzen angenehm aufgeräumt.
-- Das Bestätigen eines neuen Geräts gibt dessen Internetzugang zuverlässig frei
-  und erledigt die zugehörigen Warnungen gemeinsam. Bereits freigegebene Geräte
-  lassen sich dabei ebenfalls problemlos erneut bestätigen.
-- Überarbeitete Bewertungen und eine scrollbarere Warnungsansicht verbessern die
-  Lesbarkeit auf kleinen Displays.
+> [!IMPORTANT]
+> **VLAN-Unterstützung ist da:** Mehrere Netzwerksegmente lassen sich jetzt mit
+> Namen, Rolle und Farbe konfigurieren, überwachen und eindeutig zuordnen.
+
+> [!TIP]
+> **Für Nodarion wird die separate AdGuard-Home-Integration nicht mehr
+> benötigt.** Nodarion stellt ein eigenes AdGuard-Gerät sowie Sensoren,
+> Statistiken und Schutzschalter als native Home-Assistant-Entitäten bereit.
+> Vor dem Entfernen bitte prüfen, ob andere Dashboards oder Automationen noch
+> die bisherigen Entitäten verwenden.
+
+- Skalierbare, einzeln konfigurierbare VLAN-Scanner und Warnungen bei
+  Segmentwechseln
+- Eigenes Home-Assistant-Gerät **Engelsoft AdGuard** mit nativen Entitäten
+- Kontexthilfe in den Einstellungen, sichere Neukonfiguration und automatische
+  Erneuerung ungültiger Zugangsdaten
+- Kleinere API-Antworten und weniger Speicherzugriffe
+
+Alle Details stehen im [Changelog](CHANGELOG.md).
 
 ## Einblicke
 
@@ -120,6 +126,11 @@ Der Verbindungsbeginn und der Warnverlauf werden im Home-Assistant-Speicher gesi
 - Persistenter Teilnehmerbestand: bekannte Geräte bleiben auch nach einem
   Home-Assistant-Neustart sichtbar, wenn sie beim ersten Scan offline sind
 - Kennzahlen, Suche, Statusfilter, Sortierung und responsive Gerätetabelle
+- Anpassbare VLAN-/Segmentliste mit Name, VLAN-ID, Subnetz, Rolle, Farbe und
+  Überwachung; jedes aktivierte Segment erhält einen eigenen Scanner
+- VLAN-Spalte, Filter und farbige Segmentmarkierung in der Teilnehmerliste
+- Warnung, wenn ein über seine MAC-Adresse wiedererkanntes Gerät zwischen
+  Segmenten wechselt; Wechsel in isolierte Netze gelten als kritisch
 - Klick auf einen Teilnehmer öffnet dessen Home-Assistant-Eigenschaften
 - Optionale direkte FRITZ!Box-Erkennung über TR-064 als Ergänzung zu Ping/TCP
 - Automatische FRITZ!Box-Internetsperre für neu entdeckte Geräte bis zur
@@ -186,7 +197,9 @@ ausführen.
 
 ## Hinweise
 
-Der Home-Assistant-Host muss das Zielnetz direkt erreichen können. Bei einer
+Der Home-Assistant-Host muss jedes aktiv überwachte Zielnetz direkt erreichen
+können. VLAN-ID und Segmentrolle werden anhand des konfigurierten Subnetzes
+zugeordnet; die IP-Adresse selbst enthält keine VLAN-Information. Bei einer
 Container-Installation kann `network_mode: host` nötig sein. Ohne aktivierte
 FRITZ!Box-Anbindung können Geräte, die weder auf Ping noch auf einen der
 konfigurierten TCP-Ports reagieren, technisch nicht entdeckt werden. Bei

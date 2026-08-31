@@ -44,6 +44,27 @@ from .const import (
     DEFAULT_TIMEOUT,
     DOMAIN,
 )
+from .connection_validation import (
+    CannotConnectError,
+    InvalidAuthError,
+    async_validate_connections,
+)
+
+
+async def _async_validate_input(
+    hass, values: dict[str, Any]
+) -> dict[str, str]:
+    """Validate values and test enabled service connections."""
+    errors = _validate(values)
+    if errors:
+        return errors
+    try:
+        await async_validate_connections(hass, values)
+    except InvalidAuthError:
+        errors["base"] = "invalid_auth"
+    except CannotConnectError:
+        errors["base"] = "cannot_connect"
+    return errors
 
 
 def _schema(values: dict[str, Any]) -> vol.Schema:
@@ -199,7 +220,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle user setup."""
         errors = {}
         if user_input is not None:
-            errors = _validate(user_input)
+            errors = await _async_validate_input(self.hass, user_input)
             if not errors:
                 await self.async_set_unique_id(DOMAIN)
                 self._abort_if_unique_id_configured()
@@ -208,6 +229,46 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
         return self.async_show_form(
             step_id="user", data_schema=_schema(user_input or {}), errors=errors
+        )
+
+    async def async_step_reconfigure(self, user_input=None):
+        """Reconfigure addresses, credentials, and scanner parameters."""
+        entry = self._get_reconfigure_entry()
+        values = user_input or {**entry.data, **entry.options}
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = await _async_validate_input(self.hass, user_input)
+            if not errors:
+                return self.async_update_and_abort(
+                    entry,
+                    data_updates=user_input,
+                    options_updates={},
+                    reason="reconfigure_successful",
+                )
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=_schema(values), errors=errors
+        )
+
+    async def async_step_reauth(self, entry_data):
+        """Start credential recovery for the existing entry."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(self, user_input=None):
+        """Validate replacement credentials and reload the entry."""
+        entry = self._get_reauth_entry()
+        values = user_input or {**entry.data, **entry.options}
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = await _async_validate_input(self.hass, user_input)
+            if not errors:
+                return self.async_update_and_abort(
+                    entry,
+                    data_updates=user_input,
+                    options_updates={},
+                    reason="reauth_successful",
+                )
+        return self.async_show_form(
+            step_id="reauth_confirm", data_schema=_schema(values), errors=errors
         )
 
     @staticmethod
@@ -227,7 +288,7 @@ class OptionsFlow(config_entries.OptionsFlow):
         """Manage options."""
         errors = {}
         if user_input is not None:
-            errors = _validate(user_input)
+            errors = await _async_validate_input(self.hass, user_input)
             if not errors:
                 return self.async_create_entry(title="", data=user_input)
         values = user_input or {**self.entry.data, **self.entry.options}

@@ -11,8 +11,9 @@ import ipaddress
 import logging
 import re
 from typing import Any
+from urllib.parse import urlparse
 
-from aiohttp import BasicAuth
+from aiohttp import BasicAuth, ClientResponseError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -93,6 +94,14 @@ class AdGuardScanner:
         self.available = False
         self.data_complete = True
         self._cached_entries: list[dict[str, Any]] = []
+        self.global_dns_stats: dict[str, Any] = {
+            "queries": 0,
+            "blocked": 0,
+            "blocked_ratio": 0.0,
+            "period_hours": 24,
+            "data_complete": False,
+            "source": "query_log_cache",
+        }
         self._configuration_lock = asyncio.Lock()
 
     async def _async_request(
@@ -100,15 +109,23 @@ class AdGuardScanner:
         method: str,
         path: str,
         payload: dict[str, Any] | None = None,
+        *,
+        params: dict[str, Any] | None = None,
     ) -> Any:
         """Send one authenticated request to the AdGuard control API."""
+        request_kwargs: dict[str, Any] = {
+            "auth": self.auth,
+            "ssl": None if self.verify_ssl else False,
+        }
+        if payload is not None:
+            request_kwargs["json"] = payload
+        if params is not None:
+            request_kwargs["params"] = params
         async with asyncio.timeout(10):
             async with self.session.request(
                 method,
                 f"{self.base_url}/control/{path.lstrip('/')}",
-                json=payload,
-                auth=self.auth,
-                ssl=None if self.verify_ssl else False,
+                **request_kwargs,
             ) as response:
                 response.raise_for_status()
                 if response.status == 204 or response.content_length == 0:
@@ -118,6 +135,10 @@ class AdGuardScanner:
                 body = await response.text()
                 return body or None
 
+    async def async_validate_connection(self) -> None:
+        """Validate AdGuard reachability, TLS settings, and credentials."""
+        await self._async_request("GET", "status")
+
     async def async_configuration(self) -> dict[str, Any]:
         """Return the editable custom rules and DNS rewrites."""
         filtering, rewrites = await asyncio.gather(
@@ -126,6 +147,16 @@ class AdGuardScanner:
         )
         filtering = filtering if isinstance(filtering, dict) else {}
         return {
+            "filters": [
+                {
+                    "name": str(item.get("name") or ""),
+                    "url": str(item.get("url") or ""),
+                    "enabled": bool(item.get("enabled", True)),
+                    "rules_count": int(item.get("rules_count", 0)),
+                }
+                for item in filtering.get("filters", [])
+                if isinstance(item, dict)
+            ],
             "rules": [
                 str(rule)
                 for rule in filtering.get("user_rules", [])
@@ -141,6 +172,185 @@ class AdGuardScanner:
                 if isinstance(item, dict)
             ],
         }
+
+    async def async_status(self) -> dict[str, Any]:
+        """Return lightweight statistics and protection feature states."""
+        async def optional_status(path: str) -> dict[str, Any]:
+            try:
+                value = await self._async_request("GET", path)
+                return value if isinstance(value, dict) else {}
+            except Exception:
+                return {}
+
+        stats_task = asyncio.create_task(self._async_statistics())
+        status, filtering, safe_browsing, parental, safe_search, query_log = (
+            await asyncio.gather(
+                self._async_request("GET", "status"),
+                self._async_request("GET", "filtering/status"),
+                optional_status("safebrowsing/status"),
+                optional_status("parental/status"),
+                optional_status("safesearch/status"),
+                optional_status("querylog/config"),
+            )
+        )
+        if not query_log:
+            query_log = await optional_status("querylog_info")
+        stats = await stats_task
+        filters = filtering.get("filters", []) if isinstance(filtering, dict) else []
+        rules_count = sum(
+            int(item.get("rules_count", 0))
+            for item in filters
+            if isinstance(item, dict)
+        )
+        queries = int(stats.get("num_dns_queries", 0))
+        blocked_filtering = int(stats.get("num_blocked_filtering", 0))
+        safe_browsing_count = int(stats.get("num_replaced_safebrowsing", 0))
+        safe_search_count = int(stats.get("num_replaced_safesearch", 0))
+        parental_count = int(stats.get("num_replaced_parental", 0))
+        blocked = (
+            blocked_filtering
+            + safe_browsing_count
+            + safe_search_count
+            + parental_count
+        )
+        self.global_dns_stats = {
+            "queries": queries,
+            "blocked": blocked,
+            "blocked_ratio": round(blocked * 100 / queries, 1) if queries else 0.0,
+            "period_hours": 24,
+            "data_complete": True,
+            "source": "adguard_stats_api",
+        }
+        self.available = True
+        return {
+            **self.global_dns_stats,
+            "blocked_filtering": blocked_filtering,
+            "safe_browsing_blocked": safe_browsing_count,
+            "safe_search_enforced": safe_search_count,
+            "parental_blocked": parental_count,
+            "average_processing_ms": round(
+                float(stats.get("avg_processing_time", 0)) * 1000, 3
+            ),
+            "rules_count": rules_count,
+            "version": str(status.get("version") or ""),
+            "protection": bool(status.get("protection_enabled")),
+            "filtering": bool(filtering.get("enabled")),
+            "safe_browsing": bool(safe_browsing.get("enabled")),
+            "parental": bool(parental.get("enabled")),
+            "safe_search": bool(safe_search.get("enabled")),
+            "query_log": bool(query_log.get("enabled")),
+        }
+
+    async def _async_statistics(self) -> dict[str, Any]:
+        """Fetch AdGuard's rolling 24-hour statistics."""
+        try:
+            value = await self._async_request(
+                "GET", "stats", params={"recent": 24 * 60 * 60 * 1000}
+            )
+        except ClientResponseError as err:
+            if err.status != 400:
+                raise
+            # Older AdGuard Home releases do not support the `recent`
+            # parameter. Their configured statistics period is still useful.
+            value = await self._async_request("GET", "stats")
+        return value if isinstance(value, dict) else {}
+
+    async def async_set_feature(self, feature: str, enabled: bool) -> None:
+        """Enable or disable one AdGuard protection feature."""
+        if feature == "protection":
+            await self._async_request("POST", "protection", {"enabled": enabled})
+            return
+        if feature == "filtering":
+            status = await self._async_request("GET", "filtering/status")
+            await self._async_request(
+                "POST",
+                "filtering/config",
+                {"enabled": enabled, "interval": int(status.get("interval", 24))},
+            )
+            return
+        if feature in {"safe_browsing", "parental", "safe_search"}:
+            api_name = {
+                "safe_browsing": "safebrowsing",
+                "safe_search": "safesearch",
+                "parental": "parental",
+            }[feature]
+            path = f"{api_name}/{'enable' if enabled else 'disable'}"
+            try:
+                # Older AdGuard Home versions require a genuinely bodyless
+                # POST for these toggle endpoints.
+                await self._async_request("POST", path)
+            except ClientResponseError as err:
+                if err.status != 415:
+                    raise
+                # Newer releases reject a missing media type. An empty JSON
+                # object supplies application/json without changing the
+                # endpoint semantics.
+                await self._async_request("POST", path, {})
+            return
+        if feature == "query_log":
+            try:
+                config = await self._async_request("GET", "querylog/config")
+            except ClientResponseError as err:
+                if err.status != 404:
+                    raise
+                config = await self._async_request("GET", "querylog_info")
+            await self._async_request(
+                "POST",
+                "querylog_config",
+                {"enabled": enabled, "interval": config.get("interval", 24)},
+            )
+            return
+        raise ValueError("Unsupported AdGuard feature")
+
+    async def async_add_filter_url(self, name: str, url: str) -> None:
+        self._validate_filter_url(url)
+        if not name.strip() or len(name) > 128:
+            raise ValueError("Filter name must contain 1 to 128 characters")
+        await self._async_request(
+            "POST", "filtering/add_url", {"whitelist": False, "name": name.strip(), "url": url}
+        )
+
+    async def async_remove_filter_url(self, url: str) -> None:
+        self._validate_filter_url(url)
+        await self._async_request(
+            "POST", "filtering/remove_url", {"whitelist": False, "url": url}
+        )
+
+    async def async_set_filter_url(self, url: str, enabled: bool) -> None:
+        self._validate_filter_url(url)
+        configuration = await self.async_configuration()
+        current = next(
+            (item for item in configuration["filters"] if item["url"].lower() == url.lower()),
+            None,
+        )
+        if current is None:
+            raise ValueError("Filter URL not found")
+        await self._async_request(
+            "POST",
+            "filtering/set_url",
+            {
+                "url": url,
+                "whitelist": False,
+                "data": {"enabled": enabled, "name": current["name"], "url": url},
+            },
+        )
+
+    @staticmethod
+    def _validate_filter_url(url: str) -> None:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("Filter URL must be an absolute HTTP(S) URL")
+
+    async def async_refresh_filters(self, force: bool = False) -> None:
+        async with asyncio.timeout(30):
+            async with self.session.post(
+                f"{self.base_url}/control/filtering/refresh",
+                params={"force": str(force).lower()},
+                json={"whitelist": False},
+                auth=self.auth,
+                ssl=None if self.verify_ssl else False,
+            ) as response:
+                response.raise_for_status()
 
     async def async_add_custom_rule(self, rule: str) -> dict[str, Any]:
         """Add one custom filtering rule without replacing unrelated rules."""
@@ -381,7 +591,61 @@ class AdGuardScanner:
         )
         self.data_complete = self.data_complete and not truncated
         self._cached_entries = ordered[: self.max_entries]
+        if not await self._async_update_global_dns_stats_from_api():
+            self._update_global_dns_stats_from_query_log()
         return self._aggregate(self._cached_entries, cutoff)
+
+    async def _async_update_global_dns_stats_from_api(self) -> bool:
+        """Prefer AdGuard's own rolling 24-hour statistics when available."""
+        try:
+            payload = await self._async_statistics()
+            queries = int(payload.get("num_dns_queries", 0))
+            blocked = sum(
+                int(payload.get(key, 0))
+                for key in (
+                    "num_blocked_filtering",
+                    "num_replaced_safebrowsing",
+                    "num_replaced_safesearch",
+                    "num_replaced_parental",
+                )
+            )
+        except Exception as err:
+            _LOGGER.debug("AdGuard Home 24-hour statistics unavailable: %s", err)
+            return False
+        self.global_dns_stats = {
+            "queries": queries,
+            "blocked": blocked,
+            "blocked_ratio": round(blocked * 100 / queries, 1) if queries else 0.0,
+            "period_hours": 24,
+            "data_complete": True,
+            "source": "adguard_stats_api",
+        }
+        return True
+
+    def _update_global_dns_stats_from_query_log(self) -> None:
+        """Cache rolling totals from the query log as a compatibility fallback."""
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        entries = [
+            item
+            for item in self._cached_entries
+            if (
+                (timestamp := self._parse_time(item.get("time"))) is not None
+                and timestamp >= cutoff
+            )
+        ]
+        blocked = sum(
+            self._is_blocked(str(item.get("reason") or "")) for item in entries
+        )
+        self.global_dns_stats = {
+            "queries": len(entries),
+            "blocked": blocked,
+            "blocked_ratio": (
+                round(blocked * 100 / len(entries), 1) if entries else 0.0
+            ),
+            "period_hours": 24,
+            "data_complete": self.data_complete and self.period_hours >= 24,
+            "source": "query_log_cache",
+        }
 
     async def async_query_log(
         self,
@@ -473,7 +737,7 @@ class AdGuardScanner:
         blocked_domains: Counter[str] = Counter()
         reasons: Counter[str] = Counter()
         clients: set[str] = set()
-        blocked = 0
+        blocked = int(self.global_dns_stats["blocked"])
         for item in entries:
             client = str(item.get("client") or "").strip()
             if client:
@@ -486,7 +750,6 @@ class AdGuardScanner:
                 domains[domain] += 1
             reason = str(item.get("reason") or "").strip()
             if self._is_blocked(reason):
-                blocked += 1
                 reasons[reason or "Filtered"] += 1
                 if domain:
                     blocked_domains[domain] += 1
@@ -505,16 +768,17 @@ class AdGuardScanner:
             ]
 
         return {
-            "queries": len(entries),
+            "queries": int(self.global_dns_stats["queries"]),
             "blocked": blocked,
-            "blocked_ratio": round(blocked * 100 / len(entries), 1)
-            if entries else 0.0,
+            "blocked_ratio": float(self.global_dns_stats["blocked_ratio"]),
             "active_clients": len(clients),
             "top_domains": top_values(domains),
             "top_blocked_domains": top_values(blocked_domains),
             "blocked_reasons": dict(reasons.most_common()),
             "domains_included": include_domains,
-            "data_complete": self.data_complete,
+            "data_complete": bool(self.global_dns_stats["data_complete"])
+            and self.data_complete
+            and self.period_hours >= 24,
         }
 
     def query_series(

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import datetime
 import ipaddress
 import logging
@@ -12,7 +11,8 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, FRONTEND_VERSION, INTEGRATION_VERSION
+from .api_serialization import serialize_frontend_state
+from .const import DOMAIN
 from .monitor import NetworkMonitor
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,6 +27,10 @@ class NodarionView(HomeAssistantView):
 
     async def get(self, request: web.Request) -> web.Response:
         """Return saved monitor state."""
+        if not self._is_admin(request):
+            return self.json_message(
+                "Nur Administratoren dürfen Nodarion-Daten anzeigen", 403
+            )
         manager = self._manager(request)
         if manager is None:
             return self.json_message("Integration ist nicht geladen", 503)
@@ -125,6 +129,10 @@ class NodarionView(HomeAssistantView):
                 return self.json_message("Ungültige Regeln", 400)
             try:
                 await manager.async_set_rules(rules)
+                if "network_segments" in rules:
+                    coordinator = self._coordinator(request)
+                    if coordinator is not None:
+                        await coordinator.async_apply_network_segments()
             except (TypeError, ValueError):
                 return self.json_message("Ungültige Regeln", 400)
         elif action == "run_ai_analysis":
@@ -225,6 +233,18 @@ class NodarionView(HomeAssistantView):
                 result = await scanner.async_delete_rewrite(
                     data.get("domain"), data.get("answer")
                 )
+            elif action == "adguard_add_filter_url":
+                await scanner.async_add_filter_url(data.get("name"), data.get("url"))
+                result = await scanner.async_configuration()
+            elif action == "adguard_delete_filter_url":
+                await scanner.async_remove_filter_url(data.get("url"))
+                result = await scanner.async_configuration()
+            elif action == "adguard_set_filter_url":
+                await scanner.async_set_filter_url(data.get("url"), bool(data.get("enabled")))
+                result = await scanner.async_configuration()
+            elif action == "adguard_refresh_filters":
+                await scanner.async_refresh_filters(bool(data.get("force")))
+                result = await scanner.async_configuration()
             else:
                 return self.json_message("Unbekannte AdGuard-Aktion", 400)
         except (TypeError, ValueError):
@@ -244,53 +264,8 @@ class NodarionView(HomeAssistantView):
     def _frontend_state(
         cls, request: web.Request, manager: NetworkMonitor
     ) -> dict:
-        """Return monitor state plus the coordinator's live participants.
-
-        New coordinator hosts can exist briefly before Home Assistant has
-        created their binary-sensor state. Supplying the live inventory keeps
-        the panel complete during that registration window.
-        """
-        response = manager.as_dict()
-        response["versions"] = {
-            "integration": INTEGRATION_VERSION,
-            "frontend": FRONTEND_VERSION,
-        }
-        coordinator = cls._coordinator(request)
-        response["guest_access"] = (
-            dict(coordinator.fritz_scanner.guest_info)
-            if coordinator is not None and coordinator.fritz_scanner is not None
-            else {"available": False, "enabled": False, "clients": 0}
-        )
-        if not cls._is_admin(request):
-            response["guest_access"].pop("qr_code", None)
-            response["guest_access"]["qr_code_restricted"] = True
-        participants = []
-        if coordinator is not None and coordinator.data:
-            for host in coordinator.data.values():
-                attributes = asdict(host)
-                attributes["nodarion_key"] = host.key
-                attributes["ip_address"] = host.ip
-                attributes["mac_address"] = host.mac
-                attributes["detection_sources"] = list(host.sources)
-                attributes["trusted"] = manager.is_trusted(host)
-                attributes["trust_status"] = manager.trust_status(host)
-                attributes["connection_status"] = {
-                    key: dict(status)
-                    for key, status in coordinator.connection_status.items()
-                }
-                participants.append(
-                    {
-                        "entity_id": (
-                            f"binary_sensor.{host.ip.replace('.', '_')}"
-                        ),
-                        "state": "on" if host.online else "off",
-                        "last_changed": None,
-                        "last_updated": None,
-                        "attributes": attributes,
-                    }
-                )
-        response["participants"] = participants
-        return response
+        """Return compact monitor state plus live participants."""
+        return serialize_frontend_state(manager, cls._coordinator(request))
 
     @staticmethod
     def _manager(request: web.Request) -> NetworkMonitor | None:

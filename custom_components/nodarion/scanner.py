@@ -13,7 +13,8 @@ from time import monotonic
 
 from homeassistant.helpers.device_registry import format_mac
 
-from .models import NetworkHost
+from .models import NetworkHost, NetworkSegment
+from .scan_batches import async_batched_map
 
 _LOGGER = logging.getLogger(__name__)
 _ARP_LINE = re.compile(
@@ -32,13 +33,19 @@ class NetworkScanner:
         concurrency: int,
         ports: Iterable[int],
         excluded: set[str],
+        segment: NetworkSegment | None = None,
+        *,
+        shared_semaphore: asyncio.Semaphore | None = None,
+        batch_size: int | None = None,
     ) -> None:
         """Initialize scanner."""
         self.network = ipaddress.ip_network(network, strict=False)
         self.timeout = timeout
-        self.semaphore = asyncio.Semaphore(concurrency)
+        self.semaphore = shared_semaphore or asyncio.Semaphore(concurrency)
+        self.batch_size = max(1, batch_size or concurrency)
         self.ports = tuple(ports)
         self.excluded = excluded
+        self.segment = segment
         self._scan_number = 0
         self._known_ips: set[str] = set()
         self._dns_cache: dict[str, tuple[str | None, float]] = {}
@@ -57,7 +64,9 @@ class NetworkScanner:
             if full_discovery
             else [ip for ip in all_addresses if ip in self._known_ips]
         )
-        results = await asyncio.gather(*(self._probe(ip) for ip in addresses))
+        results = await async_batched_map(
+            addresses, self._probe, self.batch_size
+        )
         arp = await self._read_neighbors()
         hosts: dict[str, NetworkHost] = {}
         for ip, detection_source in zip(addresses, results, strict=True):
@@ -79,6 +88,13 @@ class NetworkScanner:
                 online=True,
                 scanner_hostname=hostname,
                 sources=(detection_source,),
+                segment_id=self.segment.id if self.segment else None,
+                segment_name=self.segment.name if self.segment else None,
+                vlan_id=self.segment.vlan_id if self.segment else None,
+                segment_network=self.segment.network if self.segment else str(self.network),
+                segment_role=self.segment.role if self.segment else None,
+                segment_color=self.segment.color if self.segment else None,
+                segment_monitoring=self.segment.monitoring if self.segment else True,
             )
         detected_ips = {host.ip for host in hosts.values()}
         if full_discovery:

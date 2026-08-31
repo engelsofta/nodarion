@@ -17,30 +17,35 @@
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
 </p>
 
-> **One network, one complete picture:** Nodarion combines active ping/TCP scans,
+> **Multiple networks, one complete picture:** Nodarion combines active ping/TCP scans,
 > FRITZ!Box and Mesh data, and DNS activity from AdGuard Home for each device.
 > Instead of three separate data sources, you get one clear view of devices,
 > connections, and anomalies — including local rules and optional AI analysis.
 
-Nodarion is a local Home Assistant custom integration. It scans a configurable
-IPv4 network and creates a connectivity binary sensor for every discovered
+Nodarion is a local Home Assistant custom integration. It scans one or more
+configurable IPv4 networks and creates a connectivity binary sensor for every discovered
 device. Beyond simple reachability, it helps explain where a device is
 connected, how it communicates, and whether its behaviour looks unusual.
 
 ## What is new in the current build
 
-- The complete Nodarion panel now follows the language selected in Home
-  Assistant. German is fully supported; every other language falls back to
-  English.
-- Dates, times, numbers, and both manual and daily AI network reports are
-  generated in the appropriate German or English locale.
-- Active anomalies are grouped into one continuously updated Home Assistant
-  notification, keeping the notification centre tidy even on busy networks.
-- Approving a new device reliably enables its internet access and resolves all
-  related warnings. Devices whose access is already enabled can safely be
-  approved again.
-- Refined rating indicators and a scrollable warning view improve readability
-  on smaller screens.
+> [!IMPORTANT]
+> **VLAN support is here:** configure and monitor multiple network segments,
+> assign names, roles and colours, and see every device in the correct segment.
+
+> [!TIP]
+> **You no longer need the separate AdGuard Home integration for Nodarion.**
+> Nodarion now exposes its own AdGuard device, sensors, statistics, and
+> protection switches as native Home Assistant entities. Check whether other
+> dashboards or automations still use the old entities before removing it.
+
+- Scalable, individually configurable VLAN scanners and segment-move alerts
+- A dedicated **Engelsoft AdGuard** Home Assistant device with native entities
+- Context help throughout the settings, safer reconfiguration, and automatic
+  credential recovery
+- Faster API responses and fewer storage writes
+
+See the full [changelog](CHANGELOG.md).
 
 ## Insights
 
@@ -100,6 +105,11 @@ Use the button above, or add the repository manually:
 - Presence tracking for selected devices with a configurable offline timeout
 - Search, status filters, sorting, metrics, configurable columns, and a
   responsive device table
+- Editable VLAN/segment definitions with name, VLAN ID, subnet, role, colour,
+  and monitoring; every monitored segment gets its own scanner
+- VLAN column, filtering, sorting, and a segment-coloured edge in the device table
+- MAC-backed warnings when a known device moves between segments; moves into
+  isolated networks are treated as critical
 - Favorites, current Mesh access point, and a log of Mesh handovers
 - LAN, Wi-Fi, or powerline connection details, Wi-Fi band, RX/TX rate, and
   signal strength when supplied by the FRITZ!Box
@@ -154,7 +164,9 @@ notification targets selected in Nodarion.
 
 ## Important notes
 
-The Home Assistant host must be able to reach the target network directly.
+The Home Assistant host must be able to reach every actively monitored network
+directly. VLAN IDs and roles are assigned from the configured subnet because an
+IP address does not itself contain VLAN information.
 Container installations may require `network_mode: host`. Without FRITZ!Box
 support, devices that respond to neither ping nor a configured TCP port cannot
 be discovered. With FRITZ!Box support enabled, a device reported as active by

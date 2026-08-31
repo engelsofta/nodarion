@@ -18,6 +18,7 @@ sys.modules[_SPEC.name] = _MODELS
 _SPEC.loader.exec_module(_MODELS)
 NetworkHost = _MODELS.NetworkHost
 is_network_infrastructure = _MODELS.is_network_infrastructure
+normalize_network_segments = _MODELS.normalize_network_segments
 
 
 class InfrastructureTests(unittest.TestCase):
@@ -41,6 +42,25 @@ class InfrastructureTests(unittest.TestCase):
 
         host.hostname = "ordinary-device"
         host.network_infrastructure = True
+        self.assertTrue(is_network_infrastructure(host))
+
+    def test_network_segments_are_normalized_and_reject_overlaps(self) -> None:
+        segments = normalize_network_segments([
+            {"name": "Heimnetz", "vlan_id": 10, "network": "192.168.10.7/24", "role": "trusted", "color": "#12AABB", "monitoring": True},
+            {"name": "IoT", "vlan_id": 20, "network": "192.168.20.0/24", "role": "restricted", "color": "#cc8844", "monitoring": False},
+        ])
+        self.assertEqual(segments[0].network, "192.168.10.0/24")
+        self.assertEqual(segments[0].color, "#12aabb")
+        self.assertFalse(segments[1].monitoring)
+        with self.assertRaises(ValueError):
+            normalize_network_segments([
+                {"name": "A", "vlan_id": 1, "network": "10.0.0.0/24", "role": "trusted", "color": "#000000", "monitoring": True},
+                {"name": "B", "vlan_id": 2, "network": "10.0.0.128/25", "role": "trusted", "color": "#ffffff", "monitoring": True},
+            ])
+
+    def test_infrastructure_segment_role_protects_hosts(self) -> None:
+        host = self.host("ordinary-device")
+        host.segment_role = "infrastructure"
         self.assertTrue(is_network_infrastructure(host))
 
 

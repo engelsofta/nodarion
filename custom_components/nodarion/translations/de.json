@@ -6,7 +6,7 @@
         "title": "Netzwerkscanner einrichten",
         "description": "Scanne ein lokales IPv4-Netz. Beispiel: 192.168.1.0/24",
         "data": {
-          "network": "Netzwerk (CIDR)",
+          "network": "Startnetz (CIDR; weitere VLANs werden in Nodarion verwaltet)",
           "scan_interval": "Scanintervall (Sekunden)",
           "timeout": "Zeitlimit pro Prüfung (Sekunden)",
           "concurrency": "Gleichzeitige Prüfungen",
@@ -27,6 +27,20 @@
           "adguard_verify_ssl": "SSL-Zertifikat prüfen",
           "adguard_period_hours": "DNS-Auswertungszeitraum (Stunden)"
         }
+      },
+      "reconfigure": {
+        "title": "Nodarion neu konfigurieren",
+        "description": "Die Verbindungen werden geprüft, bevor die Integration neu geladen wird.",
+        "data": {
+          "network": "Startnetz (CIDR; weitere VLANs werden in Nodarion verwaltet)", "scan_interval": "Scanintervall (Sekunden)", "timeout": "Zeitlimit pro Prüfung (Sekunden)", "concurrency": "Globale gleichzeitige Prüfungen über alle VLANs", "ports": "TCP-Ports (kommagetrennt)", "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)", "offline_after": "Nach fehlgeschlagenen Scans als offline melden", "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)", "fritz_enabled": "FRITZ!Box-Erkennung verwenden", "fritz_host": "FRITZ!Box-Adresse", "fritz_user": "FRITZ!Box-Benutzer", "fritz_password": "FRITZ!Box-Passwort", "adguard_enabled": "AdGuard-Home-Auswertung verwenden", "adguard_host": "AdGuard-Home-Adresse", "adguard_port": "AdGuard-Home-Port", "adguard_user": "AdGuard-Home-Benutzer", "adguard_password": "AdGuard-Home-Passwort", "adguard_ssl": "HTTPS verwenden", "adguard_verify_ssl": "SSL-Zertifikat prüfen", "adguard_period_hours": "DNS-Auswertungszeitraum (Stunden)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Nodarion erneut verbinden",
+        "description": "Verbindungsdaten aktualisieren und den Zugriff prüfen.",
+        "data": {
+          "network": "Startnetz (CIDR; weitere VLANs werden in Nodarion verwaltet)", "scan_interval": "Scanintervall (Sekunden)", "timeout": "Zeitlimit pro Prüfung (Sekunden)", "concurrency": "Globale gleichzeitige Prüfungen über alle VLANs", "ports": "TCP-Ports (kommagetrennt)", "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)", "offline_after": "Nach fehlgeschlagenen Scans als offline melden", "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)", "fritz_enabled": "FRITZ!Box-Erkennung verwenden", "fritz_host": "FRITZ!Box-Adresse", "fritz_user": "FRITZ!Box-Benutzer", "fritz_password": "FRITZ!Box-Passwort", "adguard_enabled": "AdGuard-Home-Auswertung verwenden", "adguard_host": "AdGuard-Home-Adresse", "adguard_port": "AdGuard-Home-Port", "adguard_user": "AdGuard-Home-Benutzer", "adguard_password": "AdGuard-Home-Passwort", "adguard_ssl": "HTTPS verwenden", "adguard_verify_ssl": "SSL-Zertifikat prüfen", "adguard_period_hours": "DNS-Auswertungszeitraum (Stunden)"
+        }
       }
     },
     "error": {
@@ -36,10 +50,14 @@
       "fritz_credentials_required": "Für die FRITZ!Box-Erkennung wird dieses Feld benötigt",
       "adguard_credentials_required": "Für die AdGuard-Home-Auswertung wird dieses Feld benötigt",
       "adguard_host_required": "Für die AdGuard-Home-Auswertung wird eine Adresse benötigt",
-      "adguard_credentials_incomplete": "Benutzername und Passwort entweder beide eintragen oder beide leer lassen"
+      "adguard_credentials_incomplete": "Benutzername und Passwort entweder beide eintragen oder beide leer lassen",
+      "cannot_connect": "Ein aktivierter lokaler Dienst ist nicht erreichbar",
+      "invalid_auth": "Die angegebenen Zugangsdaten wurden abgelehnt"
     },
     "abort": {
-      "already_configured": "Der Netzwerkscanner ist bereits eingerichtet"
+      "already_configured": "Der Netzwerkscanner ist bereits eingerichtet",
+      "reconfigure_successful": "Nodarion wurde erfolgreich neu konfiguriert",
+      "reauth_successful": "Die Verbindung wurde erfolgreich wiederhergestellt"
     }
   },
   "options": {
@@ -47,7 +65,7 @@
       "init": {
         "title": "Scanner-Einstellungen",
         "data": {
-          "network": "Netzwerk (CIDR)",
+          "network": "Bisheriges Startnetz (VLANs werden in Nodarion verwaltet)",
           "scan_interval": "Scanintervall (Sekunden)",
           "timeout": "Zeitlimit pro Prüfung (Sekunden)",
           "concurrency": "Gleichzeitige Prüfungen",
@@ -77,7 +95,18 @@
       "fritz_credentials_required": "Für die FRITZ!Box-Erkennung wird dieses Feld benötigt",
       "adguard_credentials_required": "Für die AdGuard-Home-Auswertung wird dieses Feld benötigt",
       "adguard_host_required": "Für die AdGuard-Home-Auswertung wird eine Adresse benötigt",
-      "adguard_credentials_incomplete": "Benutzername und Passwort entweder beide eintragen oder beide leer lassen"
+      "adguard_credentials_incomplete": "Benutzername und Passwort entweder beide eintragen oder beide leer lassen",
+      "cannot_connect": "Ein aktivierter lokaler Dienst ist nicht erreichbar",
+      "invalid_auth": "Die angegebenen Zugangsdaten wurden abgelehnt"
+    }
+  },
+  "entity": {
+    "binary_sensor": {"presence": {"name": "Anwesenheit"}},
+    "sensor": {
+      "dns_queries": {"name": "DNS-Anfragen"}, "dns_blocked": {"name": "Blockierte DNS-Anfragen"}, "dns_blocked_ratio": {"name": "DNS-Blockquote"}, "safe_browsing_blocked": {"name": "Safe Browsing blockiert"}, "safe_search_enforced": {"name": "Safe Search aktiviert"}, "parental_blocked": {"name": "Jugendschutz blockiert"}, "rules_count": {"name": "Aktive Filterregeln"}, "average_processing": {"name": "DNS-Verarbeitungszeit"}
+    },
+    "switch": {
+      "protection": {"name": "Gesamtschutz"}, "filtering": {"name": "DNS-Filterung"}, "safe_browsing": {"name": "Safe Browsing"}, "parental": {"name": "Jugendschutz"}, "safe_search": {"name": "Safe Search"}, "query_log": {"name": "Query-Log"}
     }
   }
 }

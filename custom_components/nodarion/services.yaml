@@ -1,0 +1,75 @@
+add_filter_url:
+  name: Filterliste hinzufügen
+  fields:
+    name:
+      required: true
+      selector:
+        text:
+    url:
+      required: true
+      selector:
+        text:
+remove_filter_url:
+  name: Filterliste entfernen
+  fields:
+    url:
+      required: true
+      selector:
+        text:
+enable_filter_url:
+  name: Filterliste aktivieren
+  fields:
+    url:
+      required: true
+      selector:
+        text:
+disable_filter_url:
+  name: Filterliste deaktivieren
+  fields:
+    url:
+      required: true
+      selector:
+        text:
+refresh_filters:
+  name: Filterlisten aktualisieren
+  fields:
+    force:
+      default: false
+      selector:
+        boolean:
+add_dns_rule:
+  name: DNS-Regel hinzufügen
+  fields:
+    rule:
+      required: true
+      selector:
+        text:
+remove_dns_rule:
+  name: DNS-Regel entfernen
+  fields:
+    rule:
+      required: true
+      selector:
+        text:
+add_dns_rewrite:
+  name: DNS-Rewrite hinzufügen
+  fields:
+    domain:
+      required: true
+      selector:
+        text:
+    answer:
+      required: true
+      selector:
+        text:
+remove_dns_rewrite:
+  name: DNS-Rewrite entfernen
+  fields:
+    domain:
+      required: true
+      selector:
+        text:
+    answer:
+      required: true
+      selector:
+        text:

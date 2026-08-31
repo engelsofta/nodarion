@@ -6,8 +6,6 @@ __pycache__/
 dist/
 tmp/
 branding/
-RELEASE_NOTES_v1.15.1.md
-RELEASE_NOTES_v1.15.2.md
 
 # Local backup copies
 custom_components/old/

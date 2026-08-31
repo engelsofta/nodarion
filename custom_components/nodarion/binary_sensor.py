@@ -75,7 +75,7 @@ class PresenceSummaryEntity(
 
     _attr_device_class = BinarySensorDeviceClass.OCCUPANCY
     _attr_has_entity_name = True
-    _attr_name = "Anwesenheit"
+    _attr_translation_key = "presence"
     _attr_icon = "mdi:home-account"
 
     def __init__(
@@ -264,6 +264,13 @@ class NetworkHostEntity(
             "infrastructure_source": (
                 host.infrastructure_source or "name_fallback"
             ),
+            "segment_id": host.segment_id,
+            "segment_name": host.segment_name,
+            "vlan_id": host.vlan_id,
+            "segment_network": host.segment_network,
+            "segment_role": host.segment_role,
+            "segment_color": host.segment_color,
+            "segment_monitoring": host.segment_monitoring,
             "dns_queries": host.dns_queries,
             "dns_blocked": host.dns_blocked,
             "dns_blocked_ratio": host.dns_blocked_ratio,

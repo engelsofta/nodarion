@@ -12,6 +12,12 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_FRITZ_ENABLED,
+    CONF_NETWORK,
+    DEFAULT_NETWORK,
+    DEFAULT_SEGMENT_COLOR,
+    DEFAULT_SEGMENT_NAME,
+    DEFAULT_SEGMENT_ROLE,
+    DEFAULT_VLAN_ID,
     DOMAIN,
     FRONTEND_VERSION,
     PANEL_TITLE,
@@ -21,8 +27,9 @@ from .api import NodarionView
 from .coordinator import NetworkCoordinator
 from .monitor import NetworkMonitor
 from .vendor import MacVendorLookup
+from .services import async_register_services, async_unregister_services
 
-PLATFORMS = [Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 type HANetMonConfigEntry = ConfigEntry[NetworkCoordinator]
 _STATIC_URL = "/engelsoft_nodarion"
 
@@ -37,6 +44,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) -> 
     monitor = NetworkMonitor(hass)
     await monitor.async_load()
     options = {**entry.data, **entry.options}
+    if "network_segments" not in monitor.rules:
+        await monitor.async_set_network_segments([{
+            "id": "home",
+            "name": DEFAULT_SEGMENT_NAME,
+            "vlan_id": DEFAULT_VLAN_ID,
+            "network": str(options.get(CONF_NETWORK, DEFAULT_NETWORK)),
+            "role": DEFAULT_SEGMENT_ROLE,
+            "color": DEFAULT_SEGMENT_COLOR,
+            "monitoring": True,
+        }])
     if options.get(CONF_FRITZ_ENABLED):
         await monitor.async_initialize_internet_guard()
     domain_data["monitor"] = monitor
@@ -47,7 +64,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) -> 
     coordinator = NetworkCoordinator(hass, entry, monitor)
     domain_data["coordinator"] = coordinator
     await coordinator.async_config_entry_first_refresh()
+    if coordinator.adguard_scanner is not None:
+        from .adguard_status import AdGuardStatusCoordinator
+
+        coordinator.adguard_status_coordinator = AdGuardStatusCoordinator(
+            hass, coordinator.adguard_scanner, entry
+        )
+        # AdGuard is an optional data source. A short outage must not prevent
+        # the network monitor itself from loading.
+        await coordinator.adguard_status_coordinator.async_refresh()
     entry.runtime_data = coordinator
+    await async_register_services(hass)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
@@ -57,6 +84,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) ->
     """Unload a config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        await entry.runtime_data.monitor.async_shutdown()
+        await async_unregister_services(hass)
         frontend.async_remove_panel(hass, PANEL_URL)
         hass.data.pop(f"{DOMAIN}_panel_registered", None)
         hass.data.get(DOMAIN, {}).pop("monitor", None)

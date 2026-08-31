@@ -1,4 +1,4 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.26.26";
+import { internetStatusFor } from "./internet-status.mjs?v=1.28.0";
 
 const esc = (value) =>
   String(value ?? "")
@@ -309,6 +309,20 @@ const EN = new Map(Object.entries({
   "Name geändert": "Name changed", "Mesh-Wechsel von": "Mesh handover from",
   "seit": "since", "Uhr": "", "basiert auf den markierten Home-Geräten": "based on the marked Home devices",
   "alle ": "every ", "Min.": "min.",
+  "VLANs und Netzwerksegmente": "VLANs and network segments",
+  "VLANs und Rollen erklären": "Explain VLANs and roles",
+  "Hilfe zu VLANs und Netzwerksegmenten": "VLAN and network-segment help",
+  "VLAN hinzufügen": "Add VLAN", "VLAN entfernen": "Remove VLAN",
+  "Subnetze dürfen sich nicht überschneiden. Überwachung aktiviert den Ping/TCP-Scanner und VLAN-Wechselwarnungen für das Segment.": "Subnets must not overlap. Monitoring enables the ping/TCP scanner and VLAN-change alerts for the segment.",
+  "Jeder Eintrag ordnet ein IPv4-Subnetz einem Namen, einer VLAN-ID und einer Farbe zu. Die VLAN-Farbe erscheint am rechten Rand der Gerätetabelle; interne Kennzeichnungen wie Gastnetz oder Einrichtungsbereich bleiben links.": "Each entry assigns an IPv4 subnet a name, VLAN ID, and color. The VLAN color appears at the right edge of the device table; internal markers such as guest network or setup range remain on the left.",
+  "Vertrauenswürdig steht für normale interne Geräte. Eingeschränkt ist für IoT- oder begrenzte Netze gedacht. Gast nimmt Teilnehmer von der regulären Internet-Freigabeprüfung aus. Isoliert stuft einen Wechsel in dieses Segment als kritisch ein. Infrastruktur schützt Router, Switches und Access Points vor der normalen Gerätesperre.": "Trusted is intended for regular internal devices. Restricted is intended for IoT or limited networks. Guest exempts devices from regular internet approval. Isolated rates a move into the segment as critical. Infrastructure protects routers, switches, and access points from regular device blocking.",
+  "Überwachung aktiviert den Ping-/TCP-Scanner und VLAN-Wechselwarnungen für dieses Subnetz. Deaktivierte Segmente bleiben zugeordnet und sichtbar, werden aber nicht aktiv durch den Segmentscanner geprüft. Subnetze dürfen sich nicht überschneiden.": "Monitoring enables the ping/TCP scanner and VLAN-change alerts for this subnet. Disabled segments remain assigned and visible but are not actively checked by the segment scanner. Subnets must not overlap.",
+  "Ist die Gastnetzüberwachung aktiv, übernimmt Nodarion Teilnehmer aus dem FRITZ!Box-Gastzugang, zeigt sie in der Tabelle an und protokolliert ihre Aktivität. Gastgeräte sind von der normalen Internet-Freigabeprüfung ausgenommen.": "When guest monitoring is enabled, Nodarion imports devices from the FRITZ!Box guest access, shows them in the table, and records their activity. Guest devices are exempt from regular internet approval.",
+  "Neue Gäste können beim ersten Verbinden gemeldet werden. Die Ruhezeitprüfung hebt Gastaktivität im festgelegten Zeitraum hervor; die maximale Gastdauer erzeugt nach Ablauf der gewählten Stunden eine Warnung.": "New guests can be reported when they first connect. Quiet-hours monitoring highlights guest activity during the configured period; maximum guest duration creates an alert after the selected number of hours.",
+  "Hier legst du fest, welche in Home Assistant eingerichteten Notify-Dienste Nodarion verwenden darf, beispielsweise die Companion App oder einen Telegram Bot.": "Choose which Home Assistant notification services Nodarion may use, such as the Companion App or a Telegram bot.",
+  "Alle und Keine ändern nur die aktuelle Auswahl. Wirksam wird sie zusammen mit den übrigen Änderungen erst nach dem Speichern. Ohne ausgewähltes Ziel bleiben HA-Glocke und nodarion_alert weiterhin verfügbar.": "All and None only change the current selection. It becomes active with the other changes after saving. HA notifications and nodarion_alert remain available without a selected target.",
+  "Gesamtschutz ist der Hauptschalter von AdGuard Home. DNS-Filterung wendet Blocklisten und eigene Regeln an; Safe Browsing blockiert bekannte Phishing- und Malware-Ziele; Jugendschutz sperrt nicht jugendfreie Inhalte; Safe Search erzwingt den sicheren Modus unterstützter Suchmaschinen.": "Overall protection is the AdGuard Home master switch. DNS filtering applies blocklists and custom rules; Safe Browsing blocks known phishing and malware targets; parental control blocks adult content; Safe Search enforces safe mode for supported search engines.",
+  "Das Query-Log wird für DNS-Live, Gerätezuordnung und KI-Auswertungen benötigt. Wird es ausgeschaltet, arbeitet der DNS-Schutz weiter, Nodarion erhält jedoch keine aktuellen DNS-Anfragen mehr.": "The query log is required for DNS Live, device assignment, and AI analysis. If disabled, DNS protection continues to work, but Nodarion no longer receives current DNS queries.",
 }));
 const EN_REPLACEMENTS = [...EN].sort((a, b) => b[0].length - a[0].length);
 const translateText = (value) => {
@@ -514,10 +528,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._logFilters = { time: "", device: "", type: "", service: "", details: "" };
     this._settingsHelp = null;
     this._settingsTab = this._loadSettingsTab();
+    this._settingsReturnTab = "participants";
     this._notifyTargetQuery = "";
     this._notifyTargetsDirty = false;
     this._settingsDraft = null;
     this._dirtyRules = new Set();
+    this._openSettingsDetails = new Set();
     this._dnsLive = {
       entries: [], series: [], client: null, name: null, updated_at: null,
     };
@@ -529,10 +545,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._dnsLiveTimer = null;
     this._dnsLiveSignature = "";
     this._dnsRenderedSignature = "";
-    this._adguardConfig = { rules: [], rewrites: [], loading: false, error: null };
-    this._adguardConfigOpen = false;
+    this._adguardConfig = { filters: [], rules: [], rewrites: [], loading: false, error: null };
     this._dnsPolicyPrompt = null;
-    this._dnsPausedBeforeConfig = false;
     this._connectionsExpanded = false;
     this._guestModalOpen = false;
     this._activeTab = "participants";
@@ -623,7 +637,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
   _loadSettingsTab() {
     try {
       const tab = localStorage.getItem("nodarion-settings-tab");
-      return ["general", "devices", "rules", "notifications", "ai-maintenance"].includes(tab)
+      return ["general", "devices", "rules", "notifications", "dns", "ai-maintenance"].includes(tab)
         ? tab : "general";
     } catch (_error) {
       return "general";
@@ -740,6 +754,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
     rules.notify_targets = [...settingsView.querySelectorAll(
       ".watch-settings-panel [data-notify-target]:checked"
     )].map((input) => input.dataset.notifyTarget);
+    rules.network_segments = [...settingsView.querySelectorAll("[data-vlan-row]")]
+      .map((row) => {
+        const value = (field) => row.querySelector(`[data-segment-field="${field}"]`);
+        return {
+          id: row.dataset.segmentId,
+          name: value("name")?.value || "",
+          vlan_id: Number(value("vlan_id")?.value),
+          network: value("network")?.value || "",
+          role: value("role")?.value || "trusted",
+          color: value("color")?.value || "#58b9d6",
+          monitoring: Boolean(value("monitoring")?.checked),
+        };
+      });
     this._settingsDraft = rules;
   }
 
@@ -875,6 +902,43 @@ class EngelsoftNodarionPanel extends HTMLElement {
     if (tab === "settings") this._renderSettings();
   }
 
+  _openSettings(section = "general", returnTab = null) {
+    const allowed = ["general", "devices", "rules", "notifications", "dns", "ai-maintenance"];
+    this._settingsTab = allowed.includes(section) ? section : "general";
+    if (returnTab) {
+      this._settingsReturnTab = returnTab;
+    } else if (this._activeTab !== "settings") {
+      this._settingsReturnTab = this._activeTab;
+    }
+    this._saveSettingsTab();
+    this._navigateTo("settings");
+    if (this._settingsTab === "dns" && this._hass?.user?.is_admin) {
+      this._loadAdguardConfig();
+    }
+  }
+
+  async _toggleAdguardSwitch(button) {
+    const entityId = button.dataset.entityId;
+    const state = this._hass.states[entityId]?.state;
+    const turnOff = state === "on";
+    if (turnOff && entityId.endsWith("_query_log")) {
+      const confirmed = await this._confirm({
+        title: "Query-Log ausschalten?",
+        message: "Ohne Query-Log fehlen DNS-Live, Gerätezuordnung und Teile der KI-Auswertung.",
+        confirmLabel: "Trotzdem ausschalten",
+        danger: true,
+      });
+      if (!confirmed) return;
+    }
+    button.disabled = true;
+    try {
+      await this._hass.callService("switch", turnOff ? "turn_off" : "turn_on", { entity_id: entityId });
+      await this._hass.callService("homeassistant", "update_entity", { entity_id: entityId });
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   _openDnsLive(client = null, name = null) {
     this._dnsLive.client = client;
     this._dnsLive.name = name;
@@ -899,6 +963,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         "GET", "nodarion/monitor?view=adguard_config"
       );
       this._adguardConfig = {
+        filters: result.filters || [],
         rules: result.rules || [],
         rewrites: result.rewrites || [],
         loading: false,
@@ -913,16 +978,21 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }
     this._dnsRenderedSignature = "";
     this._renderDnsLive();
+    if (this._activeTab === "settings" && this._settingsTab === "dns") {
+      this._renderWatch();
+      this._renderSettings();
+    }
   }
 
   async _adguardAction(payload, confirmation = null) {
     if (confirmation && !await this._confirm({ title:"Änderung bestätigen", message:confirmation, confirmLabel:"Ausführen", danger:true })) return;
-    this._dnsLivePaused = true;
+    if (this._activeTab === "dns") this._dnsLivePaused = true;
     try {
       const result = await this._hass.callApi(
         "POST", "nodarion/monitor", payload
       );
       this._adguardConfig = {
+        filters: result.filters || [],
         rules: result.rules || [],
         rewrites: result.rewrites || [],
         loading: false,
@@ -930,6 +1000,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
       };
       this._dnsRenderedSignature = "";
       this._renderDnsLive();
+      if (this._activeTab === "settings" && this._settingsTab === "dns") {
+        this._renderWatch();
+        this._renderSettings();
+      }
     } catch (error) {
       await this._confirm({ title:"Änderung fehlgeschlagen", message:error?.message || "AdGuard-Änderung fehlgeschlagen.", confirmLabel:"Schließen", danger:true, showCancel:false });
     }
@@ -1038,7 +1112,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           background:var(--ns-panel); border:1px solid var(--ns-line);
           backdrop-filter:blur(22px) saturate(110%); box-shadow:0 22px 55px rgba(10,8,5,.22), inset 0 1px rgba(255,255,255,.035);
         }
-        .metric { padding:18px 20px; border-radius:17px; position:relative; overflow:hidden; }
+        .metric { min-height:132px; padding:18px 20px; border-radius:17px; position:relative; overflow:hidden; }
         .metric:is(button) { color:inherit; text-align:left; font:inherit; cursor:pointer; transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
         .metric:is(button):hover { transform:translateY(-2px); border-color:rgba(240,161,59,.4); background:rgba(240,161,59,.09); box-shadow:0 24px 58px rgba(10,8,5,.25), inset 0 1px rgba(255,255,255,.055); }
         .nav-metric { width:100%; min-width:0; color:inherit; text-align:left; font:inherit; cursor:pointer; transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
@@ -1053,7 +1127,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .guest-inline { position:relative; z-index:3; display:inline-flex; align-items:center; gap:5px; margin-top:7px; padding:4px 7px; border:0; border-radius:7px; color:#bcecff; background:rgba(80,215,255,.08); font:inherit; font-size:9px; font-weight:750; cursor:pointer; }
         .guest-inline ha-icon { --mdc-icon-size:14px; }
         .metric::after { content:""; position:absolute; inset:auto -20px -35px auto; width:90px; height:90px; border-radius:50%; background:var(--glow); filter:blur(32px); opacity:.24; }
+        .metric-label-row { position:relative; z-index:4; display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:25px; }
         .metric-label { color:#9bb8af; font-size:13px; text-transform:uppercase; letter-spacing:1.2px; font-weight:700; }
+        .metric-settings { display:grid; place-items:center; flex:0 0 auto; width:26px; height:26px; padding:0; border:1px solid rgba(255,255,255,.1); border-radius:8px; color:#8eaea4; background:rgba(255,255,255,.035); cursor:pointer; transition:.18s ease; }
+        .metric-settings:hover { color:#fff7e9; border-color:rgba(240,161,59,.42); background:rgba(240,161,59,.14); transform:rotate(20deg); }
+        .metric-settings ha-icon { --mdc-icon-size:15px; }
         .metric-value { font-size:31px; font-weight:780; margin-top:7px; letter-spacing:-1px; }
         .metric.devices { --glow:var(--ns-green); }
         .device-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:7px; }
@@ -1087,6 +1165,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .metric.ai-metric { --glow:#b68cff; width:100%; color:inherit; text-align:left; font:inherit; cursor:pointer; }
         .metric.ai-metric .metric-value { color:#b68cff; }
         .metric-note { display:block; margin-top:5px; color:#8eaea4; font-size:10px; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .metric-entity-link { max-width:100%; padding:0; border:0; background:transparent; font-family:inherit; text-align:left; cursor:pointer; }
+        .metric-entity-link:hover { color:var(--ns-cyan); text-decoration:underline; text-underline-offset:2px; }
         .connection-panel { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:-4px 0 18px; padding:16px; border-radius:17px; background:var(--ns-panel); border:1px solid var(--ns-line); }
         .connection-panel[hidden] { display:none; }
         .connection-card { --connection-color:var(--ns-green); display:grid; grid-template-columns:11px minmax(0,1fr) auto; align-items:center; gap:11px; padding:13px 14px; border-radius:12px; background:rgba(2,10,8,.38); border:1px solid color-mix(in srgb,var(--connection-color) 22%,transparent); }
@@ -1260,8 +1340,17 @@ class EngelsoftNodarionPanel extends HTMLElement {
         tbody tr.onboarding-row td:first-child {
           box-shadow:inset 4px 0 #f0b94f;
         }
+        tbody tr.guest-row {
+          background:linear-gradient(90deg,rgba(88,185,214,.11),rgba(88,185,214,.025) 34%,transparent 70%);
+        }
         tbody tr.guest-row td:first-child {
           box-shadow:inset 4px 0 #58b9d6;
+        }
+        tbody tr.vlan-device-row td:last-child {
+          box-shadow:inset -4px 0 var(--vlan-color,#58b9d6);
+        }
+        tbody tr.guest-row:hover {
+          background:linear-gradient(90deg,rgba(88,185,214,.18),rgba(88,185,214,.055) 42%,rgba(88,185,214,.025));
         }
         tbody tr.onboarding-row:hover {
           background:linear-gradient(90deg,rgba(240,185,79,.19),rgba(240,185,79,.055) 42%,rgba(240,161,59,.025));
@@ -1405,28 +1494,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .dns-policy-scope:disabled { opacity:.45; cursor:not-allowed; }
         .dns-policy-scope ha-icon { color:var(--ns-green); --mdc-icon-size:19px; }
         .dns-policy-scope.cancel { justify-content:center; color:#8eaea4; background:transparent; border-color:transparent; }
-        .adguard-config { margin-top:16px; padding:17px; border-radius:13px; background:rgba(2,10,8,.32); border:1px solid var(--ns-line); }
-        .adguard-config h3 { margin:0 0 4px; font-size:15px; }
-        .adguard-config > p { margin:0 0 14px; color:#78998f; font-size:11px; }
-        .adguard-config-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
-        .adguard-box { min-width:0; padding:18px; border-radius:13px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.07); }
-        .adguard-box h4 { margin:0 0 13px; font-size:15px; }
-        .adguard-form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; margin-bottom:14px; }
-        .adguard-form.rewrite { grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; }
-        .adguard-form input { min-width:0; min-height:48px; padding:13px 16px; font-size:14px; }
-        .adguard-form button { min-height:48px; border:0; border-radius:10px; padding:0 18px; color:#092018; background:var(--ns-green); font:inherit; font-size:13px; font-weight:800; cursor:pointer; }
-        .adguard-items { display:grid; gap:8px; max-height:360px; overflow:auto; }
-        .adguard-item { display:flex; align-items:center; justify-content:space-between; gap:11px; padding:11px 12px; border-radius:9px; color:#cce5dc; background:rgba(2,10,8,.38); font:550 12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
-        .adguard-item button { width:34px; height:34px; display:grid; place-items:center; flex:0 0 auto; padding:0; border:0; border-radius:8px; color:#ff9ca5; background:rgba(255,107,120,.06); cursor:pointer; }
-        .adguard-item button ha-icon { --mdc-icon-size:19px; }
-        .adguard-modal-backdrop { position:fixed; z-index:1000; inset:0; display:grid; place-items:center; padding:40px; background:rgba(1,8,6,.76); backdrop-filter:blur(8px); }
-        .adguard-modal { width:min(1240px,100%); max-height:calc(100dvh - 80px); overflow:auto; border-radius:21px; padding:28px; color:#effff8; background:#0b211b; border:1px solid rgba(80,215,255,.28); box-shadow:0 16px 48px rgba(0,0,0,.52); }
-        .adguard-modal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:22px; margin-bottom:22px; }
-        .adguard-modal-head h3 { display:flex; align-items:center; gap:11px; margin:0 0 7px; font-size:24px; }
-        .adguard-modal-head h3 ha-icon { color:var(--ns-cyan); --mdc-icon-size:27px; }
-        .adguard-modal-head p { margin:0; color:#78998f; font-size:13px; line-height:1.45; }
-        .adguard-modal-close { display:grid; place-items:center; width:44px; height:44px; flex:0 0 auto; border-radius:12px; color:#cce5dc; background:rgba(255,255,255,.05); border:1px solid var(--ns-line); cursor:pointer; }
-        .adguard-modal-close ha-icon { --mdc-icon-size:24px; }
         .card-actions { display:flex; gap:7px; }
         .watch { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; cursor:pointer; color:#68867d; background:rgba(2,10,8,.35); border:1px solid var(--ns-line); }
         .watch ha-icon { --mdc-icon-size:19px; }
@@ -1534,12 +1601,27 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .watch-overview-grid .presence-overview { order:2; }
         }
         .settings-view { display:grid; gap:18px; }
-        .settings-tabs { display:flex; gap:7px; margin:0 0 14px; padding:4px; overflow-x:auto; border-radius:12px; background:rgba(2,10,8,.3); border:1px solid var(--ns-line); scrollbar-width:thin; }
-        .settings-tab { display:flex; align-items:center; justify-content:center; gap:7px; min-height:38px; padding:8px 13px; flex:1 0 auto; border:1px solid transparent; border-radius:9px; color:#78998f; background:transparent; font:inherit; font-size:11px; font-weight:780; white-space:nowrap; cursor:pointer; transition:.18s ease; }
-        .settings-tab:hover { color:#e6f7f0; background:rgba(255,255,255,.045); }
-        .settings-tab.active { color:#fff7e9; background:rgba(240,161,59,.13); border-color:rgba(240,161,59,.32); box-shadow:inset 0 -2px #e5ad50; }
-        .settings-tab ha-icon { --mdc-icon-size:17px; }
-        .settings-tab.active ha-icon { color:#f0b75e; }
+        .settings-context-title { display:flex; align-items:center; gap:11px; }
+        .settings-back { display:grid; place-items:center; flex:0 0 auto; width:36px; height:36px; padding:0; border:1px solid var(--ns-line); border-radius:10px; color:#cce5dc; background:rgba(255,255,255,.04); cursor:pointer; }
+        .settings-back:hover { color:#fff7e9; border-color:rgba(240,161,59,.4); background:rgba(240,161,59,.12); }
+        .settings-back ha-icon { --mdc-icon-size:19px; }
+        .adguard-feature-list { display:grid; gap:8px; }
+        .adguard-feature { display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; padding:12px 13px; border:1px solid var(--ns-line); border-radius:11px; color:#b9d8cd; background:rgba(255,255,255,.025); font:inherit; text-align:left; cursor:pointer; }
+        .adguard-feature:hover { border-color:rgba(240,161,59,.32); background:rgba(240,161,59,.07); }
+        .adguard-feature strong, .adguard-feature small { display:block; }
+        .adguard-feature small { margin-top:3px; color:#78998f; font-size:10px; }
+        .adguard-feature-state { min-width:42px; padding:5px 8px; border-radius:999px; color:#9aa8a3; background:rgba(255,255,255,.06); font-size:10px; font-weight:800; text-align:center; }
+        .adguard-feature.active .adguard-feature-state { color:#092018; background:var(--ns-green); }
+        .query-log-warning { display:flex; align-items:flex-start; gap:8px; margin-top:11px; padding:10px; border-radius:9px; color:#dbc58f; background:rgba(255,215,102,.07); font-size:10px; line-height:1.45; }
+        .query-log-warning ha-icon { flex:0 0 auto; --mdc-icon-size:16px; }
+        .adguard-stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+        .adguard-stat { padding:12px; border:1px solid var(--ns-line); border-radius:10px; color:#91b0a6; background:rgba(255,255,255,.025); font:inherit; text-align:left; cursor:pointer; }
+        .adguard-stat span, .adguard-stat strong { display:block; }
+        .adguard-stat span { font-size:10px; }
+        .adguard-stat strong { margin-top:6px; color:#effff8; font-size:18px; }
+        .dns-live-stats { margin:0 0 16px; padding:12px; border:1px solid var(--ns-line); border-radius:13px; background:rgba(255,255,255,.018); }
+        .dns-live-stats h3 { margin:0 0 9px; color:#78998f; font-size:10px; text-transform:uppercase; letter-spacing:1px; }
+        .dns-live-stats .adguard-stat-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
         .settings-tab-panel[hidden] { display:none !important; }
         .settings-tab-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:10px; }
         .settings-tab-panel.devices-panel { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(280px,.7fr); gap:14px; }
@@ -1615,7 +1697,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .settings-view .watch-settings-panel .rule-group {
           width:100%; margin:0; padding:5px 10px; box-sizing:border-box;
         }
-        .settings-view .rule { gap:12px; padding:9px 3px; }
+        .settings-view .rule { grid-template-columns:minmax(0,1fr) 180px; gap:12px; padding:9px 3px; }
         .settings-view .rule label { font-size:13px; }
         .settings-view .rule small { margin-top:3px; font-size:10px; line-height:1.3; }
         .settings-view .rule input { min-height:36px; padding:7px 10px; font-size:13px; }
@@ -1623,7 +1705,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .dependent-settings[hidden] { display:none; }
         .unit-input { display:grid; grid-template-columns:minmax(70px,1fr) auto; align-items:center; overflow:hidden; border-radius:10px; border:1px solid var(--ns-line); background:rgba(2,10,8,.35); }
         .unit-input input { border:0 !important; border-radius:0; background:transparent; box-shadow:none !important; }
-        .unit-input span { padding:0 10px; color:#91afa6; font-size:10px; white-space:nowrap; }
+        .unit-input span { padding:0 12px; color:#c5d9d2; font-size:11px; font-weight:700; white-space:nowrap; }
         .mobile-details { display:none; }
         .filter-chips { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:10px 54px 8px 12px; background:rgba(2,10,8,.25); border-bottom:1px solid var(--ns-line); }
         .filter-chips:empty { display:none; }
@@ -1669,6 +1751,22 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .settings-help-copy p { margin:0; color:#c9c1b7; font-size:13px; line-height:1.6; }
         .settings-help-copy strong { color:#f4dfbd; }
         .rule-group.basics { background:rgba(240,161,59,.045); border-color:rgba(240,161,59,.15); }
+        .rule-group.vlan-settings { background:rgba(80,215,255,.035); border-color:rgba(80,215,255,.14); }
+        .vlan-settings-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
+        .vlan-settings-head h3 { margin:0; }
+        .settings-heading-actions { display:flex; align-items:center; gap:8px; }
+        .vlan-add, .vlan-remove { display:inline-grid; place-items:center; border:1px solid rgba(80,215,255,.24); color:#bcecff; background:rgba(80,215,255,.07); cursor:pointer; }
+        .vlan-add { grid-template-columns:auto auto; gap:6px; padding:7px 10px; border-radius:9px; font:inherit; font-size:11px; font-weight:750; }
+        .vlan-add ha-icon, .vlan-remove ha-icon { --mdc-icon-size:17px; }
+        .vlan-list { display:grid; gap:9px; }
+        .vlan-row { display:grid; grid-template-columns:minmax(130px,1.2fr) 90px minmax(150px,1.25fr) minmax(130px,1fr) 58px 100px 34px; align-items:end; gap:8px; padding:10px; border:1px solid var(--ns-line); border-left:4px solid var(--vlan-color,#58b9d6); border-radius:11px; background:rgba(2,10,8,.27); }
+        .vlan-field { display:grid; gap:4px; min-width:0; color:#78998f; font-size:9px; font-weight:750; letter-spacing:.45px; text-transform:uppercase; }
+        .vlan-field input, .vlan-field select { width:100%; min-width:0; min-height:36px; box-sizing:border-box; padding:7px 8px; border:1px solid var(--ns-line); border-radius:8px; color:var(--ns-text); background:rgba(2,10,8,.4); font:inherit; font-size:12px; text-align:left; }
+        .vlan-field input[type="color"] { min-width:48px; padding:3px; cursor:pointer; }
+        .vlan-field.monitoring { justify-items:center; }
+        .vlan-field.monitoring input { width:22px; min-height:22px; accent-color:var(--ns-green); }
+        .vlan-remove { width:34px; height:34px; padding:0; border-radius:9px; color:#ffaaa0; border-color:rgba(255,107,95,.24); background:rgba(255,107,95,.06); }
+        .vlan-empty-note { margin:8px 2px 0; color:var(--ns-muted); font-size:10px; line-height:1.45; }
         .rule-group.presence-settings { background:rgba(143,255,194,.04); border-color:rgba(143,255,194,.14); }
         .rule-group.device-settings { background:rgba(80,215,255,.035); border-color:rgba(80,215,255,.13); }
         .rule-group.onboarding-settings { background:rgba(240,185,79,.055); border-color:rgba(240,185,79,.18); }
@@ -1736,7 +1834,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .save-rules.busy ha-icon { animation:spin .8s linear infinite; }
         .save-rules.saved { color:#10271d; background:#76d89d; }
         .save-rules.failed { color:#fff3f1; background:#a94242; }
-        .save-rules:disabled { cursor:wait; }
+        .save-rules:disabled { cursor:not-allowed; }
+        .save-rules.busy:disabled { cursor:wait; }
         .danger-zone { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:18px; margin-top:24px; padding:16px; border-radius:13px; background:rgba(255,107,120,.045); border:1px solid rgba(255,107,120,.18); }
         .danger-zone strong { display:block; color:#ffd5d9; font-size:13px; }
         .danger-zone p { margin:4px 0 0; color:#9d817e; font-size:11px; line-height:1.4; }
@@ -1902,11 +2001,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .column-picker-button {
           color:#f4dfbd; background:rgba(240,161,59,.08); border-color:rgba(240,161,59,.25);
         }
-        .column-picker, .adguard-modal {
+        .column-picker {
           background:#393531; border-color:rgba(240,161,59,.28);
         }
         .column-picker { box-shadow:0 24px 60px rgba(10,8,5,.45); }
-        .adguard-modal { box-shadow:0 16px 48px rgba(10,8,5,.48); }
         .security-card, .ai-copy article, .client, .connection-card {
           background:rgba(35,32,29,.30); border-color:rgba(255,246,229,.09);
         }
@@ -2019,7 +2117,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) tbody tr:hover { background:rgba(208,127,35,.08); }
         :host([data-theme="light"]) .column-picker,
         :host([data-theme="light"]) .custom-filter-menu,
-        :host([data-theme="light"]) .adguard-modal,
         :host([data-theme="light"]) .dns-policy-modal,
         :host([data-theme="light"]) .guest-modal,
         :host([data-theme="light"]) .settings-help-dialog {
@@ -2028,13 +2125,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         :host([data-theme="light"]) .dns-policy-modal-backdrop,
         :host([data-theme="light"]) .guest-modal-backdrop,
-        :host([data-theme="light"]) .adguard-modal-backdrop,
         :host([data-theme="light"]) .settings-help-backdrop { background:rgba(72,60,47,.38); }
         :host([data-theme="light"]) .security-card,
         :host([data-theme="light"]) .ai-copy article,
         :host([data-theme="light"]) .client,
         :host([data-theme="light"]) .connection-card,
-        :host([data-theme="light"]) .adguard-box,
         :host([data-theme="light"]) .guest-status-card {
           background:rgba(255,255,255,.64); border-color:rgba(91,72,48,.13);
         }
@@ -2053,15 +2148,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .internet-label.denied { color:#b42318; background:#fdecea; border-color:#efc1bc; }
         :host([data-theme="light"]) .internet-label.error { color:#8a5b08; background:#fff4d5; border-color:#ead49a; }
         :host([data-theme="light"]) .dns-chart,
-        :host([data-theme="light"]) .adguard-config,
         :host([data-theme="light"]) .ai-prompt,
         :host([data-theme="light"]) .presence-timeline { background:rgba(109,85,54,.055); }
         :host([data-theme="light"]) .ai-copy p,
         :host([data-theme="light"]) .presence-summary,
         :host([data-theme="light"]) .dns-action { color:#514a43; }
         :host([data-theme="light"]) .settings-help-button,
-        :host([data-theme="light"]) .settings-help-close,
-        :host([data-theme="light"]) .adguard-modal-close { color:#625a51; background:rgba(91,72,48,.06); }
+        :host([data-theme="light"]) .settings-help-close { color:#625a51; background:rgba(91,72,48,.06); }
         :host([data-theme="light"]) .device-list tbody tr,
         :host([data-theme="light"]) .log-table tbody tr,
         :host([data-theme="light"]) .dns-table tbody tr { --light-card-bg:rgba(255,253,249,.96); }
@@ -2127,14 +2220,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .dns-policy.allow { color:#277043; border-color:#b9dcc5; }
         :host([data-theme="light"]) .dns-policy-scope { color:#403932; background:#fff; border-color:rgba(91,72,48,.16); }
         :host([data-theme="light"]) .dns-policy-modal p,
-        :host([data-theme="light"]) .adguard-config > p,
-        :host([data-theme="light"]) .adguard-modal-head p,
         :host([data-theme="light"]) .guest-modal-head p,
         :host([data-theme="light"]) .guest-status-card span,
         :host([data-theme="light"]) .guest-client small,
         :host([data-theme="light"]) .mesh-head p,
         :host([data-theme="light"]) .mesh-legend { color:#6f675e; }
-        :host([data-theme="light"]) .adguard-item { color:#49423b; background:#f3eee7; }
         :host([data-theme="light"]) .guest-close { color:#514a43; }
         :host([data-theme="light"]) .guest-client { background:#f3f8f7; border-color:#d5e6e2; }
         :host([data-theme="light"]) .empty { color:#70685f; }
@@ -2175,6 +2265,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .ack { color:#6d460d; background:#fff8e9; border-color:#d9bd8c; }
         :host([data-theme="light"]) .rule-group { background:#fffdfa; border-color:rgba(91,72,48,.13); }
         :host([data-theme="light"]) .rule-group.basics { background:#fff9ef; border-color:#ead8bc; }
+        :host([data-theme="light"]) .rule-group.vlan-settings { background:#f5fafb; border-color:#d7e7eb; }
+        :host([data-theme="light"]) .vlan-row { background:#fff; }
+        :host([data-theme="light"]) .vlan-field input,
+        :host([data-theme="light"]) .vlan-field select { color:#39332d; background:#fff; border-color:#d7d0c7; }
         :host([data-theme="light"]) .rule-group.presence-settings { background:#f5fbf7; border-color:#d5e9db; }
         :host([data-theme="light"]) .rule-group.device-settings,
         :host([data-theme="light"]) .rule-group.notification-settings { background:#f5fafb; border-color:#d7e7eb; }
@@ -2282,10 +2376,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .header-action { color:#575048; background:#f7f4ef; border-color:#d8d1c8; }
         :host([data-theme="light"]) .header-action:hover,
         :host([data-theme="light"]) .header-action.active { color:#643b16; background:#fff7ea; border-color:#d99a4c; }
-        :host([data-theme="light"]) .settings-tabs { background:#eeeae4; border-color:#d7d0c7; }
-        :host([data-theme="light"]) .settings-tab { color:#6d665e; }
-        :host([data-theme="light"]) .settings-tab:hover { color:#342d27; background:rgba(255,255,255,.65); }
-        :host([data-theme="light"]) .settings-tab.active { color:#643b16; background:#fff7ea; border-color:#d99a4c; box-shadow:inset 0 -2px #c87825; }
+        :host([data-theme="light"]) .metric-settings,
+        :host([data-theme="light"]) .settings-back { color:#6d665e; background:rgba(255,255,255,.55); border-color:#d7d0c7; }
         :host([data-theme="light"]) ::selection { color:#fff; background:#a85b17; }
 
         @media (max-width:1100px) {
@@ -2309,6 +2401,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .watch-layout { grid-template-columns:1fr; } .security-metrics { grid-template-columns:1fr 1fr; }
           .presence-row { grid-template-columns:1fr; gap:7px; }
           .settings-tab-panel, .settings-tab-panel.ai-maintenance-panel { grid-template-columns:1fr; }
+          .dns-live-stats .adguard-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+          .vlan-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+          .vlan-field.name, .vlan-field.network { grid-column:span 2; }
           .rule-group.ai-config-settings .rule { grid-template-columns:1fr; }
           .rule-group.ai-config-settings .settings-select { width:100%; }
           .ai-settings .rule-list { grid-template-columns:1fr; }
@@ -2317,11 +2412,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .ai-view { grid-template-columns:1fr; } .ai-head { flex-direction:column; } .ai-report { grid-template-columns:1fr; } .ai-copy { grid-template-columns:1fr; } .ai-copy article.summary { grid-column:auto; }
           .log-panel, .dns-panel { padding:16px; } .log-title, .dns-head { align-items:flex-start; }
           .dns-head { flex-direction:column; } .dns-toolbar { grid-template-columns:1fr; }
-          .adguard-config-grid { grid-template-columns:1fr; }
-          .adguard-form.rewrite { grid-template-columns:1fr; }
-          .adguard-form button { min-height:48px; }
-          .adguard-modal-backdrop { padding:12px; }
-          .adguard-modal { max-height:calc(100dvh - 24px); padding:19px; border-radius:17px; }
         }
         @media (max-width:620px) {
           .shell { padding:14px 10px 34px; }
@@ -2444,6 +2534,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .rule-group.ai-config-settings .rule,
           .settings-view .rule { grid-template-columns:1fr; }
           .rule-group.onboarding-settings input[type="text"] { width:100%; }
+          .vlan-row { grid-template-columns:1fr 1fr; }
           .settings-view .rule input[type="checkbox"] { justify-self:end; }
           .settings-help-backdrop { padding:8px; }
           .settings-help-dialog { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); padding:18px; }
@@ -2462,7 +2553,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           </div>
           <div class="header-actions">
             <button class="header-action connection-status" type="button" title="Verbindungsdetails anzeigen"><ha-icon icon="mdi:lan-connect"></ha-icon><span>Verbindungen werden geladen</span><ha-icon icon="mdi:chevron-down"></ha-icon></button>
-            <button class="header-action header-settings" type="button" title="Einstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon><span>Einstellungen</span></button>
+            <button class="header-action header-settings" type="button" title="Allgemeine Einstellungen öffnen" aria-label="Allgemeine Einstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button>
             <button class="scan"><ha-icon icon="mdi:radar"></ha-icon><span>Jetzt scannen</span></button>
           </div>
         </header>
@@ -2508,13 +2599,27 @@ class EngelsoftNodarionPanel extends HTMLElement {
       window.setTimeout(() => button.classList.remove("busy"), 900);
     });
     this.shadowRoot.querySelector(".header-settings").addEventListener("click", () =>
-      this._navigateTo("settings")
+      this._openSettings("general")
     );
     this.shadowRoot.querySelector(".connection-status").addEventListener("click", () => {
       this._connectionsExpanded = !this._connectionsExpanded;
       this._renderConnections();
     });
     this.shadowRoot.querySelector(".metrics").addEventListener("click", (event) => {
+      const settingsLink = event.target.closest(".metric-settings");
+      if (settingsLink) {
+        this._openSettings(settingsLink.dataset.settingsSection, settingsLink.dataset.returnTab);
+        return;
+      }
+      const entityIdLink = event.target.closest(".metric-entity-link");
+      if (entityIdLink) {
+        this.dispatchEvent(new CustomEvent("hass-more-info", {
+          bubbles: true,
+          composed: true,
+          detail: { entityId: entityIdLink.dataset.entityId },
+        }));
+        return;
+      }
       if (event.target.closest(".guest-inline")) {
         this._guestModalOpen = true;
         this._renderGuest();
@@ -2744,13 +2849,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
     });
     const dnsContent = this.shadowRoot.querySelector(".dns-live-content");
     dnsContent.addEventListener("focusin", (event) => {
-      if (event.target.closest(".dns-toolbar, .adguard-modal")) this._dnsControlsActive = true;
+      if (event.target.closest(".dns-toolbar")) this._dnsControlsActive = true;
     });
     dnsContent.addEventListener("focusout", () => {
       window.setTimeout(() => {
         const active = this.shadowRoot.activeElement;
         this._dnsControlsActive = Boolean(
-          active?.closest?.(".dns-toolbar, .adguard-modal")
+          active?.closest?.(".dns-toolbar")
         );
         if (!this._dnsControlsActive) this._renderDnsLive();
       }, 0);
@@ -2774,26 +2879,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._dnsLiveFilters[input.dataset.dnsFilter] = input.value;
       this._renderDnsLive();
     });
-    dnsContent.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && this._adguardConfigOpen) {
-        this._adguardConfigOpen = false;
-        this._dnsLivePaused = this._dnsPausedBeforeConfig;
-        this._dnsControlsActive = false;
-        this._dnsRenderedSignature = "";
-        this._renderDnsLive();
-        if (!this._dnsLivePaused) this._loadDnsLive();
+    dnsContent.addEventListener("click", (event) => {
+      const entityLink = event.target.closest(".metric-entity-link");
+      if (entityLink) {
+        this.dispatchEvent(new CustomEvent("hass-more-info", {
+          bubbles:true,
+          composed:true,
+          detail:{ entityId:entityLink.dataset.entityId },
+        }));
         return;
       }
-      if (event.key !== "Enter") return;
-      if (event.target.closest(".adguard-form.rewrite")) {
-        event.preventDefault();
-        dnsContent.querySelector(".adguard-add-rewrite")?.click();
-      } else if (event.target.closest(".adguard-form")) {
-        event.preventDefault();
-        dnsContent.querySelector(".adguard-add-rule")?.click();
-      }
-    });
-    dnsContent.addEventListener("click", (event) => {
       const hostLink = event.target.closest(".dns-host-link");
       if (hostLink) {
         this._openDnsLive(hostLink.dataset.client, hostLink.dataset.name);
@@ -2805,35 +2900,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
         this._renderDnsLive();
         return;
       }
-      const configButton = event.target.closest(".adguard-config-open");
-      if (configButton) {
-        this._dnsPausedBeforeConfig = this._dnsLivePaused;
-        this._adguardConfigOpen = true;
-        this._dnsLivePaused = true;
-        this._dnsControlsActive = true;
-        this._dnsRenderedSignature = "";
-        this._renderDnsLive();
-        return;
-      }
       if (event.target.closest(".dns-chart-toggle")) {
         this._dnsChartVisible = !this._dnsChartVisible;
         this._dnsRenderedSignature = "";
         this._renderDnsLive();
-        return;
-      }
-      if (
-        event.target.closest(".adguard-modal-close")
-        || (
-          event.target.classList.contains("adguard-modal-backdrop")
-          && !event.target.closest(".adguard-modal")
-        )
-      ) {
-        this._adguardConfigOpen = false;
-        this._dnsLivePaused = this._dnsPausedBeforeConfig;
-        this._dnsControlsActive = false;
-        this._dnsRenderedSignature = "";
-        this._renderDnsLive();
-        if (!this._dnsLivePaused) this._loadDnsLive();
         return;
       }
       const policy = event.target.closest(".dns-policy");
@@ -2879,43 +2949,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
         this._dnsPolicyPrompt = null;
         this._dnsRenderedSignature = "";
         this._renderDnsLive();
-        return;
-      }
-      const deleteRule = event.target.closest(".adguard-delete-rule");
-      if (deleteRule) {
-        this._adguardAction(
-          { action: "adguard_delete_rule", rule: deleteRule.dataset.rule },
-          `Eigene Filterregel wirklich löschen?\n\n${deleteRule.dataset.rule}`
-        );
-        return;
-      }
-      const deleteRewrite = event.target.closest(".adguard-delete-rewrite");
-      if (deleteRewrite) {
-        this._adguardAction(
-          {
-            action: "adguard_delete_rewrite",
-            domain: deleteRewrite.dataset.domain,
-            answer: deleteRewrite.dataset.answer,
-          },
-          `DNS-Rewrite „${deleteRewrite.dataset.domain} → ${deleteRewrite.dataset.answer}“ wirklich löschen?`
-        );
-        return;
-      }
-      const addRule = event.target.closest(".adguard-add-rule");
-      if (addRule) {
-        const input = dnsContent.querySelector(".adguard-rule-input");
-        if (input?.value.trim()) {
-          this._adguardAction({ action: "adguard_add_rule", rule: input.value.trim() });
-        }
-        return;
-      }
-      const addRewrite = event.target.closest(".adguard-add-rewrite");
-      if (addRewrite) {
-        const domain = dnsContent.querySelector(".adguard-rewrite-domain")?.value.trim();
-        const answer = dnsContent.querySelector(".adguard-rewrite-answer")?.value.trim();
-        if (domain && answer) {
-          this._adguardAction({ action: "adguard_add_rewrite", domain, answer });
-        }
         return;
       }
       if (event.target.closest(".dns-client-clear")) {
@@ -3054,29 +3087,37 @@ class EngelsoftNodarionPanel extends HTMLElement {
     });
     const settingsView = this.shadowRoot.querySelector(".settings-view");
     settingsView.addEventListener("click", (event) => {
-      const tabButton = event.target.closest("[data-settings-tab]");
-      if (tabButton) {
-        this._settingsTab = tabButton.dataset.settingsTab;
-        this._saveSettingsTab();
-        settingsView.querySelectorAll("[data-settings-tab]").forEach((button) => {
-          const active = button.dataset.settingsTab === this._settingsTab;
-          button.classList.toggle("active", active);
-          button.setAttribute("aria-selected", String(active));
-        });
-        settingsView.querySelectorAll("[data-settings-panel]").forEach((panel) => {
-          panel.hidden = panel.dataset.settingsPanel !== this._settingsTab;
-        });
+      if (event.target.closest(".settings-back")) {
+        this._navigateTo(this._settingsReturnTab || "participants");
+        return;
+      }
+      const adguardSwitch = event.target.closest("[data-adguard-switch]");
+      if (adguardSwitch) {
+        this._toggleAdguardSwitch(adguardSwitch);
+        return;
+      }
+      const adguardEntity = event.target.closest(".adguard-stat[data-entity-id]");
+      if (adguardEntity) {
+        this.dispatchEvent(new CustomEvent("hass-more-info", {
+          bubbles: true, composed: true,
+          detail: { entityId: adguardEntity.dataset.entityId },
+        }));
         return;
       }
       const helpButton = event.target.closest("[data-settings-help]");
       if (helpButton) {
         const help = {
           basics:["Grundlagen", "Mit Überwachung aktiv werden sämtliche Warn- und Prüfregeln gemeinsam geschaltet. Die Erkennung und Anzeige der Teilnehmer läuft unabhängig davon weiter.", "Die Lernphase behandelt bereits vorhandene Teilnehmer vorübergehend als bekannt. Neue Warnungen greifen nach Ablauf der eingestellten Tage."],
+          vlans:["VLANs und Netzwerksegmente", "Jeder Eintrag ordnet ein IPv4-Subnetz einem Namen, einer VLAN-ID und einer Farbe zu. Die VLAN-Farbe erscheint am rechten Rand der Gerätetabelle; interne Kennzeichnungen wie Gastnetz oder Einrichtungsbereich bleiben links.", "Vertrauenswürdig steht für normale interne Geräte. Eingeschränkt ist für IoT- oder begrenzte Netze gedacht. Gast nimmt Teilnehmer von der regulären Internet-Freigabeprüfung aus. Isoliert stuft einen Wechsel in dieses Segment als kritisch ein. Infrastruktur schützt Router, Switches und Access Points vor der normalen Gerätesperre.", "Überwachung aktiviert den Ping-/TCP-Scanner und VLAN-Wechselwarnungen für dieses Subnetz. Deaktivierte Segmente bleiben zugeordnet und sichtbar, werden aber nicht aktiv durch den Segmentscanner geprüft. Subnetze dürfen sich nicht überschneiden."],
           presence:["Anwesenheit", "Haus-markierte Geräte melden sich sofort als anwesend. Erst wenn ein Gerät länger als das Anwesenheits-Timeout nicht erreichbar ist, gilt es als abwesend.", "Der optionale Home-Assistant-Binary-Sensor ist aktiv, sobald mindestens eines dieser Geräte zuhause ist. Er eignet sich beispielsweise für Licht-, Heizungs- oder Alarm-Automationen."],
           devices:["Geräteüberwachung", "Neue Geräte werden erst nach der Bestätigungszeit gemeldet. Kurze oder fehlerhafte Erkennungen lösen dadurch nicht sofort eine Warnung aus.", "Für Geräte mit Stern gilt die Offline-Frist. Nach deren Ablauf erscheint eine Warnung, sofern das Gerät weiterhin nicht erreichbar ist."],
           onboarding:["Neue Geräte", "Der Bereich für neue Geräte kennzeichnet Teilnehmer im angegebenen DHCP-Adressbereich als neu. Adressen außerhalb dieses Bereichs erscheinen als regulärer Bereich.", "Bei automatischer Übernahme liest Nodarion Start und Ende direkt aus der FRITZ!Box. Optional können neue Geräte sofort überwacht oder zusätzlich in Home Assistant gemeldet werden."],
+          guest:["Gastzugang", "Ist die Gastnetzüberwachung aktiv, übernimmt Nodarion Teilnehmer aus dem FRITZ!Box-Gastzugang, zeigt sie in der Tabelle an und protokolliert ihre Aktivität. Gastgeräte sind von der normalen Internet-Freigabeprüfung ausgenommen.", "Neue Gäste können beim ersten Verbinden gemeldet werden. Die Ruhezeitprüfung hebt Gastaktivität im festgelegten Zeitraum hervor; die maximale Gastdauer erzeugt nach Ablauf der gewählten Stunden eine Warnung."],
           quiet:["Ruhezeiten", "Während der Ruhezeit kann das Aktivwerden eines Geräts als Auffälligkeit gemeldet werden. Zeiträume über Mitternacht, beispielsweise 23:00 bis 06:00 Uhr, werden automatisch korrekt behandelt.", "Ist die Prüfung deaktiviert, beeinflusst die Ruhezeit weder Erkennung noch Anwesenheitssteuerung."],
-          notifications:["Benachrichtigungen und Prüfungen", "Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln gewarnt wird.", "Die HA-Glocke zeigt Meldungen direkt in Home Assistant. Ausgewählte Benachrichtigungsziele senden Warnungen zusätzlich etwa an die Companion App oder einen eingerichteten Telegram Bot.", "Unabhängig von diesen Schaltern erzeugt jede neue Warnung das Home-Assistant-Ereignis nodarion_alert. Damit lassen sich eigene Automationen und weitere Eskalationswege bauen."],
+          checks:["Weitere Prüfungen", "Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln eine Warnung wegen instabiler Verbindung entsteht.", "Die Identitätsprüfung meldet, wenn an derselben IP-Adresse eine andere MAC-Adresse erscheint. Ein Wechsel wird erst nach wiederholter Bestätigung übernommen, damit einzelne fehlerhafte Scans keinen Alarm auslösen."],
+          notifications:["Benachrichtigungen", "Die HA-Glocke zeigt neue Auffälligkeiten als dauerhafte Meldung direkt in Home Assistant. Warnungen und kritische Meldungen können unabhängig voneinander an die ausgewählten Ziele gesendet werden.", "Unabhängig von diesen Schaltern erzeugt jede neue Warnung das Home-Assistant-Ereignis nodarion_alert. Damit lassen sich eigene Automationen und weitere Eskalationswege bauen."],
+          targets:["Benachrichtigungsziele", "Hier legst du fest, welche in Home Assistant eingerichteten Notify-Dienste Nodarion verwenden darf, beispielsweise die Companion App oder einen Telegram Bot.", "Alle und Keine ändern nur die aktuelle Auswahl. Wirksam wird sie zusammen mit den übrigen Änderungen erst nach dem Speichern. Ohne ausgewähltes Ziel bleiben HA-Glocke und nodarion_alert weiterhin verfügbar."],
+          adguard:["Schutzfunktionen", "Gesamtschutz ist der Hauptschalter von AdGuard Home. DNS-Filterung wendet Blocklisten und eigene Regeln an; Safe Browsing blockiert bekannte Phishing- und Malware-Ziele; Jugendschutz sperrt nicht jugendfreie Inhalte; Safe Search erzwingt den sicheren Modus unterstützter Suchmaschinen.", "Das Query-Log wird für DNS-Live, Gerätezuordnung und KI-Auswertungen benötigt. Wird es ausgeschaltet, arbeitet der DNS-Schutz weiter, Nodarion erhält jedoch keine aktuellen DNS-Anfragen mehr."],
           ai:["KI-Analyse", "Die tägliche Auswertung fasst Netzwerkzustand, Änderungen und Auffälligkeiten nach dem gewählten Zeitpunkt zusammen. Eine manuelle Analyse bleibt im KI-Reiter jederzeit möglich.", "Mit anonymisiertem DNS-Datenschutz werden keine lesbaren Domainnamen an die KI übergeben. Domainnamen mitsenden ermöglicht detailliertere Bewertungen, gibt aber entsprechend mehr Informationen weiter."],
           cleanup:["Bereinigung", "Anzeige bereinigen entfernt alte Offline-Einträge, behält aber gespeicherte Gerätefreigaben. Vollständig vergessen entfernt zusätzlich Überwachungs- und Anwesenheitsmarkierungen.", "Vor beiden Aktionen zeigt Nodarion die Anzahl betroffener und geschützter Teilnehmer an und fragt nochmals nach."],
         }[helpButton.dataset.settingsHelp];
@@ -3137,6 +3178,40 @@ class EngelsoftNodarionPanel extends HTMLElement {
         this._renderSettings();
         return;
       }
+      const addVlan = event.target.closest(".vlan-add");
+      if (addVlan) {
+        this._captureSettingsDraft(settingsView);
+        const segments = [...(this._settingsDraft.network_segments || [])];
+        const usedIds = new Set(segments.map((segment) => Number(segment.vlan_id)));
+        let vlanId = 1;
+        while (usedIds.has(vlanId) && vlanId < 4094) vlanId += 1;
+        segments.push({
+          id:`vlan-${Date.now()}`,
+          name:`VLAN ${vlanId}`,
+          vlan_id:vlanId,
+          network:`192.168.${Math.min(vlanId, 254)}.0/24`,
+          role:"restricted",
+          color:"#58b9d6",
+          monitoring:true,
+        });
+        this._settingsDraft.network_segments = segments;
+        this._dirtyRules.add("network_segments");
+        this._renderWatch();
+        this._renderSettings();
+        return;
+      }
+      const removeVlan = event.target.closest(".vlan-remove");
+      if (removeVlan) {
+        this._captureSettingsDraft(settingsView);
+        const segments = [...(this._settingsDraft.network_segments || [])];
+        if (segments.length <= 1) return;
+        segments.splice(Number(removeVlan.dataset.segmentIndex), 1);
+        this._settingsDraft.network_segments = segments;
+        this._dirtyRules.add("network_segments");
+        this._renderWatch();
+        this._renderSettings();
+        return;
+      }
       const cleanup = event.target.closest(".cleanup");
       if (cleanup) {
         this._cleanupOffline(cleanup, cleanup.dataset.forget !== "false");
@@ -3144,17 +3219,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
       }
       const watchSave = event.target.closest(".save-watch-rules");
       if (watchSave) {
-        const rules = {};
-        settingsView.querySelectorAll(
-          ".watch-settings-panel [data-rule]"
-        ).forEach((input) => {
-          rules[input.dataset.rule] = input.type === "checkbox"
-            ? input.checked
-            : input.type === "number" ? Number(input.value) : input.value;
-        });
-        rules.notify_targets = [...settingsView.querySelectorAll(
-          ".watch-settings-panel [data-notify-target]:checked"
-        )].map((input) => input.dataset.notifyTarget);
+        this._captureSettingsDraft(settingsView);
+        const rules = { ...this._settingsDraft };
         this._saveRuleSettings(watchSave, rules, "watch");
         return;
       }
@@ -3170,6 +3236,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
       }
       const rule = event.target?.dataset?.rule;
       if (rule) this._dirtyRules.add(rule);
+      if (event.target?.dataset?.segmentField) {
+        this._dirtyRules.add("network_segments");
+        const row = event.target.closest("[data-vlan-row]");
+        if (event.target.dataset.segmentField === "color" && row) {
+          row.style.setProperty("--vlan-color", event.target.value);
+        }
+      }
       if (["onboarding_enabled", "guest_monitoring_enabled", "quiet_hours_enabled", "ai_analysis_enabled"].includes(rule)) {
         settingsView.querySelectorAll(`[data-depends-on="${rule}"]`).forEach((group) => {
           group.hidden = !event.target.checked;
@@ -3180,7 +3253,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           group.hidden = event.target.checked;
         });
       }
-      if (rule || event.target?.matches?.("[data-notify-target]")) {
+      if (rule || event.target?.dataset?.segmentField || event.target?.matches?.("[data-notify-target]")) {
         this._captureSettingsDraft(settingsView);
         this._updateSettingsDirtyUi(settingsView);
       }
@@ -3188,6 +3261,15 @@ class EngelsoftNodarionPanel extends HTMLElement {
     settingsView.addEventListener("input", (event) => {
       if (event.target?.dataset?.rule) {
         this._dirtyRules.add(event.target.dataset.rule);
+        this._captureSettingsDraft(settingsView);
+        this._updateSettingsDirtyUi(settingsView);
+      }
+      if (event.target?.dataset?.segmentField) {
+        this._dirtyRules.add("network_segments");
+        const row = event.target.closest("[data-vlan-row]");
+        if (event.target.dataset.segmentField === "color" && row) {
+          row.style.setProperty("--vlan-color", event.target.value);
+        }
         this._captureSettingsDraft(settingsView);
         this._updateSettingsDirtyUi(settingsView);
       }
@@ -3200,17 +3282,14 @@ class EngelsoftNodarionPanel extends HTMLElement {
         target.hidden = Boolean(query && !searchable.includes(query));
       });
     });
-    settingsView.addEventListener("keydown", (event) => {
-      const tab = event.target.closest?.("[data-settings-tab]");
-      if (!tab || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-      const tabs = [...settingsView.querySelectorAll("[data-settings-tab]")];
-      const index = tabs.indexOf(tab);
-      const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
-        : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
-      event.preventDefault();
-      tabs[next]?.focus();
-      tabs[next]?.click();
-    });
+    settingsView.addEventListener("toggle", (event) => {
+      const details = event.target.closest?.("details.advanced-settings");
+      if (!details) return;
+      const key = details.querySelector(":scope > summary")?.textContent?.trim();
+      if (!key) return;
+      if (details.open) this._openSettingsDetails.add(key);
+      else this._openSettingsDetails.delete(key);
+    }, true);
   }
 
   _render() {
@@ -3292,7 +3371,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     ].filter(Boolean).join(" · ");
     const latest = entities.reduce((date, entity) => entity.last_updated > date ? entity.last_updated : date, "");
     const age = latest ? new Intl.DateTimeFormat(activeLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(latest)) : "–";
-    const connections = entities[0]?.attributes.connection_status || {};
+    const connections = this._monitor.connection_status || {};
     const configuredConnections = Object.values(connections).filter(
       (connection) => connection.configured
     );
@@ -3311,6 +3390,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const dnsStatus = !adguardConnection.configured
       ? "Nicht eingerichtet"
       : adguardConnection.available ? "Schutz aktiv" : "Nicht erreichbar";
+    const dnsRatioEntity = this._hass.states["sensor.nodarion_dns_blockquote"];
+    const dnsRatio = dnsRatioEntity && !["unknown", "unavailable"].includes(dnsRatioEntity.state)
+      ? `${Number(dnsRatioEntity.state).toLocaleString(activeLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} % blockiert`
+      : "Blockquote nicht verfügbar";
     const latestAiReport = this._monitor.ai_analysis?.reports?.[0];
     const aiScore = latestAiReport ? `${Number(latestAiReport.score)}/10` : "–";
     const aiNote = latestAiReport?.summary || (
@@ -3321,7 +3404,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const metrics = this.shadowRoot.querySelector(".metrics");
     metrics.innerHTML = `
       <article class="metric nav-metric devices ${this._activeTab === "participants" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="participants" aria-current="${this._activeTab === "participants" ? "page" : "false"}">
-        <div class="metric-label">Netzwerkgeräte</div>
+        <div class="metric-label-row"><div class="metric-label">Netzwerkgeräte</div><button class="metric-settings" type="button" data-settings-section="devices" data-return-tab="participants" title="Geräteeinstellungen öffnen" aria-label="Geräteeinstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="device-counts">
           <button class="device-count online ${this._columnFilters.state === "on" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="on" title="Nur Online-Geräte anzeigen"><strong>${online}</strong><span>Online</span></button>
           <button class="device-count offline ${this._columnFilters.state === "off" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="off" title="Nur Offline-Geräte anzeigen"><strong>${entities.length - online}</strong><span>Offline</span></button>
@@ -3329,23 +3412,23 @@ class EngelsoftNodarionPanel extends HTMLElement {
         </div>
         ${guestMonitoring ? `<button class="guest-inline" type="button" title="Gastzugang anzeigen"><ha-icon icon="mdi:wifi-star"></ha-icon>${guestClients} ${guestClients === 1 ? "Gast" : "Gäste"} · ${guestInfo.enabled ? "aktiv" : "deaktiviert"}</button>` : ""}
       </article>
-      <button class="metric nav-metric events-metric ${this._activeTab === "log" ? "active" : ""}" type="button" data-nav-tab="log" aria-current="${this._activeTab === "log" ? "page" : "false"}">
-        <div class="metric-label">Ereignisse</div>
+      <article class="metric nav-metric events-metric ${this._activeTab === "log" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="log" aria-current="${this._activeTab === "log" ? "page" : "false"}">
+        <div class="metric-label-row"><div class="metric-label">Ereignisse</div><button class="metric-settings" type="button" data-settings-section="notifications" data-return-tab="log" title="Benachrichtigungen öffnen" aria-label="Benachrichtigungseinstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="metric-status-value"><ha-icon icon="mdi:text-box-search-outline"></ha-icon>${eventCount}</div>
         <span class="metric-note">${alertCount ? `${alertCount} offene ${alertCount === 1 ? "Warnung" : "Warnungen"}` : "Keine offenen Warnungen"}</span>
-      </button>
-      <button class="metric nav-metric dns-metric ${this._activeTab === "dns" ? "active" : ""}" type="button" data-nav-tab="dns" aria-current="${this._activeTab === "dns" ? "page" : "false"}">
-        <div class="metric-label">DNS-Schutz</div>
+      </article>
+      <article class="metric nav-metric dns-metric ${this._activeTab === "dns" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="dns" aria-current="${this._activeTab === "dns" ? "page" : "false"}">
+        <div class="metric-label-row"><div class="metric-label">DNS-Schutz</div><button class="metric-settings" type="button" data-settings-section="dns" data-return-tab="dns" title="DNS-Einstellungen öffnen" aria-label="DNS-Einstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="metric-status-value"><ha-icon icon="mdi:shield-check-outline"></ha-icon>${esc(dnsStatus)}</div>
-        <span class="metric-note">AdGuard DNS-Live</span>
-      </button>
-      <button class="metric nav-metric ai-metric ${this._activeTab === "ai" ? "active" : ""}" type="button" data-nav-tab="ai" aria-current="${this._activeTab === "ai" ? "page" : "false"}" title="${esc(aiNote)}">
-        <div class="metric-label">Netzbewertung</div>
+        <button class="metric-note metric-entity-link" type="button" data-entity-id="sensor.nodarion_dns_blockquote" title="Home-Assistant-Dialog öffnen">${esc(dnsRatio)}</button>
+      </article>
+      <article class="metric nav-metric ai-metric ${this._activeTab === "ai" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="ai" aria-current="${this._activeTab === "ai" ? "page" : "false"}" title="${esc(aiNote)}">
+        <div class="metric-label-row"><div class="metric-label">Netzbewertung</div><button class="metric-settings" type="button" data-settings-section="ai-maintenance" data-return-tab="ai" title="KI-Einstellungen öffnen" aria-label="KI-Einstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="metric-value">${esc(aiScore)}</div>
         <span class="metric-note">${esc(aiNote)}</span>
-      </button>
+      </article>
       <article class="metric nav-metric watch-metric ${this._activeTab === "watch" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="watch" aria-current="${this._activeTab === "watch" ? "page" : "false"}">
-        <div class="metric-label">Überwachung ${alertCount ? `<span class="metric-alert-badge">${alertCount}</span>` : ""}</div>
+        <div class="metric-label-row"><div class="metric-label">Überwachung ${alertCount ? `<span class="metric-alert-badge">${alertCount}</span>` : ""}</div><button class="metric-settings" type="button" data-settings-section="rules" data-return-tab="watch" title="Überwachungsregeln öffnen" aria-label="Überwachungseinstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="function-counts">
           <button class="function-count favorite ${this._columnFilters.watch === "monitored" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="monitored" title="Favoriten: ${important} gesamt, ${importantOnline} online"><strong><ha-icon icon="mdi:star-outline"></ha-icon>${important}/${importantOnline}</strong><span>Favoriten</span></button>
           <button class="function-count notify ${this._columnFilters.watch === "notify" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="notify" title="Glocke: ${notifications} gesamt, ${notificationsOnline} online"><strong><ha-icon icon="mdi:bell-outline"></ha-icon>${notifications}/${notificationsOnline}</strong><span>Glocke</span></button>
@@ -3360,6 +3443,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._renderAi();
     this._renderWatch();
     this._renderSettings();
+    this.shadowRoot.querySelectorAll(".settings-view details.advanced-settings").forEach((details) => {
+      const key = details.querySelector(":scope > summary")?.textContent?.trim();
+      if (key && this._openSettingsDetails.has(key)) details.open = true;
+    });
     if (focusState) {
       const selector = focusState.type === "participant-input"
         ? `[data-column-filter="${focusState.key}"]`
@@ -3527,8 +3614,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     panel.toggleAttribute("hidden", !this._connectionsExpanded);
     if (!this._connectionsExpanded) return;
 
-    const connections =
-      this._entities()[0]?.attributes.connection_status || {};
+    const connections = this._monitor.connection_status || {};
     const router = this._entities().find((entity) =>
       entity.attributes.fritzbox_model || entity.attributes.fritzos_version
     )?.attributes;
@@ -3672,6 +3758,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         && internetPresentation(entity).cssClass !== filters.internet
       ) return false;
       if (filters.connection && connectionValue(entity) !== filters.connection) return false;
+      if (filters.vlan && (attr.segment_id || "unassigned") !== filters.vlan) return false;
       if (filters.address && addressValue(entity) !== filters.address) return false;
       if (filters.source && !sourceValues(entity).includes(filters.source)) return false;
       return (
@@ -3700,6 +3787,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         return text(onboardingStatus(attr.ip_address, this._monitor.rules));
       }
       if (this._sort === "mac") return text(attr.mac_address);
+      if (this._sort === "vlan") return Number(attr.vlan_id ?? 9999);
       if (this._sort === "connection") return text(`${attr.connection_type || ""} ${attr.wifi_band || ""} ${attr.access_point || ""}`);
       if (this._sort === "mesh") return text(attr.access_point);
       if (this._sort === "rate") return Number(attr.link_rate_mbps ?? attr.link_rate_rx_mbps ?? -1);
@@ -3834,9 +3922,18 @@ class EngelsoftNodarionPanel extends HTMLElement {
         ? `${attr.dns_blocked || 0} blockiert · ${attr.dns_blocked_ratio || 0} %`
         : "";
       const dnsAssessment = hasAdGuard ? dnsRating(attr.dns_blocked_ratio) : null;
-      return `<tr class="${online ? "on" : "off"} ${!online && monitored ? "important-offline" : ""} ${lifecycle === "onboarding" ? "onboarding-row" : ""} ${attr.guest_network ? "guest-row" : ""}" ${lifecycle === "onboarding" ? 'title="Gerät im DHCP-Einrichtungsbereich"' : ""}>
+      const segmentColor = /^#[0-9a-f]{6}$/i.test(String(attr.segment_color || "")) ? attr.segment_color : "#58b9d6";
+      const segmentLabel = attr.segment_name
+        ? `${attr.segment_name}${attr.vlan_id ? ` · VLAN ${attr.vlan_id}` : ""}`
+        : "Nicht zugeordnet";
+      const rowTitle = [
+        attr.guest_network ? "Gerät im Gastnetz" : "",
+        lifecycle === "onboarding" ? "Gerät im DHCP-Einrichtungsbereich" : "",
+      ].filter(Boolean).join(" · ");
+      return `<tr class="${online ? "on" : "off"} ${!online && monitored ? "important-offline" : ""} ${lifecycle === "onboarding" ? "onboarding-row" : ""} ${attr.guest_network ? "guest-row" : ""} ${attr.segment_id ? "vlan-device-row" : ""}" style="--vlan-color:${esc(segmentColor)}" ${rowTitle ? `title="${esc(rowTitle)}"` : ""}>
         <td data-column="state" data-label="Status"><div class="status-cell"><div class="status"><i class="dot"></i>${online ? "Online" : "Offline"}</div><span class="status-time">${esc(formatStateChanged(stateChanged))}</span></div></td>
         <td data-column="onboarding" data-label="IP-Bereich"><span class="onboarding-state ${lifecycle}">${esc(lifecycleLabel)}</span></td>
+        <td data-column="vlan" data-label="VLAN"><div class="detail-stack"><strong>${esc(segmentLabel)}</strong><small>${esc(({trusted:"Vertrauenswürdig",restricted:"Eingeschränkt",guest:"Gast",isolated:"Isoliert",infrastructure:"Infrastruktur"})[attr.segment_role] || attr.segment_role || "Keine Rolle")}${attr.segment_monitoring === false ? " · nicht überwacht" : ""}</small></div></td>
         <td data-column="name" data-label="Teilnehmer"><div class="device-cell">
           <span class="device-icon ${specialDeviceClass}" title="${esc(deviceIconTitle(entity))}"><ha-icon icon="${deviceIcon(entity)}"></ha-icon></span>
           <div class="device-label"><button class="entity-link" data-key="${esc(key)}" data-name="${esc(name)}" title="Live-Log dieses Geräts anzeigen">${esc(name)}</button>
@@ -3864,6 +3961,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }).join("");
     const columns = [
       ["state", "Status"], ["onboarding", "IP-Bereich"],
+      ["vlan", "VLAN"],
       ["name", "Teilnehmer"], ["ip", "IP-Adresse"],
       ["mac", "MAC-Adresse"], ["connection", "Verbindung"], ["mesh", "Mesh-Zugangspunkt"],
       ["rate", "WLAN-Daten"], ["address", "Adressvergabe"], ["dns", "AdGuard DNS"],
@@ -3897,6 +3995,27 @@ class EngelsoftNodarionPanel extends HTMLElement {
       { value:"assigned", label:"Regulärer Bereich", icon:"mdi:check-decagram-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "assigned") },
       { value:"unknown", label:"Einrichtung deaktiviert", icon:"mdi:minus-circle-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "unknown") },
     ]);
+    const segmentCounts = new Map();
+    allEntities.forEach((entity) => {
+      const id = entity.attributes.segment_id || "unassigned";
+      const current = segmentCounts.get(id) || {
+        id,
+        name:entity.attributes.segment_name || "Nicht zugeordnet",
+        vlanId:entity.attributes.vlan_id,
+        count:0,
+      };
+      current.count += 1;
+      segmentCounts.set(id, current);
+    });
+    const vlanFilter = customFilter("vlan", [
+      { value:"", label:"Alle VLANs", icon:"mdi:lan", count:allEntities.length },
+      ...[...segmentCounts.values()].sort((a, b) => Number(a.vlanId || 9999) - Number(b.vlanId || 9999)).map((segment) => ({
+        value:segment.id,
+        label:segment.vlanId ? `${segment.name} · VLAN ${segment.vlanId}` : segment.name,
+        icon:"mdi:lan-connect",
+        count:segment.count,
+      })),
+    ], "190px");
     const watchFilter = customFilter("watch", [
       { value:"", label:"Alle Funktionen", icon:"mdi:tune-variant", count:allEntities.length },
       { value:"monitored", label:"Überwacht", icon:"mdi:star-outline", count:countWhere((entity) => this._monitor.monitored.includes(entity.attributes.nodarion_key)) },
@@ -3952,17 +4071,18 @@ class EngelsoftNodarionPanel extends HTMLElement {
       .map(([name, count]) => `<button type="button" class="custom-filter-option ${this._columnFilters.mesh === name ? "active" : ""}" data-column-filter-key="mesh" data-column-filter-value="${esc(name)}"><ha-icon icon="${this._columnFilters.mesh === name ? "mdi:check" : "mdi:access-point"}"></ha-icon><span>${esc(name)}</span><span class="custom-filter-count">${count}</span></button>`)
       .join("");
     const selectedMesh = this._columnFilters.mesh || "Alle Mesh-Punkte";
-    const filterNames = { state:"Status", onboarding:"IP-Bereich", name:"Teilnehmer", ip:"IP-Adresse", mac:"MAC-Adresse", connection:"Verbindung", mesh:"Mesh", rate:"WLAN", address:"Adressvergabe", dns:"AdGuard DNS", source:"Erkannt durch", internet:"Internetzugang", watch:"Überwachung" };
-    const filterValueNames = { on:"Online", off:"Offline", guest:"Gastzugang", onboarding:"Einrichtungsbereich", assigned:"Regulärer Bereich", unknown:"Einrichtung deaktiviert", monitored:"Überwacht", notify:"Offline-Meldung", presence:"Anwesenheit", none:"Keine Funktion", denied:"Gesperrt", pending:"Freigabe ausstehend", error:"Freigabe fehlgeschlagen", unchecked:"Noch nicht geprüft", unmanaged:"Nicht verwaltet", infrastructure:"Netzwerkinfrastruktur", learning:"Lernphase", trusted:"Vertrauenswürdig", allowed:"Freigegeben", ...sourceLabels };
+    const filterNames = { state:"Status", onboarding:"IP-Bereich", vlan:"VLAN", name:"Teilnehmer", ip:"IP-Adresse", mac:"MAC-Adresse", connection:"Verbindung", mesh:"Mesh", rate:"WLAN", address:"Adressvergabe", dns:"AdGuard DNS", source:"Erkannt durch", internet:"Internetzugang", watch:"Überwachung" };
+    const filterValueNames = { on:"Online", off:"Offline", guest:"Gastzugang", onboarding:"Einrichtungsbereich", assigned:"Regulärer Bereich", unknown:"Einrichtung deaktiviert", monitored:"Überwacht", notify:"Offline-Meldung", presence:"Anwesenheit", none:"Keine Funktion", denied:"Gesperrt", pending:"Freigabe ausstehend", error:"Freigabe fehlgeschlagen", unchecked:"Noch nicht geprüft", unmanaged:"Nicht verwaltet", infrastructure:"Netzwerkinfrastruktur", learning:"Lernphase", trusted:"Vertrauenswürdig", allowed:"Freigegeben", ...sourceLabels, ...Object.fromEntries([...segmentCounts.values()].map((segment) => [segment.id, segment.vlanId ? `${segment.name} · VLAN ${segment.vlanId}` : segment.name])) };
     const activeFilters = Object.entries(this._columnFilters).filter(([, value]) => value);
     const filterChips = activeFilters.length ? `<div class="filter-chips" role="status" aria-label="Aktive Filter">${activeFilters.map(([key, value]) => `<button class="filter-chip" type="button" data-clear-column-filter="${esc(key)}" aria-label="Filter ${esc(filterNames[key] || key)} entfernen"><span>${esc(filterNames[key] || key)}: ${esc(filterValueNames[value] || value)}</span><ha-icon icon="mdi:close"></ha-icon></button>`).join("")}<button class="filter-reset" type="button" data-clear-all-filters>Alle Filter zurücksetzen</button></div>` : "";
-    const emptyRow = `<tr><td colspan="13"><div class="empty"><ha-icon icon="mdi:filter-off-outline"></ha-icon><strong>Keine passenden Geräte</strong>Filter ändern oder leeren.</div></td></tr>`;
+    const emptyRow = `<tr><td colspan="14"><div class="empty"><ha-icon icon="mdi:filter-off-outline"></ha-icon><strong>Keine passenden Geräte</strong>Filter ändern oder leeren.</div></td></tr>`;
     grid.innerHTML = `${filterChips}<table aria-label="Netzwerkgeräte">
       <thead>
-        <tr>${heading("Status", "state")}${heading("IP-Bereich", "onboarding")}${heading("Teilnehmer", "name")}${heading("IP-Adresse", "ip")}${heading("MAC-Adresse", "mac")}${heading("Verbindung", "connection")}${heading("Mesh-Zugangspunkt", "mesh")}${heading("WLAN-Daten", "rate")}${heading("Adressvergabe", "address")}${heading("AdGuard DNS", "dns")}${heading("Erkannt durch", "source")}<th data-column="internet" class="no-sort">Internetzugang</th><th data-column="watch" class="no-sort">Überwachung</th></tr>
+        <tr>${heading("Status", "state")}${heading("IP-Bereich", "onboarding")}${heading("VLAN", "vlan")}${heading("Teilnehmer", "name")}${heading("IP-Adresse", "ip")}${heading("MAC-Adresse", "mac")}${heading("Verbindung", "connection")}${heading("Mesh-Zugangspunkt", "mesh")}${heading("WLAN-Daten", "rate")}${heading("Adressvergabe", "address")}${heading("AdGuard DNS", "dns")}${heading("Erkannt durch", "source")}<th data-column="internet" class="no-sort">Internetzugang</th><th data-column="watch" class="no-sort">Überwachung</th></tr>
         <tr class="column-filters">
           <th data-column="state">${stateFilter}</th>
           <th data-column="onboarding">${onboardingFilter}</th>
+          <th data-column="vlan">${vlanFilter}</th>
           ${filterInput("name", "Name oder *")}
           ${filterInput("ip", "IP oder *")}
           ${filterInput("mac", "MAC oder *")}
@@ -4134,7 +4254,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
       initial_loading: !this._dnsLive.entries.length && this._dnsLiveLoading,
       hostnames: hostnameEntries,
       adguard_config: this._adguardConfig,
-      adguard_config_open: this._adguardConfigOpen,
       policy_prompt: this._dnsPolicyPrompt,
       is_admin: Boolean(this._hass?.user?.is_admin),
     });
@@ -4218,6 +4337,18 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const blockedTotal = series.reduce(
       (sum, bucket) => sum + Number(bucket.blocked || 0), 0
     );
+    const adguardStats = [
+      ["sensor.nodarion_dns_anfragen", "DNS-Anfragen"],
+      ["sensor.nodarion_dns_blockiert", "Blockiert"],
+      ["sensor.nodarion_dns_blockquote", "Blockquote"],
+      ["sensor.nodarion_dns_verarbeitungszeit", "Verarbeitungszeit"],
+    ].map(([entityId, label]) => {
+      const entity = this._hass.states[entityId];
+      const value = entity && !["unknown", "unavailable"].includes(entity.state)
+        ? `${entity.state}${entity.attributes.unit_of_measurement ? ` ${entity.attributes.unit_of_measurement}` : ""}`
+        : "–";
+      return `<button class="adguard-stat metric-entity-link" type="button" data-entity-id="${entityId}" title="Home-Assistant-Dialog öffnen"><span>${label}</span><strong>${esc(value)}</strong></button>`;
+    }).join("");
     const chartBars = series.map((bucket, index) => {
       const allowed = Number(bucket.allowed || 0);
       const blocked = Number(bucket.blocked || 0);
@@ -4241,37 +4372,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <span class="dns-chart-label">${index % 4 === 0 || index === series.length - 1 ? esc(hour) : ""}</span>
       </div>`;
     }).join("");
-    const customRules = (this._adguardConfig.rules || []).map((rule) => `
-      <div class="adguard-item"><span>${esc(rule)}</span><button class="adguard-delete-rule" type="button" data-rule="${esc(rule)}" title="Regel löschen"><ha-icon icon="mdi:delete-outline"></ha-icon></button></div>
-    `).join("") || `<div class="adguard-item"><span>Keine eigenen Regeln vorhanden</span></div>`;
-    const rewrites = (this._adguardConfig.rewrites || []).map((item) => `
-      <div class="adguard-item"><span>${esc(item.domain)} → ${esc(item.answer)}${item.enabled === false ? " (deaktiviert)" : ""}</span><button class="adguard-delete-rewrite" type="button" data-domain="${esc(item.domain)}" data-answer="${esc(item.answer)}" title="Rewrite löschen"><ha-icon icon="mdi:delete-outline"></ha-icon></button></div>
-    `).join("") || `<div class="adguard-item"><span>Keine DNS-Rewrites vorhanden</span></div>`;
-    const configurationModal = this._hass?.user?.is_admin && this._adguardConfigOpen ? `
-      <div class="adguard-modal-backdrop" role="presentation">
-        <section class="adguard-modal" role="dialog" aria-modal="true" aria-label="AdGuard-Konfiguration">
-          <div class="adguard-modal-head">
-            <div>
-              <h3><ha-icon icon="mdi:shield-cog-outline"></ha-icon>AdGuard-Konfiguration</h3>
-              <p>Änderungen werden direkt in AdGuard Home gespeichert. DNS-Live ist während der Bearbeitung pausiert.</p>
-            </div>
-            <button class="adguard-modal-close" type="button" title="Schließen"><ha-icon icon="mdi:close"></ha-icon></button>
-          </div>
-          ${this._adguardConfig.error ? `<div class="dns-error">${esc(this._adguardConfig.error)}</div>` : ""}
-          <div class="adguard-config-grid">
-            <div class="adguard-box">
-              <h4>Eigene Filterregeln</h4>
-              <div class="adguard-form"><input class="adguard-rule-input" placeholder="z. B. ||example.org^"><button class="adguard-add-rule" type="button">Hinzufügen</button></div>
-              <div class="adguard-items">${customRules}</div>
-            </div>
-            <div class="adguard-box">
-              <h4>DNS-Rewrites</h4>
-              <div class="adguard-form rewrite"><input class="adguard-rewrite-domain" placeholder="host.example.org"><input class="adguard-rewrite-answer" placeholder="192.168.178.10"><button class="adguard-add-rewrite" type="button">Hinzufügen</button></div>
-              <div class="adguard-items">${rewrites}</div>
-            </div>
-          </div>
-        </section>
-      </div>` : "";
     const policyPrompt = this._dnsPolicyPrompt;
     const policyModal = policyPrompt ? `
       <div class="dns-policy-modal-backdrop" role="presentation">
@@ -4289,12 +4389,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
       <div class="dns-head">
         <div><h2><ha-icon icon="mdi:dns-outline"></ha-icon>AdGuard DNS-Live</h2><p>Neueste DNS-Anfragen · zuletzt aktualisiert ${esc(updated)} · automatisch alle 3 Sekunden</p></div>
         <div class="dns-actions">
-          ${this._hass?.user?.is_admin ? `<button class="dns-action adguard-config-open" type="button"><ha-icon icon="mdi:cog-outline"></ha-icon>Konfiguration</button>` : ""}
           <button class="dns-action dns-chart-toggle" type="button" title="Stundendiagramm ${this._dnsChartVisible ? "ausblenden" : "einblenden"}"><ha-icon icon="${this._dnsChartVisible ? "mdi:chart-box-outline" : "mdi:chart-box-plus-outline"}"></ha-icon>Diagramm ${this._dnsChartVisible ? "aus" : "an"}</button>
           <button class="dns-action dns-pause" type="button"><ha-icon icon="${this._dnsLivePaused ? "mdi:play" : "mdi:pause"}"></ha-icon>${this._dnsLivePaused ? "Fortsetzen" : "Pause"}</button>
           <button class="dns-action dns-refresh ${this._dnsLiveLoading ? "busy" : ""}" type="button" ${this._dnsLiveLoading ? "disabled" : ""}><ha-icon icon="mdi:refresh"></ha-icon>Aktualisieren</button>
         </div>
       </div>
+      <section class="dns-live-stats"><h3>Letzte 24 Stunden</h3><div class="adguard-stat-grid">${adguardStats}</div></section>
       ${this._dnsLive.error ? `<div class="dns-error"><strong>AdGuard-Log nicht verfügbar:</strong> ${esc(this._dnsLive.error)}</div>` : ""}
       ${this._dnsChartVisible ? `<div class="dns-chart">
         <div class="dns-chart-head">
@@ -4324,7 +4424,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <tbody>${rows}</tbody>
         </table>` : `<div class="empty"><ha-icon icon="${this._dnsLiveLoading ? "mdi:progress-clock" : "mdi:dns-outline"}"></ha-icon><strong>${this._dnsLiveLoading ? "DNS-Anfragen werden geladen" : "Keine passenden DNS-Anfragen"}</strong>${this._dnsLiveLoading ? "Einen kleinen Moment …" : "Filter ändern oder auf neue Anfragen warten."}</div>`}
       </div>
-      ${configurationModal}
       ${policyModal}`;
   }
 
@@ -4451,6 +4550,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       quiet_activity: "mdi:weather-night",
       flapping: "mdi:pulse",
       identity_changed: "mdi:swap-horizontal-bold",
+      vlan_changed: "mdi:lan-disconnect",
       important_offline: "mdi:lan-disconnect",
       guest_new: "mdi:wifi-star",
       guest_quiet: "mdi:weather-night-partly-cloudy",
@@ -4461,6 +4561,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       quiet_activity: "Aktivität zur Ruhezeit",
       flapping: "Instabile Verbindung",
       identity_changed: "Identität geändert",
+      vlan_changed: "VLAN gewechselt",
       important_offline: "Wichtiges Gerät offline",
       guest_new: "Neuer Gast",
       guest_quiet: "Gast zur Ruhezeit",
@@ -4577,6 +4678,51 @@ class EngelsoftNodarionPanel extends HTMLElement {
       || this._monitor.known_hosts.includes(key)
     ).length;
     const checked = (value) => value ? "checked" : "";
+    const segmentRoleLabels = {
+      trusted:"Vertrauenswürdig",
+      restricted:"Eingeschränkt",
+      guest:"Gast",
+      isolated:"Isoliert",
+      infrastructure:"Infrastruktur",
+    };
+    const networkSegments = Array.isArray(rules.network_segments)
+      ? rules.network_segments : [];
+    const networkSegmentRows = networkSegments.map((segment, index) => {
+      const roleOptions = Object.entries(segmentRoleLabels).map(([value, label]) =>
+        `<option value="${value}" ${segment.role === value ? "selected" : ""}>${label}</option>`
+      ).join("");
+      const color = /^#[0-9a-f]{6}$/i.test(String(segment.color || ""))
+        ? segment.color : "#58b9d6";
+      return `<div class="vlan-row" data-vlan-row data-segment-id="${esc(segment.id || `segment-${index + 1}`)}" style="--vlan-color:${esc(color)}">
+        <label class="vlan-field name"><span>Name</span><input type="text" maxlength="48" data-segment-field="name" value="${esc(segment.name || "")}" required></label>
+        <label class="vlan-field"><span>VLAN-ID</span><input type="number" min="1" max="4094" data-segment-field="vlan_id" value="${Number(segment.vlan_id || 1)}" required></label>
+        <label class="vlan-field network"><span>Subnetz</span><input type="text" data-segment-field="network" value="${esc(segment.network || "")}" placeholder="192.168.20.0/24" required></label>
+        <label class="vlan-field"><span>Rolle</span><select data-segment-field="role">${roleOptions}</select></label>
+        <label class="vlan-field"><span>Farbe</span><input type="color" data-segment-field="color" value="${esc(color)}"></label>
+        <label class="vlan-field monitoring"><span>Überwachung</span><input type="checkbox" data-segment-field="monitoring" ${checked(segment.monitoring)}></label>
+        <button class="vlan-remove" type="button" data-segment-index="${index}" title="VLAN entfernen" aria-label="VLAN ${esc(segment.name || String(segment.vlan_id))} entfernen" ${networkSegments.length <= 1 ? "disabled" : ""}><ha-icon icon="mdi:delete-outline"></ha-icon></button>
+      </div>`;
+    }).join("");
+    const settingsTitles = {
+      general: ["Allgemeine Einstellungen", "Grundlagen, Lernphase und VLANs"],
+      devices: ["Geräteeinstellungen", "Neue Geräte, Gastzugang und Bereinigung"],
+      rules: ["Überwachungseinstellungen", "Regeln, Ruhezeiten und weitere Prüfungen"],
+      notifications: ["Benachrichtigungen", "Home-Assistant-Meldungen und Benachrichtigungsziele"],
+      dns: ["DNS- und AdGuard-Einstellungen", "Schutzfunktionen, Statistiken und Filterverwaltung"],
+      "ai-maintenance": ["KI-Einstellungen", "Tägliche Netzbewertung und DNS-Datenschutz"],
+    };
+    const settingsTitle = settingsTitles[this._settingsTab] || settingsTitles.general;
+    const adguardSwitches = [
+      ["switch.nodarion_adguard_gesamtschutz", "Gesamtschutz", "Master-Schalter für sämtliche Schutzfunktionen"],
+      ["switch.nodarion_adguard_dns_filterung", "DNS-Filterung", "Blocklisten und eigene Filterregeln anwenden"],
+      ["switch.nodarion_adguard_safe_browsing", "Safe Browsing", "Phishing- und Malware-Domains blockieren"],
+      ["switch.nodarion_adguard_jugendschutz", "Jugendschutz", "Nicht jugendfreie Inhalte blockieren"],
+      ["switch.nodarion_adguard_safe_search", "Safe Search", "Sichere Suche bei Suchmaschinen erzwingen"],
+      ["switch.nodarion_adguard_query_log", "Query-Log", "Für DNS-Live, Gerätezuordnung und KI erforderlich"],
+    ].map(([entityId, label, note]) => {
+      const state = this._hass.states[entityId]?.state;
+      return `<button class="adguard-feature ${state === "on" ? "active" : ""}" type="button" data-adguard-switch data-entity-id="${entityId}"><span><strong>${label}</strong><small>${note}</small></span><span class="adguard-feature-state">${state === "on" ? "An" : state === "off" ? "Aus" : "–"}</span></button>`;
+    }).join("");
     panel.innerHTML = `
       <div class="security-metrics">
         <article class="security-card"><span>Aktive Warnungen</span><strong>${Number(summary.active || 0)}</strong></article>
@@ -4596,14 +4742,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <div class="alert-list">${alertHtml}</div>
         </section>
         <section class="watch-panel watch-settings-panel">
-          <div class="watch-heading"><div><h2>Einstellungen</h2><p>Änderungen gelten ab dem nächsten Netzwerkscan.</p></div><div class="settings-save-area"><div class="settings-dirty" role="status" aria-live="polite" ${this._dirtyRules.size ? "" : "hidden"}><span>${this._dirtyRules.size} ungespeicherte ${this._dirtyRules.size === 1 ? "Änderung" : "Änderungen"}</span><button class="discard-settings" type="button">Verwerfen</button></div><button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>Alle Einstellungen speichern</button></div></div>
-          <nav class="settings-tabs" role="tablist" aria-label="Einstellungsbereiche">
-            <button class="settings-tab ${this._settingsTab === "general" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "general"}" data-settings-tab="general"><ha-icon icon="mdi:tune-variant"></ha-icon>Allgemein</button>
-            <button class="settings-tab ${this._settingsTab === "devices" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "devices"}" data-settings-tab="devices"><ha-icon icon="mdi:devices"></ha-icon>Geräte</button>
-            <button class="settings-tab ${this._settingsTab === "rules" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "rules"}" data-settings-tab="rules"><ha-icon icon="mdi:shield-alert-outline"></ha-icon>Regeln &amp; Alarme</button>
-            <button class="settings-tab ${this._settingsTab === "notifications" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "notifications"}" data-settings-tab="notifications"><ha-icon icon="mdi:bell-outline"></ha-icon>Benachrichtigungen</button>
-            <button class="settings-tab ${this._settingsTab === "ai-maintenance" ? "active" : ""}" type="button" role="tab" aria-selected="${this._settingsTab === "ai-maintenance"}" data-settings-tab="ai-maintenance"><ha-icon icon="mdi:creation-outline"></ha-icon>KI-Analyse</button>
-          </nav>
+          <div class="watch-heading"><div class="settings-context-title"><button class="settings-back" type="button" title="Zurück" aria-label="Zurück zur vorherigen Ansicht"><ha-icon icon="mdi:arrow-left"></ha-icon></button><div><h2>${esc(settingsTitle[0])}</h2><p>${esc(settingsTitle[1])} · Änderungen gelten ab dem nächsten Netzwerkscan.</p></div></div><div class="settings-save-area"><div class="settings-dirty" role="status" aria-live="polite" ${this._dirtyRules.size ? "" : "hidden"}><span>${this._dirtyRules.size} ungespeicherte ${this._dirtyRules.size === 1 ? "Änderung" : "Änderungen"}</span><button class="discard-settings" type="button">Verwerfen</button></div><button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>Alle Einstellungen speichern</button></div></div>
           <div class="rule-list">
             <div class="settings-tab-panel general-panel" role="tabpanel" data-settings-panel="general" ${this._settingsTab === "general" ? "" : "hidden"}>
             <section class="rule-group basics">
@@ -4611,10 +4750,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="rule"><label>Überwachung aktiv<small>Alle Regeln gemeinsam ein- oder ausschalten</small></label><input type="checkbox" data-rule="enabled" ${checked(rules.enabled)}></div>
               <div class="learning-card"><strong>${learning.active ? `Lernphase läuft bis ${esc(learningEnd)}` : "Lernphase ist beendet"}</strong><p>${learning.active ? "Aktuell erkannte Geräte werden automatisch übernommen. Danach müssen neue Geräte wieder geprüft werden." : "Neue Geräte werden geprüft und bei aktiviertem Internetschutz zunächst gesperrt."}</p><div class="learning-actions"><button class="learning-action restart-learning" type="button">Neu beginnen</button><button class="learning-action extend-learning" type="button">7 Tage verlängern</button>${learning.active ? `<button class="learning-action end-learning" type="button">Jetzt beenden</button>` : ""}</div><label class="rule"><span>Dauer bei Neustart<small>Maximal 30 Tage</small></span><span class="unit-input"><input type="number" min="0" max="30" data-rule="learning_days" value="${Number(rules.learning_days)}"><span>Tage</span></span></label></div>
             </section>
-            <section class="rule-group presence-settings">
-              <h3>Anwesenheit<button class="settings-help-button" type="button" data-settings-help="presence" title="Anwesenheit erklären" aria-label="Hilfe zu Anwesenheit">?</button></h3>
-              <div class="rule"><label>Anwesenheits-Timeout<small>Markierte Geräte gehen sofort online und erst danach offline</small></label><span class="unit-input"><input type="number" min="1" max="1440" data-rule="presence_timeout_minutes" value="${Number(rules.presence_timeout_minutes)}"><span>Minuten</span></span></div>
-              <div class="rule"><label>Anwesenheitssensor<small>Binary Sensor &bdquo;Anwesenheit&ldquo; f&uuml;r Automationen aktivieren</small></label><input type="checkbox" data-rule="presence_sensor_enabled" ${checked(rules.presence_sensor_enabled)}></div>
+            <section class="rule-group vlan-settings">
+              <div class="vlan-settings-head"><h3>VLANs und Netzwerksegmente</h3><div class="settings-heading-actions"><button class="settings-help-button" type="button" data-settings-help="vlans" title="VLANs und Rollen erklären" aria-label="Hilfe zu VLANs und Netzwerksegmenten">?</button><button class="vlan-add" type="button"><ha-icon icon="mdi:plus"></ha-icon>VLAN hinzufügen</button></div></div>
+              <div class="vlan-list">${networkSegmentRows}</div>
+              <p class="vlan-empty-note">Subnetze dürfen sich nicht überschneiden. Überwachung aktiviert den Ping/TCP-Scanner und VLAN-Wechselwarnungen für das Segment.</p>
             </section>
             </div>
             <div class="settings-tab-panel devices-panel" role="tabpanel" data-settings-panel="devices" ${this._settingsTab === "devices" ? "" : "hidden"}>
@@ -4627,7 +4766,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="rule"><label>Benachrichtigung<small>Neue Geräte in Home Assistant melden</small></label><input type="checkbox" data-rule="onboarding_notify" ${checked(rules.onboarding_notify)}></div></div>
             </section>
             <section class="rule-group guest-settings">
-              <h3>Gastzugang</h3>
+              <h3>Gastzugang<button class="settings-help-button" type="button" data-settings-help="guest" title="Gastzugang erklären" aria-label="Hilfe zum Gastzugang">?</button></h3>
               <div class="rule"><label>Gastnetz anzeigen und überwachen<small>Gastgeräte in Nodarion erfassen, anzeigen und protokollieren</small></label><input type="checkbox" data-rule="guest_monitoring_enabled" ${checked(rules.guest_monitoring_enabled)}></div><div class="dependent-settings" data-depends-on="guest_monitoring_enabled" ${rules.guest_monitoring_enabled ? "" : "hidden"}>
               <div class="rule"><label>Neue Gäste melden<small>Beim erstmaligen Verbinden mit dem FRITZ!Box-Gastzugang warnen</small></label><input type="checkbox" data-rule="guest_new_enabled" ${checked(rules.guest_new_enabled)}></div>
               <div class="rule"><label>Gäste zur Ruhezeit melden<small>Verbindungen im eingestellten Ruhezeitraum hervorheben</small></label><input type="checkbox" data-rule="guest_quiet_enabled" ${checked(rules.guest_quiet_enabled)}></div>
@@ -4647,6 +4786,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="rule"><label>Neue Geräte bestätigen<small>Erst nach dieser Online-Zeit warnen</small></label><span class="unit-input"><input type="number" min="1" max="1440" data-rule="new_device_minutes" value="${Number(rules.new_device_minutes)}"><span>Minuten</span></span></div>
               <div class="rule"><label>Wichtiges Gerät offline<small>Danach eine Warnung anzeigen</small></label><span class="unit-input"><input type="number" min="1" max="10080" data-rule="offline_minutes" value="${Number(rules.offline_minutes)}"><span>Minuten</span></span></div>
             </section>
+            <section class="rule-group presence-settings">
+              <h3>Anwesenheit<button class="settings-help-button" type="button" data-settings-help="presence" title="Anwesenheit erklären" aria-label="Hilfe zu Anwesenheit">?</button></h3>
+              <div class="rule"><label>Anwesenheits-Timeout<small>Markierte Geräte gehen sofort online und erst danach offline</small></label><span class="unit-input"><input type="number" min="1" max="1440" data-rule="presence_timeout_minutes" value="${Number(rules.presence_timeout_minutes)}"><span>Minuten</span></span></div>
+              <div class="rule"><label>Anwesenheitssensor<small>Binary Sensor &bdquo;Anwesenheit&ldquo; f&uuml;r Automationen aktivieren</small></label><input type="checkbox" data-rule="presence_sensor_enabled" ${checked(rules.presence_sensor_enabled)}></div>
+            </section>
             <section class="rule-group detection-settings">
               <h3>Ruhezeiten<button class="settings-help-button" type="button" data-settings-help="quiet" title="Ruhezeiten erklären" aria-label="Hilfe zu Ruhezeiten">?</button></h3>
               <div class="rule"><label>Ruhezeit überwachen<small>Aktivierungen in diesem Zeitraum melden</small></label><input type="checkbox" data-rule="quiet_hours_enabled" ${checked(rules.quiet_hours_enabled)}></div><div class="dependent-settings" data-depends-on="quiet_hours_enabled" ${rules.quiet_hours_enabled ? "" : "hidden"}>
@@ -4654,7 +4798,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="rule"><label>Ruhezeit endet</label><input type="time" data-rule="quiet_end" value="${esc(rules.quiet_end)}"></div></div>
             </section>
             <details class="advanced-settings"><summary>Erweiterte Prüfungen</summary><section class="rule-group alert-rule-settings">
-              <h3>Weitere Prüfungen<button class="settings-help-button" type="button" data-settings-help="notifications" title="Prüfungen erklären" aria-label="Hilfe zu weiteren Prüfungen">?</button></h3>
+              <h3>Weitere Prüfungen<button class="settings-help-button" type="button" data-settings-help="checks" title="Prüfungen erklären" aria-label="Hilfe zu weiteren Prüfungen">?</button></h3>
               <div class="rule"><label>Statuswechsel pro Stunde<small>Ab dieser Anzahl als instabil melden</small></label><span class="unit-input"><input type="number" min="2" max="100" data-rule="flap_limit" value="${Number(rules.flap_limit)}"><span>Wechsel/Std.</span></span></div>
               <div class="rule"><label>Identitätswechsel melden<small>Andere MAC-Adresse am gleichen IP-Platz</small></label><input type="checkbox" data-rule="identity_changes" ${checked(rules.identity_changes)}></div>
             </section></details>
@@ -4668,10 +4812,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="notify-event-hint"><ha-icon icon="mdi:transit-connection-variant"></ha-icon><span>Für eigene Automationen wird immer das Ereignis <code>nodarion_alert</code> ausgelöst.</span></div>
             </section>
             <section class="rule-group notification-target-settings">
-              <h3><span>Benachrichtigungsziele</span><span class="notify-target-count">${selectedNotifyCount} von ${notifyEntities.length} ausgewählt</span></h3>
+              <h3><span>Benachrichtigungsziele</span><span class="settings-heading-actions"><span class="notify-target-count">${selectedNotifyCount} von ${notifyEntities.length} ausgewählt</span><button class="settings-help-button" type="button" data-settings-help="targets" title="Benachrichtigungsziele erklären" aria-label="Hilfe zu Benachrichtigungszielen">?</button></span></h3>
               <p class="notification-target-description">Companion App, Telegram und andere in Home Assistant eingerichtete Ziele</p>
               <div class="notify-target-section"><div class="notify-target-toolbar"><span class="notify-search-wrap"><ha-icon icon="mdi:magnify"></ha-icon><input class="notify-target-search" type="search" value="${esc(this._notifyTargetQuery)}" placeholder="Ziel durchsuchen …" aria-label="Benachrichtigungsziel durchsuchen"></span><button class="notify-target-action" type="button" data-notify-target-action="all">Alle</button><button class="notify-target-action" type="button" data-notify-target-action="none">Keine</button></div><div class="notify-target-list">${notifyTargetHtml}</div></div>
             </section>
+            </div>
+            <div class="settings-tab-panel dns-settings-panel" role="tabpanel" data-settings-panel="dns" ${this._settingsTab === "dns" ? "" : "hidden"}>
+              <section class="rule-group adguard-control-settings"><h3>Schutzfunktionen<button class="settings-help-button" type="button" data-settings-help="adguard" title="Schutzfunktionen erklären" aria-label="Hilfe zu den AdGuard-Schutzfunktionen">?</button></h3><div class="adguard-feature-list">${adguardSwitches}</div><div class="query-log-warning"><ha-icon icon="mdi:alert-outline"></ha-icon>Das Ausschalten des Query-Logs unterbricht DNS-Live und reduziert die Auswertung.</div></section>
             </div>
             <div class="settings-tab-panel ai-maintenance-panel" role="tabpanel" data-settings-panel="ai-maintenance" ${this._settingsTab === "ai-maintenance" ? "" : "hidden"}>
             <section class="rule-group ai-config-settings">
