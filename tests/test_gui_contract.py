@@ -77,8 +77,8 @@ class GuiContractTests(unittest.TestCase):
         const_source = (
             ROOT / "custom_components" / "nodarion" / "const.py"
         ).read_text(encoding="utf-8")
-        self.assertIn('FRONTEND_VERSION = "1.28.1"', const_source)
-        self.assertIn('internet-status.mjs?v=1.28.1', PANEL)
+        self.assertIn('FRONTEND_VERSION = "1.28.2"', const_source)
+        self.assertIn('internet-status.mjs?v=1.28.2', PANEL)
 
     def test_light_and_dark_settings_share_contrast_tokens(self) -> None:
         for token in (
@@ -93,7 +93,7 @@ class GuiContractTests(unittest.TestCase):
         self.assertIn('.adguard-stat strong,', PANEL)
 
     def test_light_column_picker_has_explicit_contrast_styles(self) -> None:
-        self.assertIn(':host([data-theme="light"]) .column-picker label { color:#423c35; }', PANEL)
+        self.assertIn(':host([data-theme="light"]) .column-picker label { color:#38332e;', PANEL)
         self.assertIn(':host([data-theme="light"]) .column-picker-head { color:#302b26;', PANEL)
         self.assertIn(':host([data-theme="light"]) .column-picker-close {', PANEL)
 
@@ -107,6 +107,17 @@ class GuiContractTests(unittest.TestCase):
             '.log-clear,',
         ):
             self.assertIn(f':host([data-theme="light"]) {selector}', PANEL)
+
+    def test_header_logo_links_safely_to_github(self) -> None:
+        self.assertIn('class="logo" href="https://github.com/engelsofta/nodarion"', PANEL)
+        self.assertIn('target="_blank" rel="noopener noreferrer"', PANEL)
+        self.assertIn('.logo:focus-visible', PANEL)
+
+    def test_light_theme_uses_readable_status_and_action_colours(self) -> None:
+        self.assertIn(':host([data-theme="light"]) .guest-inline {', PANEL)
+        self.assertIn(':host([data-theme="light"]) .rating.warn {', PANEL)
+        self.assertIn('--rating-color:#8a6200', PANEL)
+        self.assertIn(':host([data-theme="light"]) .metric-settings {', PANEL)
 
     def test_dns_metric_opens_the_native_sensor_dialog(self) -> None:
         self.assertIn('this._hass.states["sensor.nodarion_dns_blockquote"]', PANEL)

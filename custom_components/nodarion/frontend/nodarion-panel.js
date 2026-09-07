@@ -1,4 +1,4 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.28.1";
+import { internetStatusFor } from "./internet-status.mjs?v=1.28.2";
 
 const esc = (value) =>
   String(value ?? "")
@@ -12,6 +12,7 @@ const esc = (value) =>
 // intentionally falls back to English.
 let panelLocale = "en";
 const EN = new Map(Object.entries({
+  "Nodarion auf GitHub öffnen": "Open Nodarion on GitHub",
   "Warnungen und Auffälligkeiten": "Warnings and anomalies",
   "Aktive Hinweise stehen oben, erledigte bleiben als Verlauf erhalten.": "Active notices are shown first; resolved ones remain in the history.",
   "Änderungen werden direkt in AdGuard Home gespeichert. DNS-Live ist während der Bearbeitung pausiert.": "Changes are saved directly to AdGuard Home. DNS Live is paused while editing.",
@@ -1101,7 +1102,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
           width:58px; height:58px; display:grid; place-items:center; border-radius:18px;
           background:linear-gradient(145deg, rgba(85,242,162,.22), rgba(80,215,255,.08));
           border:1px solid rgba(85,242,162,.3); box-shadow:0 0 40px rgba(85,242,162,.12);
+          text-decoration:none; cursor:pointer;
+          transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
         }
+        .logo:hover { transform:translateY(-2px); border-color:rgba(240,161,59,.7); box-shadow:0 18px 38px rgba(221,139,42,.28),inset 0 1px rgba(255,255,255,.42); }
+        .logo:focus-visible { outline:3px solid color-mix(in srgb,var(--ns-green) 55%,transparent); outline-offset:3px; }
         .logo ha-icon { color:var(--ns-green); --mdc-icon-size:31px; }
         h1 { margin:0; font-size:clamp(26px,3vw,38px); letter-spacing:-1.5px; font-weight:720; }
         .eyebrow { color:var(--ns-cyan); font-size:10px; letter-spacing:2.8px; font-weight:750; text-transform:uppercase; margin-bottom:5px; }
@@ -2162,7 +2167,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           box-shadow:0 24px 60px rgba(82,61,36,.20);
         }
         :host([data-theme="light"]) .column-picker-head { color:#302b26; border-bottom-color:#ded7ce; }
-        :host([data-theme="light"]) .column-picker label { color:#423c35; }
+        :host([data-theme="light"]) .column-picker label { color:#38332e; font-weight:700; }
         :host([data-theme="light"]) .column-picker label:hover { color:#653b12; background:#fff3df; }
         :host([data-theme="light"]) .column-picker input { accent-color:#a85b17; }
         :host([data-theme="light"]) .column-picker-close {
@@ -2475,7 +2480,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .settings-view .learning-card p { color:#625c54; }
         :host([data-theme="light"]) .settings-view .learning-action { color:#65400f; background:#fff5e3; border-color:#ddbd8d; }
         :host([data-theme="light"]) .column-picker-button {
-          color:#65400f; background:#fff7e9; border-color:#d9b680;
+          color:#55300c; background:#fff0d5; border-color:#c98a3c;
+          box-shadow:0 5px 14px rgba(116,72,23,.14);
         }
         :host([data-theme="light"]) .column-picker-button:hover {
           color:#48280b; background:#ffedcf; border-color:#c98535;
@@ -2525,6 +2531,28 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         :host([data-theme="light"]) .vlan-remove {
           color:#a93630; background:#fff0ee; border-color:#e7bbb6;
+        }
+        :host([data-theme="light"]) .guest-inline {
+          color:#225f73; background:#e8f5f8; border:1px solid #b9dce4;
+        }
+        :host([data-theme="light"]) .guest-inline:hover {
+          color:#174756; background:#dceff4; border-color:#85bdca;
+        }
+        :host([data-theme="light"]) .rating.warn {
+          --rating-color:#8a6200; background:#fff5d2; border-color:#dfc568;
+        }
+        :host([data-theme="light"]) .rating.bad {
+          --rating-color:#a52e2e; background:#fdebea; border-color:#e5aaa7;
+        }
+        :host([data-theme="light"]) .rating.good,
+        :host([data-theme="light"]) .rating.okay {
+          color:#514b44; background:#efede9; border-color:#c9c4bd;
+        }
+        :host([data-theme="light"]) .metric-settings {
+          color:#5f574e; background:#f7f3ed; border-color:#cec6bc;
+        }
+        :host([data-theme="light"]) .metric-settings:hover {
+          color:#57310c; background:#fff0d7; border-color:#cc9149;
         }
         :host([data-theme="light"]) ::selection { color:#fff; background:#a85b17; }
 
@@ -2692,7 +2720,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       <div class="shell">
         <header>
           <div class="brand">
-            <div class="logo"><ha-icon icon="mdi:shield-search"></ha-icon></div>
+            <a class="logo" href="https://github.com/engelsofta/nodarion" target="_blank" rel="noopener noreferrer" title="Nodarion auf GitHub öffnen" aria-label="Nodarion auf GitHub öffnen"><ha-icon icon="mdi:shield-search"></ha-icon></a>
             <div>
               <div class="eyebrow">Engelsoft</div>
               <h1>Nodarion</h1>

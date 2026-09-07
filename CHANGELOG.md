@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.23.2 — No more hide-and-seek
+
+This small visual follow-up makes the remaining controls readable in Home
+Assistant's light theme and gives the Nodarion logo somewhere useful to go.
+
+### Improved
+
+- Increased contrast for table-column labels, settings buttons, guest-network
+  indicators, and device DNS-rating badges in light mode.
+- Added explicit light-theme colours for neutral, elevated, warning, and
+  critical rating chips.
+- Strengthened hover states without changing the established gold Nodarion
+  design language.
+- Clicking the header logo now opens the public Nodarion GitHub repository in a
+  new tab, with keyboard focus styling and accessible German/English labels.
+- Bumped the frontend cache version so Home Assistant loads the corrected
+  stylesheet instead of retaining the previous cached module.
+
+### Versions
+
+- Integration: `1.23.2`
+- Frontend: `1.28.2`
+
+---
+
 ## 1.23.1 — Same network, now with the lights on
 
 This visual maintenance release gives every Nodarion settings page one shared,
