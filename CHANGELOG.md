@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.24.1 — VIP lane for sleepy devices
+
+> Important devices take the fast lane. The rest of the network keeps cruising.
+
+### Improved
+
+- Moved fast recovery into a dedicated lightweight task that probes only
+  monitored and presence devices which are currently offline.
+- Kept normal known-device scans, rolling discovery, FRITZ!Box, and AdGuard on
+  their regular schedules instead of repeating them every 15 seconds.
+- Prevented normal scans and priority recovery probes from overlapping.
+- Preserved immediate recovery through ping and the existing two-hit safety
+  confirmation for TCP-only detections.
+- Cleanly stops the recovery task as soon as every important device is online
+  and when the integration unloads.
+
+### Versions
+
+- Integration: `1.24.1`
+- Frontend: `1.29.4`
+
+---
+
 ## 1.24.0 — Fast scans, calm LANs
 
 > **Scan fast. Stay LAN-back.** Nodarion now spends its effort where it matters:
