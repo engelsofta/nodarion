@@ -1,0 +1,54 @@
+name: Feedback und Ideen
+description: Teile Erfahrungen, Verbesserungswünsche oder eine neue Idee für Nodarion.
+title: "[Feedback]: "
+labels:
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke, dass du Nodarion besser machen möchtest! Konkrete Beobachtungen aus deinem Netzwerk sind besonders hilfreich. Für offene Fragen und lockeren Austausch kannst du auch die GitHub Discussions verwenden.
+
+  - type: dropdown
+    id: feedback_type
+    attributes:
+      label: Art des Feedbacks
+      description: Worum geht es hauptsächlich?
+      options:
+        - Verbesserungsvorschlag
+        - Neue Funktion
+        - Bedienung und Oberfläche
+        - Performance und Netzwerkscan
+        - Positives Feedback
+        - Sonstiges
+    validations:
+      required: true
+
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Dein Feedback
+      description: Beschreibe deine Beobachtung oder Idee möglichst konkret.
+      placeholder: Was funktioniert gut, was könnte besser sein oder was fehlt dir?
+    validations:
+      required: true
+
+  - type: textarea
+    id: benefit
+    attributes:
+      label: Welchen Nutzen hätte die Änderung?
+      description: Optional – wem und in welcher Situation würde sie helfen?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Zusätzlicher Kontext
+      description: Optional – Screenshots, Beispiele, Netzwerkgröße oder weitere Hinweise. Bitte keine Passwörter oder Zugangsdaten einfügen.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Kurzer Check
+      options:
+        - label: Ich habe geprüft, ob es bereits ein ähnliches Issue oder eine passende Discussion gibt.
+          required: true

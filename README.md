@@ -27,6 +27,16 @@ configurable IPv4 networks and creates a connectivity binary sensor for every di
 device. Beyond simple reachability, it helps explain where a device is
 connected, how it communicates, and whether its behaviour looks unusual.
 
+## Feedback welcome
+
+Nodarion grows through real networks and real-world experience. If something
+is missing, works especially well, or sparks an idea, open a
+[feedback or feature issue](https://github.com/engelsofta/nodarion/issues/new?template=feedback.yml).
+For open questions, shared experiences, and ideas that are still taking shape,
+[GitHub Discussions](https://github.com/engelsofta/nodarion/discussions) is the
+more relaxed place. Praise is a valid bug report too — it is simply much nicer
+to fix. 😉
+
 ## What is new in the current build
 
 > [!IMPORTANT]

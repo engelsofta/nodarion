@@ -34,6 +34,16 @@ Nodarion arbeitet als lokale Home-Assistant-Custom-Integration, scannt ein oder
 mehrere einstellbare IPv4-Netze und legt pro gefundenem Teilnehmer einen
 Konnektivitäts-Binärsensor an.
 
+## Feedback willkommen
+
+Nodarion lebt von echten Netzwerken und echten Erfahrungen. Wenn dir etwas
+fehlt, etwas besonders gut funktioniert oder du eine Idee hast, freuen wir uns
+über ein [Feedback- oder Feature-Issue](https://github.com/engelsofta/nodarion/issues/new?template=feedback.yml).
+Für offene Fragen, Erfahrungsaustausch und noch nicht ganz ausgereifte Ideen
+sind die [GitHub Discussions](https://github.com/engelsofta/nodarion/discussions)
+der gemütlichere Ort. Auch Lob ist ein gültiger Bugreport – nur deutlich
+angenehmer zu beheben. 😉
+
 ## Neu im aktuellen Build
 
 > [!IMPORTANT]
