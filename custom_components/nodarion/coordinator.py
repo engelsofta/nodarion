@@ -196,6 +196,10 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         self._wan_retry_after: dict[str, float] = {}
         self._identity_changes = IdentityChangeTracker(confirmations=2)
         self._protected_router_ips: set[str] = set()
+        self._scanner_lock = asyncio.Lock()
+        self._last_normal_scan = 0.0
+        self._priority_offline_keys: set[str] = set()
+        self._priority_recovery_task: asyncio.Task[None] | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -252,9 +256,11 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         )
         try:
             started = perf_counter()
-            scan_results = await asyncio.gather(
-                *(scanner.async_scan() for scanner in self.scanners.values())
-            )
+            async with self._scanner_lock:
+                scan_results = await asyncio.gather(
+                    *(scanner.async_scan() for scanner in self.scanners.values())
+                )
+                self._last_normal_scan = perf_counter()
             found = {
                 key: host
                 for result in scan_results
@@ -622,18 +628,13 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                         ),
                     )
         await self.monitor.async_process(previous, found)
-        important_offline_count = sum(
-            key in priority_keys and not host.online
-            for key, host in found.items()
-        )
+        self._priority_offline_keys = {
+            key for key, host in found.items()
+            if key in priority_keys and not host.online
+        }
+        important_offline_count = len(self._priority_offline_keys)
         important_offline = important_offline_count > 0
-        # Important offline devices get a dedicated fast lane. Discovery stays
-        # rate-limited inside NetworkScanner, so this does not multiply subnet
-        # sweeps while waiting for a presence device to return.
-        self.update_interval = timedelta(
-            seconds=min(self.scan_interval, 15) if important_offline
-            else self.scan_interval
-        )
+        self._sync_priority_recovery_task()
         self.connection_status = {
             **self.connection_status,
             "scanner": {
@@ -648,6 +649,124 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         }
         self.monitor.async_maybe_schedule_ai_analysis(self, found)
         return found
+
+    def _sync_priority_recovery_task(self) -> None:
+        """Run one lightweight loop only while important devices are offline."""
+        task = self._priority_recovery_task
+        if self._priority_offline_keys:
+            if task is None or task.done():
+                self._priority_recovery_task = self.hass.async_create_task(
+                    self._async_priority_recovery_loop(),
+                    "Nodarion priority recovery",
+                )
+            return
+        if (
+            task is not None
+            and not task.done()
+            and task is not asyncio.current_task()
+        ):
+            task.cancel()
+        self._priority_recovery_task = None
+
+    async def _async_priority_recovery_loop(self) -> None:
+        """Recheck only important offline devices every fifteen seconds."""
+        try:
+            while self._priority_offline_keys:
+                await asyncio.sleep(min(self.scan_interval, 15))
+                await self._async_priority_recovery()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _LOGGER.exception("Priority recovery scan failed")
+        finally:
+            if asyncio.current_task() is self._priority_recovery_task:
+                self._priority_recovery_task = None
+
+    async def _async_priority_recovery(self) -> None:
+        """Restore reachable important hosts without a regular network scan."""
+        if not self.data or not self._priority_offline_keys:
+            return
+        # A regular scan that just completed already checked these addresses.
+        if perf_counter() - self._last_normal_scan < 5:
+            return
+        targets = {
+            key: self.data[key]
+            for key in self._priority_offline_keys
+            if key in self.data and not self.data[key].online
+        }
+        if not targets:
+            self._priority_offline_keys.clear()
+            self._sync_priority_recovery_task()
+            return
+
+        async with self._scanner_lock:
+            results = await asyncio.gather(*(
+                scanner.async_scan_priority(host.ip for host in targets.values())
+                for scanner in self.scanners.values()
+            ))
+        detected = {
+            key: host for result in results for key, host in result.items()
+            if key in targets
+        }
+        if not detected:
+            return
+
+        previous = self.data
+        current = dict(previous)
+        restored: set[str] = set()
+        for key, probe in detected.items():
+            old = current[key]
+            tcp_only = probe.sources == ("tcp",)
+            if tcp_only:
+                confirmations = self._pending_tcp_detections.get(key, 0) + 1
+                self._pending_tcp_detections[key] = confirmations
+                if confirmations < 2:
+                    continue
+            else:
+                self._pending_tcp_detections.pop(key, None)
+            current[key] = replace(
+                old,
+                online=True,
+                missed_scans=0,
+                mac=probe.mac or old.mac,
+                hostname=preferred_hostname(probe.hostname, old.hostname),
+                scanner_hostname=probe.scanner_hostname or old.scanner_hostname,
+                sources=tuple(dict.fromkeys((*old.sources, *probe.sources))),
+            )
+            restored.add(key)
+        if not restored:
+            return
+
+        self._priority_offline_keys.difference_update(restored)
+        await self.monitor.async_process(previous, current)
+        remaining = len(self._priority_offline_keys)
+        self.connection_status = {
+            **self.connection_status,
+            "scanner": {
+                **self.connection_status["scanner"],
+                "scan_mode": "priority_recovery" if remaining else "normal",
+                "effective_interval_seconds": (
+                    min(self.scan_interval, 15) if remaining else self.scan_interval
+                ),
+                "important_offline": remaining,
+            },
+        }
+        self.async_set_updated_data(current)
+        if not remaining:
+            self._sync_priority_recovery_task()
+
+    async def async_shutdown(self) -> None:
+        """Stop the optional priority recovery loop."""
+        task = self._priority_recovery_task
+        self._priority_recovery_task = None
+        self._priority_offline_keys.clear()
+        if task is None or task.done():
+            return
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     async def _async_timed_scan(self, key: str, scanner: Any) -> Any:
         """Run an optional data source and retain its health and duration."""

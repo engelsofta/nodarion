@@ -86,6 +86,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) ->
     """Unload a config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        await entry.runtime_data.async_shutdown()
         await entry.runtime_data.monitor.async_shutdown()
         await async_unregister_services(hass)
         frontend.async_remove_panel(hass, PANEL_URL)

@@ -130,6 +130,42 @@ class NetworkScanner:
             lambda ip: self._probe(ip, thorough=ip in thorough),
             self.batch_size,
         )
+        hosts = await self._hosts_from_results(addresses, results, arp)
+        detected_ips = {host.ip for host in hosts.values()}
+        self._known_ips.update(detected_ips)
+        self.scan_stats = {
+            "checked": len(addresses),
+            "priority": len(self._priority_ips),
+            "neighbors": len(neighbor_candidates),
+            "discovery": len(discovery),
+            "detected": len(detected_ips),
+        }
+        return hosts
+
+    async def async_scan_priority(
+        self, addresses: Iterable[str]
+    ) -> dict[str, NetworkHost]:
+        """Probe only selected important offline addresses."""
+        selected = list(dict.fromkeys(
+            ip for ip in addresses if self._contains_address(ip)
+        ))
+        if not selected:
+            return {}
+        arp = await self._read_neighbors()
+        results = await async_batched_map(
+            selected,
+            lambda ip: self._probe(ip, thorough=True),
+            self.batch_size,
+        )
+        return await self._hosts_from_results(selected, results, arp)
+
+    async def _hosts_from_results(
+        self,
+        addresses: list[str],
+        results: list[str | None],
+        arp: dict[str, str],
+    ) -> dict[str, NetworkHost]:
+        """Enrich successful probes without serial reverse-DNS waits."""
         detected = [
             ip for ip, source in zip(addresses, results, strict=True)
             if source is not None
@@ -166,15 +202,6 @@ class NetworkScanner:
                 segment_color=self.segment.color if self.segment else None,
                 segment_monitoring=self.segment.monitoring if self.segment else True,
             )
-        detected_ips = {host.ip for host in hosts.values()}
-        self._known_ips.update(detected_ips)
-        self.scan_stats = {
-            "checked": len(addresses),
-            "priority": len(self._priority_ips),
-            "neighbors": len(neighbor_candidates),
-            "discovery": len(discovery),
-            "detected": len(detected_ips),
-        }
         return hosts
 
     async def _probe(self, ip: str, *, thorough: bool = True) -> str | None:
