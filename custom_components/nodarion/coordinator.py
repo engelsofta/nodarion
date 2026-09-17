@@ -222,6 +222,23 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 )
         restoring = self.data is None
         previous = self.monitor.restored_hosts() if restoring else self.data
+        priority_keys = self.monitor.monitored | self.monitor.presence_devices
+        priority_ips = {
+            host.ip for key, host in previous.items() if key in priority_keys
+        }
+        priority_ips.update(
+            str(item.get("ip"))
+            for key, item in self.monitor.host_inventory.items()
+            if key in priority_keys and item.get("ip")
+        )
+        known_ips = {host.ip for host in previous.values()}
+        known_ips.update(
+            str(item.get("ip"))
+            for item in self.monitor.host_inventory.values()
+            if item.get("ip")
+        )
+        for scanner in self.scanners.values():
+            scanner.set_tracked_ips(known_ips, priority_ips)
         adguard_due = (
             self.adguard_scanner is not None
             and now_monotonic >= self._next_adguard_scan
@@ -246,6 +263,22 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             self._record_connection(
                 "scanner", True, (perf_counter() - started) * 1000
             )
+            scan_stats = {
+                key: sum(
+                    int(scanner.scan_stats.get(key, 0))
+                    for scanner in self.scanners.values()
+                )
+                for key in (
+                    "checked", "priority", "neighbors", "discovery", "detected"
+                )
+            }
+            self.connection_status = {
+                **self.connection_status,
+                "scanner": {
+                    **self.connection_status["scanner"],
+                    "scan_stats": scan_stats,
+                },
+            }
         except Exception as err:
             self._record_connection(
                 "scanner", False, (perf_counter() - started) * 1000
@@ -589,6 +622,30 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                         ),
                     )
         await self.monitor.async_process(previous, found)
+        important_offline_count = sum(
+            key in priority_keys and not host.online
+            for key, host in found.items()
+        )
+        important_offline = important_offline_count > 0
+        # Important offline devices get a dedicated fast lane. Discovery stays
+        # rate-limited inside NetworkScanner, so this does not multiply subnet
+        # sweeps while waiting for a presence device to return.
+        self.update_interval = timedelta(
+            seconds=min(self.scan_interval, 15) if important_offline
+            else self.scan_interval
+        )
+        self.connection_status = {
+            **self.connection_status,
+            "scanner": {
+                **self.connection_status["scanner"],
+                "scan_mode": "priority_recovery" if important_offline else "normal",
+                "effective_interval_seconds": (
+                    min(self.scan_interval, 15)
+                    if important_offline else self.scan_interval
+                ),
+                "important_offline": important_offline_count,
+            },
+        }
         self.monitor.async_maybe_schedule_ai_analysis(self, found)
         return found
 

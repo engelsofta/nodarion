@@ -1,4 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.28.2";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.4";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.4";
 
 const esc = (value) =>
   String(value ?? "")
@@ -563,22 +564,62 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ai_analysis: { reports: [], running: false, last_error: null },
     };
     this._monitorLoading = false;
+    this._stateClient = null;
+    this._stateConnection = null;
     this._translationFrame = null;
     this._translationObserver = new MutationObserver(() => this._scheduleLocalization());
+    this._edgeSwipe = null;
+    this._onEdgeTouchStart = (event) => {
+      const touch = event.touches?.[0];
+      if (!touch || touch.clientX > 24 || (!this.hasAttribute("narrow") && window.innerWidth > 800)) {
+        this._edgeSwipe = null;
+        return;
+      }
+      this._edgeSwipe = { x: touch.clientX, y: touch.clientY, opened: false };
+    };
+    this._onEdgeTouchMove = (event) => {
+      const touch = event.touches?.[0];
+      if (!touch || !this._edgeSwipe || this._edgeSwipe.opened) return;
+      const deltaX = touch.clientX - this._edgeSwipe.x;
+      const deltaY = Math.abs(touch.clientY - this._edgeSwipe.y);
+      if (deltaX >= 72 && deltaY <= 48) {
+        this._edgeSwipe.opened = true;
+        this._toggleHomeAssistantMenu();
+      }
+    };
+    this._onEdgeTouchEnd = () => { this._edgeSwipe = null; };
     this._observeTranslations();
   }
 
   connectedCallback() {
     this._observeTranslations();
+    this.addEventListener("touchstart", this._onEdgeTouchStart, { passive: true });
+    this.addEventListener("touchmove", this._onEdgeTouchMove, { passive: true });
+    this.addEventListener("touchend", this._onEdgeTouchEnd, { passive: true });
+    this.addEventListener("touchcancel", this._onEdgeTouchEnd, { passive: true });
   }
 
   disconnectedCallback() {
+    this._stateClient?.stop();
+    this._stateClient = null;
+    this._stateConnection = null;
     window.clearTimeout(this._dnsLiveTimer);
     if (this._translationFrame !== null) {
       window.cancelAnimationFrame(this._translationFrame);
       this._translationFrame = null;
     }
     this._translationObserver.disconnect();
+    this.removeEventListener("touchstart", this._onEdgeTouchStart);
+    this.removeEventListener("touchmove", this._onEdgeTouchMove);
+    this.removeEventListener("touchend", this._onEdgeTouchEnd);
+    this.removeEventListener("touchcancel", this._onEdgeTouchEnd);
+  }
+
+  _toggleHomeAssistantMenu() {
+    this.dispatchEvent(new CustomEvent("hass-toggle-menu", {
+      bubbles: true,
+      composed: true,
+    }));
   }
 
   _observeTranslations() {
@@ -655,6 +696,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   set hass(value) {
     this._hass = value;
+    if (value?.connection && value.connection !== this._stateConnection) {
+      this._stateClient?.stop();
+      this._stateConnection = value.connection;
+      this._stateClient = new NodarionStateClient(value, (state, changed) => {
+        this._monitor = state;
+        this._lastMonitorLoad = Date.now();
+        this._render(changed);
+      });
+      this._stateClient.start();
+    }
     const nextLocale = String(value?.language || "en").toLowerCase().startsWith("de") ? "de" : "en";
     if (nextLocale !== panelLocale) {
       panelLocale = nextLocale;
@@ -668,14 +719,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this.dataset.theme = darkMode === undefined
       ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
       : (darkMode ? "dark" : "light");
+    // The coordinator subscription carries attribute changes. HA state updates
+    // only need a compact identity/state signature, avoiding JSON serialization
+    // of every device on every global Home Assistant update.
     const signature = this._entities()
-      .map((entity) => `${entity.entity_id}:${entity.state}:${entity.last_changed}:${JSON.stringify(entity.attributes)}`)
+      .map((entity) => `${entity.entity_id}:${entity.state}:${entity.last_changed}`)
       .join("|");
     if (signature !== this._lastSignature) {
       this._lastSignature = signature;
-      this._render();
+      this._render(new Set(["participants"]));
     }
-    if (Date.now() - this._lastMonitorLoad > 10000) this._loadMonitor();
     this._scheduleLocalization();
   }
 
@@ -713,8 +766,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
     if (!this._hass || this._monitorLoading) return;
     this._monitorLoading = true;
     try {
-      this._monitor = await this._hass.callApi("GET", "nodarion/monitor");
-      this._render();
+      if (!this._stateClient) return;
+      await this._stateClient.refresh();
     } catch (_error) {
       // The integration may briefly be unavailable while Home Assistant reloads.
     } finally {
@@ -725,10 +778,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   async _setMonitor(key, monitored, notify, presence) {
     try {
-      this._monitor = await this._hass.callApi(
-        "POST", "nodarion/monitor", { key, monitored, notify, presence }
-      );
-      this._render();
+      await this._stateClient.mutate({ key, monitored, notify, presence });
     } catch (_error) {
       // A later state update retries loading the saved settings.
     }
@@ -736,10 +786,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   async _monitorAction(payload) {
     try {
-      this._monitor = await this._hass.callApi(
-        "POST", "nodarion/monitor", payload
-      );
-      this._render();
+      await this._stateClient.mutate(payload);
     } catch (_error) {
       // The next state refresh retries the request.
     }
@@ -821,13 +868,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
     button.classList.add("busy");
     button.innerHTML = '<ha-icon icon="mdi:loading"></ha-icon>Speichert …';
     try {
-      this._monitor = await this._hass.callApi(
-        "POST", "nodarion/monitor", { action: "set_rules", rules }
-      );
+      await this._stateClient.mutate({ action: "set_rules", rules });
       this._notifyTargetsDirty = false;
       this._settingsDraft = null;
       this._dirtyRules.clear();
-      this._render();
       const savedButton = this.shadowRoot.querySelector(selector);
       if (!savedButton) return;
       savedButton.disabled = true;
@@ -859,9 +903,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
       button.classList.add("busy");
     }
     try {
-      this._monitor = await this._hass.callApi(
-        "POST", "nodarion/monitor", { action: "run_ai_analysis", language: panelLocale }
-      );
+      await this._stateClient.mutate({
+        action: "run_ai_analysis", language: panelLocale,
+      });
     } catch (error) {
       this._monitor.ai_analysis = {
         ...(this._monitor.ai_analysis || {}),
@@ -1082,6 +1126,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         * { box-sizing: border-box; }
         .shell { width:100%; max-width:none; margin:0; padding:28px clamp(14px,2vw,30px) 52px; position:relative; isolation:isolate; }
+        .ha-menu { display:none; place-items:center; flex:0 0 44px; width:44px; height:44px; padding:0; border:1px solid var(--ns-line); border-radius:13px; color:var(--ns-text); background:var(--ns-surface); cursor:pointer; }
+        .ha-menu ha-icon { --mdc-icon-size:24px; }
         .shell::before {
           content:""; position:fixed; z-index:-1; inset:0; pointer-events:none; opacity:.28;
           background-image:radial-gradient(rgba(255,255,255,.16) .45px, transparent .45px);
@@ -1446,11 +1492,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .log-time { color:#9bb8af; font-size:13px; white-space:nowrap; }
         .log-date { display:block; color:#58776e; font-size:11px; margin-top:3px; }
         .dns-panel { border-radius:18px; padding:24px; background:var(--ns-panel); border:1px solid var(--ns-line); box-shadow:0 18px 50px rgba(0,0,0,.18); }
-        .dns-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:16px; }
+        .dns-head { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:16px; }
         .dns-head h2 { display:flex; align-items:center; gap:9px; margin:0 0 5px; font-size:20px; }
         .dns-head h2 ha-icon { color:var(--ns-cyan); --mdc-icon-size:23px; }
         .dns-head p { margin:0; color:#78998f; font-size:12px; }
         .dns-actions { display:flex; align-items:center; gap:8px; }
+        .dns-head-tools { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
         .dns-action { display:flex; align-items:center; gap:7px; padding:9px 11px; border-radius:9px; color:#cce5dc; background:rgba(255,255,255,.04); border:1px solid var(--ns-line); font:inherit; font-size:11px; font-weight:750; cursor:pointer; }
         .dns-action:hover { border-color:rgba(80,215,255,.35); }
         .dns-action ha-icon { --mdc-icon-size:16px; }
@@ -1633,6 +1680,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .dns-live-stats { margin:0 0 16px; padding:12px; border:1px solid var(--ns-line); border-radius:13px; background:rgba(255,255,255,.018); }
         .dns-live-stats h3 { margin:0 0 9px; color:#78998f; font-size:10px; text-transform:uppercase; letter-spacing:1px; }
         .dns-live-stats .adguard-stat-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+        .dns-head .dns-live-stats { margin:0 2px 0 0; padding:0 12px 0 0; border:0; border-right:1px solid var(--ns-line); border-radius:0; background:transparent; }
+        .dns-head .dns-live-stats h3 { margin:0 0 4px; font-size:8px; line-height:1; }
+        .dns-head .dns-live-stats .adguard-stat-grid { display:flex; gap:5px; }
+        .dns-head .dns-live-stats .adguard-stat { min-width:82px; padding:5px 8px; border-radius:8px; background:rgba(255,255,255,.018); }
+        .dns-head .dns-live-stats .adguard-stat span { font-size:8px; white-space:nowrap; }
+        .dns-head .dns-live-stats .adguard-stat strong { margin-top:2px; font-size:12px; line-height:1.15; white-space:nowrap; }
         .settings-tab-panel[hidden] { display:none !important; }
         .settings-tab-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:10px; }
         .settings-tab-panel.devices-panel { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(280px,.7fr); gap:14px; }
@@ -2566,6 +2619,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         @media (max-width:1200px) { .metrics { grid-template-columns:repeat(3,1fr); } }
         @media (max-width:800px) {
           .shell { padding-top:20px; } header { align-items:flex-start; flex-wrap:wrap; } .scan span { display:none; }
+          .ha-menu { display:grid; }
           .header-actions { margin-left:auto; }
           .header-settings span { display:none; }
           .metrics { grid-template-columns:1fr 1fr; } .toolbar { flex-wrap:wrap; }
@@ -2587,7 +2641,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .danger-zone .cleanup { width:100%; justify-content:center; }
           .ai-view { grid-template-columns:1fr; } .ai-head { flex-direction:column; } .ai-report { grid-template-columns:1fr; } .ai-copy { grid-template-columns:1fr; } .ai-copy article.summary { grid-column:auto; }
           .log-panel, .dns-panel { padding:16px; } .log-title, .dns-head { align-items:flex-start; }
-          .dns-head { flex-direction:column; } .dns-toolbar { grid-template-columns:1fr; }
+          .dns-head { flex-direction:column; } .dns-head-tools { width:100%; justify-content:flex-start; } .dns-head .dns-live-stats { width:100%; padding:0 0 10px; border-right:0; border-bottom:1px solid var(--ns-line); } .dns-head .dns-live-stats .adguard-stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .dns-toolbar { grid-template-columns:1fr; }
         }
         @media (max-width:620px) {
           .shell { padding:14px 10px 34px; }
@@ -2602,7 +2656,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .version-info { font-size:9px; }
           .scan { flex:0 0 44px; width:44px; height:44px; justify-content:center; padding:0; }
           .metrics { grid-template-columns:1fr 1fr; }
-          .metric.devices, .functions-metric, .metric.connections { grid-column:1 / -1; }
+          .metric.devices, .functions-metric, .metric.connections, .metric.watch-metric { grid-column:1 / -1; }
           .guest-qr { grid-template-columns:1fr; justify-items:center; text-align:center; }
           .tabs { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:6px; }
           .tab { min-height:43px; padding:9px 7px; font-size:12px; }
@@ -2630,6 +2684,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           }
           .device-list .column-filters th[data-column="name"],
           .device-list .column-filters th[data-column="ip"],
+          .device-list .column-filters th[data-column="vlan"],
           .log-table .log-filters th:first-child,
           .log-table .log-filters th:nth-child(2),
           .log-table .log-filters th:last-child { grid-column:1 / -1; }
@@ -2715,11 +2770,20 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .settings-help-backdrop { padding:8px; }
           .settings-help-dialog { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); padding:18px; }
         }
-        @media (max-width:460px) { .metrics { gap:9px; } .metric { padding:15px; } .metric-value { font-size:27px; } .metric.network .metric-value { font-size:15px; } }
+        :host([narrow]) .ha-menu { display:grid; }
+        @media (max-width:460px) {
+          .metrics { gap:9px; }
+          .metric { padding:15px; }
+          .metric-value { font-size:27px; }
+          .metric.network .metric-value { font-size:15px; }
+          .function-count strong { gap:4px; font-size:21px; }
+          .function-count { padding-inline:5px; }
+        }
       </style>
       <div class="shell">
         <header>
           <div class="brand">
+            <button class="ha-menu" type="button" title="Home-Assistant-Menü öffnen" aria-label="Home-Assistant-Menü öffnen"><ha-icon icon="mdi:menu"></ha-icon></button>
             <a class="logo" href="https://github.com/engelsofta/nodarion" target="_blank" rel="noopener noreferrer" title="Nodarion auf GitHub öffnen" aria-label="Nodarion auf GitHub öffnen"><ha-icon icon="mdi:shield-search"></ha-icon></a>
             <div>
               <div class="eyebrow">Engelsoft</div>
@@ -2768,14 +2832,17 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this.shadowRoot.querySelector(".scan").addEventListener("click", async () => {
       const button = this.shadowRoot.querySelector(".scan");
       button.classList.add("busy");
-      const ids = this._entities().map((entity) => entity.entity_id);
-      if (ids.length) {
-        await this._hass.callService("homeassistant", "update_entity", { entity_id: ids });
+      try {
+        await this._stateClient.mutate({ action: "scan_now" });
+      } finally {
+        button.classList.remove("busy");
       }
-      window.setTimeout(() => button.classList.remove("busy"), 900);
     });
     this.shadowRoot.querySelector(".header-settings").addEventListener("click", () =>
       this._openSettings("general")
+    );
+    this.shadowRoot.querySelector(".ha-menu").addEventListener("click", () =>
+      this._toggleHomeAssistantMenu()
     );
     this.shadowRoot.querySelector(".connection-status").addEventListener("click", () => {
       this._connectionsExpanded = !this._connectionsExpanded;
@@ -3468,7 +3535,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }, true);
   }
 
-  _render() {
+  _render(changed = null) {
     const activeElement = this.shadowRoot.activeElement;
     const participantDropdown = activeElement?.closest?.(".device-list .custom-column-filter");
     const logDropdown = activeElement?.closest?.(".log-list .custom-column-filter");
@@ -3611,14 +3678,24 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <button class="function-count presence ${this._columnFilters.watch === "presence" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="presence" title="Anwesenheit: ${presenceDevices} gesamt, ${presenceOnline} online"><strong><ha-icon icon="mdi:home-outline"></ha-icon>${presenceDevices}/${presenceOnline}</strong><span>Anwesenheit</span></button>
         </div>
       </article>`;
-    this._renderConnections();
-    this._renderGuest();
-    this._renderCards();
-    this._renderLog();
-    this._renderDnsLive();
-    this._renderAi();
-    this._renderWatch();
-    this._renderSettings();
+    const full = !changed;
+    const preferencesChanged = full || changed.has("preferences");
+    const lifecycleChanged = full || changed.has("lifecycle");
+    const statusChanged = full || changed.has("status");
+    const participantsChanged = full || changed.has("participants") || preferencesChanged;
+    const eventsChanged = full || changed.has("events");
+    const alertsChanged = full || changed.has("alerts");
+    if (statusChanged) this._renderConnections();
+    if (participantsChanged || lifecycleChanged) {
+      this._renderGuest();
+      this._renderCards();
+      this._renderMesh();
+    }
+    if (eventsChanged) this._renderLog();
+    if (statusChanged) this._renderDnsLive();
+    if (statusChanged) this._renderAi();
+    if (participantsChanged || alertsChanged || statusChanged || preferencesChanged) this._renderWatch();
+    if (preferencesChanged) this._renderSettings();
     this.shadowRoot.querySelectorAll(".settings-view details.advanced-settings").forEach((details) => {
       const key = details.querySelector(":scope > summary")?.textContent?.trim();
       if (key && this._openSettingsDetails.has(key)) details.open = true;
@@ -3697,12 +3774,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
     button.classList.add("busy");
     button.disabled = true;
     try {
-      const response = await this._hass.callApi(
-        "POST", "nodarion/monitor", { action: "cleanup_inactive", forget }
-      );
+      const response = await this._stateClient.mutate({
+        action: "cleanup_inactive", forget,
+      });
       const removed = Number(response.cleanup_result?.removed || 0);
-      this._monitor = response;
-      this._render();
       const result = this.shadowRoot.querySelector(".cleanup-result");
       result.textContent = removed
         ? `${removed} Offline-${removed === 1 ? "Gerät" : "Geräte"} entfernt.`
@@ -3727,11 +3802,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const original = button.textContent;
     button.textContent = "Wird freigegeben …";
     try {
-      this._monitor = await this._hass.callApi(
-        "POST",
-        "nodarion/monitor",
-        { action: "approve_internet", key: button.dataset.key }
-      );
+      await this._stateClient.mutate({
+        action: "approve_internet", key: button.dataset.key,
+      });
       button.textContent = "Freigegeben";
     } catch (error) {
       const detail = error?.body?.message || error?.message;
@@ -3838,9 +3911,26 @@ class EngelsoftNodarionPanel extends HTMLElement {
               : null,
           ].filter(Boolean).join(" · ")
         : "";
+      const scanStats = key === "scanner" ? connection.scan_stats : null;
+      const scanInfo = scanStats
+        ? panelLocale === "de"
+          ? `${Number(scanStats.checked || 0)} geprüft · ${Number(scanStats.detected || 0)} erkannt · ${Number(scanStats.discovery || 0)} Discovery · ${Number(scanStats.priority || 0)} wichtig`
+          : `${Number(scanStats.checked || 0)} checked · ${Number(scanStats.detected || 0)} detected · ${Number(scanStats.discovery || 0)} discovery · ${Number(scanStats.priority || 0)} important`
+        : "";
+      const recoveryActive = key === "scanner"
+        && connection.scan_mode === "priority_recovery";
+      const scannerMode = key === "scanner"
+        ? recoveryActive
+          ? panelLocale === "de"
+            ? `Schnellprüfung aktiv · ${Number(connection.important_offline || 0)} wichtige offline · alle ${Number(connection.effective_interval_seconds || 15)} Sek.`
+            : `Fast recovery active · ${Number(connection.important_offline || 0)} important offline · every ${Number(connection.effective_interval_seconds || 15)} sec.`
+          : panelLocale === "de"
+            ? `Normalbetrieb · alle ${Number(connection.effective_interval_seconds || connection.interval_seconds || 60)} Sek.`
+            : `Normal mode · every ${Number(connection.effective_interval_seconds || connection.interval_seconds || 60)} sec.`
+        : "";
       return `<article class="connection-card ${stateClass}">
         <i class="connection-dot"></i>
-        <div><div class="connection-name">${esc(connection.label)}</div>${deviceInfo ? `<span class="connection-device-info">${esc(deviceInfo)}</span>` : ""}<div class="connection-state">${stateLabel}</div></div>
+        <div><div class="connection-name">${esc(connection.label)}</div>${scannerMode ? `<span class="connection-device-info">${esc(scannerMode)}</span>` : ""}${deviceInfo ? `<span class="connection-device-info">${esc(deviceInfo)}</span>` : ""}${scanInfo ? `<span class="connection-device-info">${esc(scanInfo)}</span>` : ""}<div class="connection-state">${stateLabel}</div></div>
         <div class="connection-time">${connection.configured ? duration(connection.duration_ms) : "–"}<span class="connection-checked">${connection.configured ? `${checked(connection.last_checked)} · ${interval(connection.interval_seconds)}` : "In den Optionen deaktiviert"}</span></div>
       </article>`;
     }).join("");
@@ -4564,13 +4654,15 @@ class EngelsoftNodarionPanel extends HTMLElement {
     content.innerHTML = `
       <div class="dns-head">
         <div><h2><ha-icon icon="mdi:dns-outline"></ha-icon>AdGuard DNS-Live</h2><p>Neueste DNS-Anfragen · zuletzt aktualisiert ${esc(updated)} · automatisch alle 3 Sekunden</p></div>
-        <div class="dns-actions">
-          <button class="dns-action dns-chart-toggle" type="button" title="Stundendiagramm ${this._dnsChartVisible ? "ausblenden" : "einblenden"}"><ha-icon icon="${this._dnsChartVisible ? "mdi:chart-box-outline" : "mdi:chart-box-plus-outline"}"></ha-icon>Diagramm ${this._dnsChartVisible ? "aus" : "an"}</button>
-          <button class="dns-action dns-pause" type="button"><ha-icon icon="${this._dnsLivePaused ? "mdi:play" : "mdi:pause"}"></ha-icon>${this._dnsLivePaused ? "Fortsetzen" : "Pause"}</button>
-          <button class="dns-action dns-refresh ${this._dnsLiveLoading ? "busy" : ""}" type="button" ${this._dnsLiveLoading ? "disabled" : ""}><ha-icon icon="mdi:refresh"></ha-icon>Aktualisieren</button>
+        <div class="dns-head-tools">
+          <section class="dns-live-stats dns-quick-stats"><h3>Letzte 24 Stunden</h3><div class="adguard-stat-grid">${adguardStats}</div></section>
+          <div class="dns-actions">
+            <button class="dns-action dns-chart-toggle" type="button" title="Stundendiagramm ${this._dnsChartVisible ? "ausblenden" : "einblenden"}"><ha-icon icon="${this._dnsChartVisible ? "mdi:chart-box-outline" : "mdi:chart-box-plus-outline"}"></ha-icon>Diagramm ${this._dnsChartVisible ? "aus" : "an"}</button>
+            <button class="dns-action dns-pause" type="button"><ha-icon icon="${this._dnsLivePaused ? "mdi:play" : "mdi:pause"}"></ha-icon>${this._dnsLivePaused ? "Fortsetzen" : "Pause"}</button>
+            <button class="dns-action dns-refresh ${this._dnsLiveLoading ? "busy" : ""}" type="button" ${this._dnsLiveLoading ? "disabled" : ""}><ha-icon icon="mdi:refresh"></ha-icon>Aktualisieren</button>
+          </div>
         </div>
       </div>
-      <section class="dns-live-stats"><h3>Letzte 24 Stunden</h3><div class="adguard-stat-grid">${adguardStats}</div></section>
       ${this._dnsLive.error ? `<div class="dns-error"><strong>AdGuard-Log nicht verfügbar:</strong> ${esc(this._dnsLive.error)}</div>` : ""}
       ${this._dnsChartVisible ? `<div class="dns-chart">
         <div class="dns-chart-head">
@@ -5034,6 +5126,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   _renderMesh() {
     const panel = this.shadowRoot.querySelector(".mesh-panel");
+    // The topology view is optional. State updates must not turn a missing
+    // view into an apparent failure of the action that triggered the update.
+    if (!panel) return;
     const entities = this._entities().filter((entity) => entity.state === "on");
     const groups = new Map();
     entities.forEach((entity) => {

@@ -77,8 +77,28 @@ class GuiContractTests(unittest.TestCase):
         const_source = (
             ROOT / "custom_components" / "nodarion" / "const.py"
         ).read_text(encoding="utf-8")
-        self.assertIn('FRONTEND_VERSION = "1.28.2"', const_source)
-        self.assertIn('internet-status.mjs?v=1.28.2', PANEL)
+        self.assertIn('FRONTEND_VERSION = "1.29.4"', const_source)
+        self.assertIn('internet-status.mjs?v=1.29.4', PANEL)
+
+    def test_dns_stats_are_compact_and_grouped_with_header_actions(self) -> None:
+        head = PANEL[PANEL.index('<div class="dns-head">'):]
+        self.assertLess(head.index("dns-quick-stats"), head.index('class="dns-actions"'))
+        self.assertIn("border-right:1px solid var(--ns-line)", PANEL)
+
+    def test_optional_mesh_view_cannot_break_other_actions(self) -> None:
+        mesh_render = PANEL[PANEL.index("  _renderMesh() {"):]
+        self.assertIn('const panel = this.shadowRoot.querySelector(".mesh-panel")', mesh_render)
+        self.assertIn("if (!panel) return;", mesh_render[:300])
+
+    def test_mobile_panel_exposes_home_assistant_navigation(self) -> None:
+        self.assertIn('class="ha-menu"', PANEL)
+        self.assertIn('new CustomEvent("hass-toggle-menu"', PANEL)
+        self.assertIn('this._onEdgeTouchStart', PANEL)
+        self.assertIn('deltaX >= 72', PANEL)
+
+    def test_mobile_summary_and_filters_do_not_collide(self) -> None:
+        self.assertIn('.metric.watch-metric { grid-column:1 / -1; }', PANEL)
+        self.assertIn('th[data-column="vlan"]', PANEL)
 
     def test_light_and_dark_settings_share_contrast_tokens(self) -> None:
         for token in (
@@ -174,7 +194,7 @@ class GuiContractTests(unittest.TestCase):
 
     def test_adguard_stats_live_above_dns_log_not_in_settings(self) -> None:
         dns_live = PANEL.index('AdGuard DNS-Live</h2>')
-        dns_stats = PANEL.index('<section class="dns-live-stats"')
+        dns_stats = PANEL.index('<section class="dns-live-stats dns-quick-stats"')
         dns_toolbar = PANEL.index('<div class="dns-toolbar"')
         dns_settings = PANEL.index('data-settings-panel="dns"')
         self.assertLess(dns_live, dns_stats)

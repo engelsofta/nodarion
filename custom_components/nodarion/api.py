@@ -101,6 +101,14 @@ class NodarionView(HomeAssistantView):
             response = self._frontend_state(request, manager)
             response["cleanup_result"] = {"removed": removed}
             return self.json(response)
+        if action == "scan_now":
+            coordinator = self._coordinator(request)
+            if coordinator is None:
+                return self.json_message("Integration ist nicht geladen", 503)
+            for scanner in coordinator.scanners.values():
+                scanner.request_full_discovery()
+            await coordinator.async_request_refresh()
+            return self.json(self._frontend_state(request, manager))
         if action == "approve_internet":
             key = data.get("key")
             coordinator = self._coordinator(request)

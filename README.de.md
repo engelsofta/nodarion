@@ -232,9 +232,16 @@ Zeit tatsächlich erkannten Teilnehmer unabhängig von der Erkennungsquelle als
 Geräte können erst nach ihrem späteren Erscheinen bestätigt werden.
 
 Zur Reduzierung der Netz- und Systemlast prüft die Ping/TCP-Erkennung bekannte
-Adressen im eingestellten Scanintervall und durchsucht das gesamte Netz alle
-fünf Scanzyklen nach neuen Teilnehmern. Reverse-DNS-Namen werden eine Stunde
-zwischengespeichert. FRITZ!Box- und Mesh-Daten werden höchstens jede
+Adressen bevorzugt und durchsucht unbekannte Adressen rollierend in kleinen
+Gruppen. ARP-/Neighbor-Hinweise werden priorisiert, und der Scanner merkt sich
+pro Gerät die zuletzt erfolgreiche Erkennungsmethode beziehungsweise den
+erfolgreichen TCP-Port. Überwachte und für die Anwesenheit verwendete Geräte
+erhalten eine Schnellspur: Solange eines davon offline ist, erfolgt die
+Wiedererkennungsprüfung spätestens alle 15 Sekunden, ohne dadurch zusätzliche
+VLAN-Komplettscans auszulösen. **Jetzt scannen** startet bei Bedarf bewusst eine
+vollständige Discovery. Reverse-DNS läuft begrenzt parallel; erfolgreiche Namen
+werden 24 Stunden und negative Antworten 30 Minuten zwischengespeichert.
+FRITZ!Box- und Mesh-Daten werden höchstens jede
 Minute, AdGuard-Daten höchstens alle zehn Minuten und FRITZ!Box-Geräteinformationen
 höchstens einmal pro Stunde neu abgefragt. Dazwischen nutzt Nodarion die zuletzt
 erfolgreich gelesenen Zusatzdaten.

@@ -181,9 +181,15 @@ changes and automatic stale-inventory cleanup, and are revoked only after a
 changed MAC has been observed twice. Trust, enforcement, cleanup, and failure
 reasons are recorded in the live log.
 
-To reduce network and system load, ping/TCP discovery checks known addresses at
-the selected interval and performs a full discovery every five cycles. Reverse
-DNS results are cached for one hour. FRITZ!Box and Mesh data is refreshed at most once per minute,
+To reduce network and system load, ping/TCP discovery checks known addresses
+first and scans unknown addresses in small rolling batches. ARP/neighbor hints
+are prioritised, and the scanner remembers the last successful probe method or
+TCP port for each device. Monitored and presence devices use a fast recovery
+lane: while one is offline, it is rechecked at least every 15 seconds without
+triggering extra full-VLAN scans. **Scan now** deliberately performs complete
+discovery when required. Reverse DNS runs with bounded parallelism; successful
+names are cached for 24 hours and negative responses for 30 minutes. FRITZ!Box
+and Mesh data is refreshed at most once per minute,
 AdGuard data every ten minutes, and FRITZ!Box device information once per hour.
 
 AdGuard Home analysis requires direct access to its web interface and an

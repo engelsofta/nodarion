@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.24.0 — Fast scans, calm LANs
+
+> **Scan fast. Stay LAN-back.** Nodarion now spends its effort where it matters:
+> important devices return quickly, while background discovery stays polite.
+
+### Added
+
+- Added a priority recovery lane for monitored and presence devices. When one
+  of these devices is offline, it is checked every 15 seconds until it returns.
+- Added rolling discovery in groups of 32 unknown addresses instead of periodic
+  full-subnet bursts.
+- Added ARP/neighbor candidate prioritisation and learned probe profiles that
+  remember the last successful ping or TCP port for every device.
+- Added live scanner status to **Connections active**, including the current
+  mode, effective interval, checked addresses, detections, discovery work, and
+  important devices.
+- Added a WebSocket subscription with revisioned state patches for the panel.
+  REST remains available as a compatibility fallback.
+
+### Improved
+
+- Parallelised reverse-DNS lookup with a dedicated concurrency limit and
+  separate positive and negative cache lifetimes.
+- Reduced default global scanner concurrency from 64 to 32 and kept discovery
+  rate-limited even while important offline devices use fast recovery.
+- **Scan now** performs an intentional complete discovery rather than merely
+  refreshing existing entities.
+- Split frontend state transport into its own module and limited rendering to
+  the sections affected by an update.
+- Removed repeated full-state polling and expensive attribute serialization on
+  every Home Assistant state change.
+- Moved the four AdGuard DNS statistics into a compact, subtly separated group
+  beside the DNS Live controls.
+- Completed German and English wording for the new scanner modes and counters.
+
+### Fixed
+
+- Prevented an optional missing mesh view from turning a successful AI report
+  into a misleading `null.innerHTML` error.
+- Kept fast recovery focused on important devices without multiplying rolling
+  discovery or full-VLAN scans.
+
+### Versions
+
+- Integration: `1.24.0`
+- Frontend: `1.29.4`
+
+---
+
 ## 1.23.2 — No more hide-and-seek
 
 This small visual follow-up makes the remaining controls readable in Home

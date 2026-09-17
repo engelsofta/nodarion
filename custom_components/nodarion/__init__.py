@@ -28,6 +28,7 @@ from .coordinator import NetworkCoordinator
 from .monitor import NetworkMonitor
 from .vendor import MacVendorLookup
 from .services import async_register_services, async_unregister_services
+from .websocket import async_register_websocket_api
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 type HANetMonConfigEntry = ConfigEntry[NetworkCoordinator]
@@ -60,6 +61,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) -> 
     if not domain_data.get("api_registered"):
         hass.http.register_view(NodarionView)
         domain_data["api_registered"] = True
+    async_register_websocket_api(hass)
     await _async_register_panel(hass)
     coordinator = NetworkCoordinator(hass, entry, monitor)
     domain_data["coordinator"] = coordinator
