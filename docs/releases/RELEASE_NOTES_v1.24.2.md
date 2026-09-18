@@ -1,4 +1,4 @@
-# Nodarion 1.24.2 — Schnell wach. Dauerhaft wachsam.
+# Nodarion 1.24.2 — Starts fast. Stays vigilant.
 
 > **Nodarion ist sofort da. Seine Langstreckenläufer halten Home Assistant
 > nicht länger an der Startlinie fest.**
