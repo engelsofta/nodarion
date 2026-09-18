@@ -57,15 +57,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) -> 
         }])
     if options.get(CONF_FRITZ_ENABLED):
         await monitor.async_initialize_internet_guard()
-    domain_data["monitor"] = monitor
-    if not domain_data.get("api_registered"):
-        hass.http.register_view(NodarionView)
-        domain_data["api_registered"] = True
-    async_register_websocket_api(hass)
-    await _async_register_panel(hass)
     coordinator = NetworkCoordinator(hass, entry, monitor)
+    # Make the persisted inventory available immediately.  An active network
+    # scan may take tens of seconds and must not hold up integration setup.
+    # The background refresh below replaces this snapshot as soon as fresh
+    # data is available.
+    coordinator.async_set_updated_data(monitor.restored_hosts())
+
+    domain_data["monitor"] = monitor
     domain_data["coordinator"] = coordinator
-    await coordinator.async_config_entry_first_refresh()
     if coordinator.adguard_scanner is not None:
         from .adguard_status import AdGuardStatusCoordinator
 
@@ -76,8 +76,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) -> 
         # the network monitor itself from loading.
         await coordinator.adguard_status_coordinator.async_refresh()
     entry.runtime_data = coordinator
+
+    if not domain_data.get("api_registered"):
+        hass.http.register_view(NodarionView)
+        domain_data["api_registered"] = True
+    async_register_websocket_api(hass)
     await async_register_services(hass)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await _async_register_panel(hass)
+
+    initial_refresh = hass.async_create_background_task(
+        coordinator.async_refresh(),
+        "Nodarion initial network scan",
+    )
+    entry.async_on_unload(initial_refresh.cancel)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
 

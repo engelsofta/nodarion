@@ -655,7 +655,10 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         task = self._priority_recovery_task
         if self._priority_offline_keys:
             if task is None or task.done():
-                self._priority_recovery_task = self.hass.async_create_task(
+                # This loop intentionally survives for as long as an important
+                # device is offline.  Register it as background work so Home
+                # Assistant does not wait for it during bootstrap or shutdown.
+                self._priority_recovery_task = self.hass.async_create_background_task(
                     self._async_priority_recovery_loop(),
                     "Nodarion priority recovery",
                 )

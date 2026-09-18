@@ -15,6 +15,7 @@ STATUS = (COMPONENT / "adguard_status.py").read_text(encoding="utf-8")
 SENSOR = (COMPONENT / "sensor.py").read_text(encoding="utf-8")
 SWITCH = (COMPONENT / "switch.py").read_text(encoding="utf-8")
 BINARY_SENSOR = (COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
+INIT = (COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
 
 class ConfigurationContractTests(unittest.TestCase):
@@ -29,6 +30,17 @@ class ConfigurationContractTests(unittest.TestCase):
     def test_authentication_failures_start_reauth(self) -> None:
         self.assertIn("entry.async_start_reauth(self.hass)", COORDINATOR)
         self.assertIn("entry.async_start_reauth(self.hass)", STATUS)
+
+    def test_setup_restores_immediately_and_refreshes_in_background(self) -> None:
+        restored = "coordinator.async_set_updated_data(monitor.restored_hosts())"
+        platforms = "await hass.config_entries.async_forward_entry_setups"
+        background = "initial_refresh = hass.async_create_background_task("
+        self.assertIn(restored, INIT)
+        self.assertIn(background, INIT)
+        self.assertIn("entry.async_on_unload(initial_refresh.cancel)", INIT)
+        self.assertNotIn("async_config_entry_first_refresh", INIT)
+        self.assertLess(INIT.index(restored), INIT.index(platforms))
+        self.assertLess(INIT.index(platforms), INIT.index(background))
 
     def test_native_entities_use_translation_keys(self) -> None:
         self.assertNotIn('name="DNS-Anfragen"', SENSOR)

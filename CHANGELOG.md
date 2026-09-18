@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.24.2 — Schnell wach. Dauerhaft wachsam.
+
+> Nodarion ist sofort da. Seine Langstreckenläufer halten Home Assistant nicht
+> länger an der Startlinie fest.
+
+### Improved
+
+- Restored the persisted participant inventory immediately instead of waiting
+  for the first active network scan to finish.
+- Moved the initial network refresh behind entity, service, and panel setup so
+  Nodarion becomes available promptly with a consistent cached state.
+- Registered the initial scan and long-running priority recovery loop as true
+  Home Assistant background tasks.
+- Kept explicit task cancellation when the integration unloads.
+
+### Fixed
+
+- Prevented the intentionally persistent `Nodarion priority recovery` loop
+  from being counted as pending bootstrap work and delaying Home Assistant
+  startup until its timeout.
+
+### Versions
+
+- Integration: `1.24.2`
+- Frontend: `1.29.4`
+
+---
+
 ## 1.24.1 — VIP lane for sleepy devices
 
 > Important devices take the fast lane. The rest of the network keeps cruising.

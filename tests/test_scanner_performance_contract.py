@@ -30,6 +30,11 @@ class ScannerPerformanceContractTests(unittest.TestCase):
         self.assertIn("min(self.scan_interval, 15)", COORDINATOR)
         self.assertIn("async_scan_priority", SCANNER)
         self.assertIn("_async_priority_recovery_loop", COORDINATOR)
+        self.assertIn("self.hass.async_create_background_task(", COORDINATOR)
+        self.assertNotIn(
+            "self._priority_recovery_task = self.hass.async_create_task(",
+            COORDINATOR,
+        )
         self.assertIn("if key in self.data and not self.data[key].online", COORDINATOR)
         self.assertNotIn("self.update_interval = timedelta", COORDINATOR)
         self.assertIn('"scan_mode": "priority_recovery"', COORDINATOR)
