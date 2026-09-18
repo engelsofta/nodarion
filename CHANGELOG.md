@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.24.4 — Right API, right entry
+
+> The modern lookup now has the full address: identifier plus config entry.
+
+### Fixed
+
+- Passed the required config-entry ID to Home Assistant's
+  `async_get_device_by_identifier` registry method.
+- Prevented coordinator listener updates from failing with a missing-argument
+  `TypeError` after the 1.24.3 registry migration.
+
+### Versions
+
+- Integration: `1.24.4`
+- Frontend: `1.29.4`
+
+---
+
 ## 1.24.3 — Future-proof, warning-proof
 
 > Same devices, cleaner startup: Nodarion speaks Home Assistant's current
