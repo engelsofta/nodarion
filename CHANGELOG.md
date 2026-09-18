@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.24.3 — Future-proof, warning-proof
+
+> Same devices, cleaner startup: Nodarion speaks Home Assistant's current
+> registry language.
+
+### Fixed
+
+- Replaced the deprecated multi-config-entry device lookup with Home
+  Assistant's identifier-specific registry API.
+- Removed the deprecation warning scheduled to become an error in Home
+  Assistant 2027.8.
+
+### Versions
+
+- Integration: `1.24.3`
+- Frontend: `1.29.4`
+
+---
+
 ## 1.24.2 — Starts fast. Stays vigilant.
 
 > Nodarion ist sofort da. Seine Langstreckenläufer halten Home Assistant nicht

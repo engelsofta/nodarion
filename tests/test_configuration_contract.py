@@ -49,6 +49,10 @@ class ConfigurationContractTests(unittest.TestCase):
         self.assertGreaterEqual(SENSOR.count("translation_key="), 8)
         self.assertGreaterEqual(SWITCH.count("translation_key="), 6)
 
+    def test_device_lookup_uses_config_entry_safe_identifier_api(self) -> None:
+        self.assertIn("async_get_device_by_identifier", BINARY_SENSOR)
+        self.assertNotIn("registry.async_get_device(", BINARY_SENSOR)
+
     def test_translation_files_are_valid_and_cover_recovery_and_entities(self) -> None:
         for path in (
             COMPONENT / "strings.json",

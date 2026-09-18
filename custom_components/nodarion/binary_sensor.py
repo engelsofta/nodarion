@@ -143,7 +143,7 @@ def _update_device_names(
     """Keep integration-managed device names aligned with discovered hostnames."""
     registry = dr.async_get(hass)
     for host in hosts.values():
-        device = registry.async_get_device(identifiers={(DOMAIN, host.key)})
+        device = registry.async_get_device_by_identifier((DOMAIN, host.key))
         if (
             device is not None
             and device.name_by_user is None
