@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.24.5 — One version, everywhere
+
+> What you install is now exactly what Nodarion shows.
+
+### Fixed
+
+- Updated the integration version exposed to the Nodarion panel, which had
+  remained pinned to `1.24.1` while the manifest advanced.
+- Added a regression check that keeps the displayed version synchronized with
+  the integration manifest.
+- Refreshed the release badges in both README files.
+
+### Versions
+
+- Integration: `1.24.5`
+- Frontend: `1.29.4`
+
+---
+
 ## 1.24.4 — Right API, right entry
 
 > The modern lookup now has the full address: identifier plus config entry.

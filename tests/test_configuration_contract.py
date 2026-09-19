@@ -16,9 +16,17 @@ SENSOR = (COMPONENT / "sensor.py").read_text(encoding="utf-8")
 SWITCH = (COMPONENT / "switch.py").read_text(encoding="utf-8")
 BINARY_SENSOR = (COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
 INIT = (COMPONENT / "__init__.py").read_text(encoding="utf-8")
+CONSTANTS = (COMPONENT / "const.py").read_text(encoding="utf-8")
+MANIFEST = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
 
 
 class ConfigurationContractTests(unittest.TestCase):
+    def test_displayed_version_matches_manifest(self) -> None:
+        self.assertIn(
+            f'INTEGRATION_VERSION = "{MANIFEST["version"]}"',
+            CONSTANTS,
+        )
+
     def test_connections_are_tested_before_all_configuration_writes(self) -> None:
         self.assertGreaterEqual(FLOW.count("await _async_validate_input"), 4)
         self.assertIn("async_step_reconfigure", FLOW)

@@ -4,7 +4,7 @@ DOMAIN = "nodarion"
 PLATFORMS = ["binary_sensor", "sensor", "switch"]
 PANEL_URL = "nodarion"
 PANEL_TITLE = "Engelsoft Nodarion"
-INTEGRATION_VERSION = "1.24.1"
+INTEGRATION_VERSION = "1.24.5"
 FRONTEND_VERSION = "1.29.4"
 
 CONF_FRITZ_ENABLED = "fritz_enabled"
