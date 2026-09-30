@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.4";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.4";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.9";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.9";
 
 const esc = (value) =>
   String(value ?? "")
@@ -14,6 +14,10 @@ const esc = (value) =>
 let panelLocale = "en";
 const EN = new Map(Object.entries({
   "Nodarion auf GitHub öffnen": "Open Nodarion on GitHub",
+  "Übersicht ein- oder ausklappen": "Expand or collapse overview",
+  "Nodarion gefällt dir?": "Enjoying Nodarion?",
+  "Ein Stern auf GitHub sagt Danke.": "A GitHub star says thanks.",
+  "Nodarion mit einem Stern auf GitHub unterstützen": "Support Nodarion with a star on GitHub",
   "Warnungen und Auffälligkeiten": "Warnings and anomalies",
   "Aktive Hinweise stehen oben, erledigte bleiben als Verlauf erhalten.": "Active notices are shown first; resolved ones remain in the history.",
   "Änderungen werden direkt in AdGuard Home gespeichert. DNS-Live ist während der Bearbeitung pausiert.": "Changes are saved directly to AdGuard Home. DNS Live is paused while editing.",
@@ -63,6 +67,7 @@ const EN = new Map(Object.entries({
   "24-Stunden-Bewertung mit Tagesvergleich": "24-hour rating with day-to-day comparison",
   "Neueste DNS-Anfragen": "Latest DNS requests",
   "automatisch alle 3 Sekunden": "automatically every 3 seconds",
+  "Übersicht": "Overview", "Geräte suchen …": "Search devices …", "Geräte suchen": "Search devices", "Geräte filtern": "Filter devices", "Suche": "Search",
   "Netzwerkgeräte": "Network devices", "Alle IP-Bereiche": "All IP ranges",
   "Teilnehmer": "Devices", "IP-Adresse": "IP address", "MAC-Adresse": "MAC address",
   "Verbindung": "Connection", "Verbindungen werden geladen": "Loading connections",
@@ -523,6 +528,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._hass = null;
     this._columnFilters = {};
+    this._mobileOverviewExpanded = false;
+    this._mobileFiltersExpanded = false;
     this._columnVisibility = this._loadColumnVisibility();
     this._sort = "ip";
     this._sortDirection = "asc";
@@ -956,6 +963,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._settingsReturnTab = this._activeTab;
     }
     this._saveSettingsTab();
+    this._renderWatch();
     this._navigateTo("settings");
     if (this._settingsTab === "dns" && this._hass?.user?.is_admin) {
       this._loadAdguardConfig();
@@ -1135,6 +1143,14 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         header { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:28px; }
         .brand { display:flex; align-items:center; gap:16px; }
+        .github-thanks { display:flex; align-items:center; justify-content:center; gap:10px; flex:1; min-width:0; padding:9px 12px; border:1px solid var(--ns-line); border-radius:13px; color:var(--ns-text); background:rgba(240,161,59,.045); text-decoration:none; transition:background .18s ease,border-color .18s ease; }
+        .github-thanks > ha-icon { --mdc-icon-size:24px; flex-shrink:0; color:var(--ns-yellow,#f0c774); }
+        .github-thanks-copy { display:grid; gap:3px; }
+        .github-thanks strong { font-size:12px; font-weight:750; }
+        .github-thanks small { font-size:11px; line-height:1.4; color:var(--ns-muted); }
+        .github-thanks:hover { background:rgba(240,161,59,.11); border-color:var(--ns-yellow,#f0c774); }
+        .github-thanks:focus-visible { outline:2px solid var(--ns-yellow,#f0c774); outline-offset:3px; }
+        @media (max-width:800px) { .github-thanks { display:none; } }
         .header-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; }
         .header-action { min-height:43px; display:flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid var(--ns-line); border-radius:13px; color:#cce5dc; background:rgba(255,255,255,.04); font:inherit; font-size:11px; font-weight:750; white-space:nowrap; cursor:pointer; transition:.18s ease; }
         .header-action:hover, .header-action.active { color:#fff7e9; border-color:rgba(240,161,59,.38); background:rgba(240,161,59,.1); }
@@ -2779,6 +2795,101 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .function-count strong { gap:4px; font-size:21px; }
           .function-count { padding-inline:5px; }
         }
+        .metric-overview { display:contents; }
+        .mobile-overview-toggle, .mobile-overview-actions, .mobile-device-controls { display:none; }
+        @media (max-width:620px) {
+          .metrics { display:flex; flex-direction:column; gap:7px; padding:0; border:0; background:transparent; box-shadow:none; margin-bottom:12px; }
+          .metrics .metric.devices { min-height:0; padding:8px 11px; }
+          .metrics .devices .metric-label-row { margin-bottom:3px; }
+          .metrics .devices .device-counts { margin:0; gap:4px; }
+          .metrics .devices .device-count { display:flex; align-items:baseline; justify-content:center; gap:5px; padding:4px; }
+          .metrics .devices .device-count strong { font-size:19px; }
+          .metrics .devices .device-count span { font-size:9px; }
+          .metrics .devices .guest-inline { margin-top:4px; padding:3px 6px; font-size:10px; }
+          .metrics .devices { position:relative; }
+          .metrics .devices .guest-inline { max-width:calc(100% - 36px); }
+          .mobile-overview-toggle { position:absolute; bottom:4px; right:5px; display:grid; place-items:center; width:30px; height:30px; padding:0; border:0; border-radius:7px; background:transparent; color:var(--ns-text,#eee5d5); cursor:pointer; }
+          .mobile-overview-actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+          .mobile-alert-summary { display:flex; align-items:center; gap:6px; min-height:36px; border:1px solid var(--ns-line); border-radius:9px; background:rgba(255,255,255,.04); color:var(--ns-text,#eee5d5); padding:5px 9px; font:inherit; font-size:12px; cursor:pointer; }
+          .mobile-overview-toggle ha-icon, .mobile-alert-summary ha-icon { --mdc-icon-size:18px; }
+          .mobile-alert-summary { color:var(--ns-yellow,#f0c774); }
+          .overview-expanded .mobile-overview-toggle ha-icon { transform:rotate(180deg); }
+          .metric-overview { display:none; }
+          .overview-expanded .metric-overview { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+          .metric-overview .metric { min-height:0; padding:10px; }
+          .metric-overview .metric-value, .metric-overview .metric-status-value { font-size:20px; }
+          .metric-overview .function-count strong { font-size:17px; }
+          .mobile-device-controls { display:block; margin-bottom:8px; }
+          .mobile-search-row { display:flex; gap:7px; padding-right:51px; }
+          .mobile-device-search { box-sizing:border-box; height:44px; display:flex; align-items:center; flex:1; min-width:0; gap:7px; padding:0 10px; border:1px solid var(--ns-line); border-radius:10px; background:var(--light-card-bg,rgba(38,35,32,.92)); }
+          .mobile-device-search ha-icon { --mdc-icon-size:20px; color:var(--ns-cyan); }
+          .mobile-device-search input { width:100%; min-width:0; height:100%; padding:0; box-sizing:border-box; border:0; outline:0; background:transparent; color:inherit; font:inherit; font-size:13px; }
+          .mobile-device-search:focus-within { border-color:var(--ns-cyan); }
+          .mobile-filter-toggle { display:flex; align-items:center; justify-content:center; gap:3px; box-sizing:border-box; min-width:44px; height:44px; padding:0 6px; border:1px solid var(--ns-line); border-radius:10px; background:var(--light-card-bg,rgba(38,35,32,.92)); color:inherit; cursor:pointer; }
+          .mobile-filter-toggle ha-icon { --mdc-icon-size:21px; }
+          .mobile-filter-toggle.active { color:var(--ns-yellow,#f0c774); }
+          .mobile-filter-toggle span { font-size:11px; font-weight:700; }
+          .mobile-device-filters { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:10px 0; }
+          .mobile-device-filters[hidden] { display:none; }
+          .mobile-filter-field { min-width:0; display:grid; gap:4px; }
+          .mobile-filter-field > span { font-size:10px; color:var(--ns-muted,#bcb5a8); }
+          .mobile-device-filters .custom-column-filter { width:100%; min-width:0 !important; }
+          .device-list .column-filters { display:none; }
+          .device-list .filter-chips { margin-bottom:8px; gap:5px; }
+          .device-list .filter-chip, .device-list .filter-reset { font-size:11px; padding:5px 7px; }
+          .table-column-picker, :host([data-theme="light"]) .table-column-picker { top:0; right:0; box-sizing:border-box; width:44px; height:44px; border-radius:10px; border:1px solid var(--ns-line); background:var(--light-card-bg,rgba(38,35,32,.92)); color:inherit; }
+          .table-column-picker ha-icon { --mdc-icon-size:21px; }
+          .device-list tbody tr { display:flex; flex-direction:column; }
+          .device-list tbody td { padding:7px 11px; }
+          .device-list td[data-column="name"] { order:-3; padding-top:10px; }
+          .device-list td[data-column="state"] { order:-2; }
+          .device-list td[data-column="ip"] { order:-1; }
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="vlan"],
+          .device-list tbody tr:not(.mobile-expanded) td[data-column="internet"] { display:none; }
+          .device-list .status-cell { display:flex; flex-wrap:nowrap; }
+          .device-list .status-cell .status-time { font-size:9px; text-align:right; }
+          .device-list .status-cell .status-time br { display:none; }
+        }
+
+        /* Adapt to each card's width, including narrow desktop columns. */
+        .watch-metric { container-type:inline-size; container-name:nodarion-watch; }
+        @container nodarion-watch (max-width:360px) {
+          .function-counts { gap:4px; }
+          .function-count { padding-inline:3px; }
+          .watch-metric .function-count strong { font-size:clamp(13px,7cqi,23px); gap:3px; white-space:nowrap; }
+          .function-count ha-icon { --mdc-icon-size:13px; flex-shrink:0; }
+          .function-count span { font-size:8px; letter-spacing:.15px; }
+        }
+        .settings-view { min-width:0; }
+        .settings-view .watch-heading { flex-wrap:wrap; }
+        .settings-context-title { min-width:0; flex:1 1 290px; }
+        .settings-context-title > div { min-width:0; }
+        .settings-context-title p { overflow-wrap:anywhere; }
+        .settings-save-area { min-width:0; max-width:100%; }
+        .settings-view .rule-group, .settings-view .learning-card { min-width:0; }
+        .settings-tab-panel.general-panel { grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); }
+        .vlan-settings { container-type:inline-size; container-name:nodarion-vlan; }
+        .vlan-settings-head { flex-wrap:wrap; }
+        .vlan-settings-head h3 { min-width:0; overflow-wrap:anywhere; }
+        .settings-view .rule input:not([type="checkbox"]):not([type="color"]) { min-width:0; width:100%; box-sizing:border-box; }
+        .settings-view .unit-input { min-width:0; }
+        @container nodarion-vlan (max-width:760px) {
+          .vlan-row { grid-template-columns:repeat(3,minmax(0,1fr)); }
+          .vlan-field.name, .vlan-field.network { grid-column:auto; }
+        }
+        @container nodarion-vlan (max-width:460px) {
+          .vlan-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+          .vlan-field.name, .vlan-field.network { grid-column:1 / -1; }
+        }
+        :host([data-theme="dark"]) .settings-view { --ns-field:rgba(255,238,209,.075); }
+        :host([data-theme="dark"]) .settings-view input:not([type="checkbox"]):not([type="color"]),
+        :host([data-theme="dark"]) .settings-view select,
+        :host([data-theme="dark"]) .settings-view .settings-select summary,
+        :host([data-theme="dark"]) .settings-view .unit-input {
+          background:var(--ns-field); border-color:rgba(239,220,186,.17);
+        }
+        :host([data-theme="dark"]) .settings-view .unit-input input:not([type="checkbox"]):not([type="color"]) { background:transparent; }
+        :host([data-theme="dark"]) .settings-view .unit-input span { background:rgba(255,238,209,.035); }
       </style>
       <div class="shell">
         <header>
@@ -2791,6 +2902,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="version-info"></div>
             </div>
           </div>
+          <a class="github-thanks" href="https://github.com/engelsofta/nodarion" target="_blank" rel="noopener noreferrer" aria-label="Nodarion mit einem Stern auf GitHub unterstützen" title="Nodarion mit einem Stern auf GitHub unterstützen">
+            <ha-icon icon="mdi:star-outline" aria-hidden="true"></ha-icon>
+            <span class="github-thanks-copy"><strong>Nodarion gefällt dir?</strong><small>Ein Stern auf GitHub sagt Danke.</small></span>
+          </a>
           <div class="header-actions">
             <button class="header-action connection-status" type="button" title="Verbindungsdetails anzeigen"><ha-icon icon="mdi:lan-connect"></ha-icon><span>Verbindungen werden geladen</span><ha-icon icon="mdi:chevron-down"></ha-icon></button>
             <button class="header-action header-settings" type="button" title="Allgemeine Einstellungen öffnen" aria-label="Allgemeine Einstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button>
@@ -2849,6 +2964,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._renderConnections();
     });
     this.shadowRoot.querySelector(".metrics").addEventListener("click", (event) => {
+      if (event.target.closest(".mobile-overview-toggle")) {
+        this._mobileOverviewExpanded = !this._mobileOverviewExpanded;
+        const metrics = this.shadowRoot.querySelector(".metrics");
+        metrics.classList.toggle("overview-expanded", this._mobileOverviewExpanded);
+        metrics.querySelector(".mobile-overview-toggle").setAttribute("aria-expanded", String(this._mobileOverviewExpanded));
+        return;
+      }
       const settingsLink = event.target.closest(".metric-settings");
       if (settingsLink) {
         this._openSettings(settingsLink.dataset.settingsSection, settingsLink.dataset.returnTab);
@@ -2888,6 +3010,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._navigateTo(navigation.dataset.navTab);
     });
     this.shadowRoot.querySelector(".device-list").addEventListener("click", (event) => {
+      if (event.target.closest(".mobile-filter-toggle")) {
+        this._mobileFiltersExpanded = !this._mobileFiltersExpanded;
+        this._renderCards();
+        this.shadowRoot.querySelector(".mobile-filter-toggle")?.focus({ preventScroll: true });
+        return;
+      }
       const clearFilter = event.target.closest("[data-clear-column-filter]");
       if (clearFilter) {
         delete this._columnFilters[clearFilter.dataset.clearColumnFilter];
@@ -3008,11 +3136,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const key = input.dataset.columnFilter;
       this._columnFilters[key] = input.value.trim();
       const selection = input.selectionStart;
+      const mobile = Boolean(input.closest(".mobile-device-controls"));
       this._renderCards();
       const replacement = this.shadowRoot.querySelector(
-        `[data-column-filter="${key}"]`
+        `${mobile ? ".mobile-device-controls " : "table "}[data-column-filter="${key}"]`
       );
-      replacement?.focus();
+      replacement?.focus({ preventScroll: true });
       if (selection !== null && replacement?.setSelectionRange) {
         replacement.setSelectionRange(selection, selection);
       }
@@ -3546,11 +3675,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const focusState = activeElement?.dataset?.columnFilter ? {
       type:"participant-input", key:activeElement.dataset.columnFilter,
       start:activeElement.selectionStart, end:activeElement.selectionEnd,
+      mobile:Boolean(activeElement.closest(".mobile-device-controls")),
     } : activeElement?.dataset?.logFilter ? {
       type:"log-input", key:activeElement.dataset.logFilter,
       start:activeElement.selectionStart, end:activeElement.selectionEnd,
     } : participantDropdown ? {
       type:"participant-dropdown",
+      mobile:Boolean(participantDropdown.closest(".mobile-device-controls")),
       key:participantDropdown.dataset.columnFilterKey
         || participantDropdown.closest("th")?.dataset.column,
     } : logDropdown ? {
@@ -3645,6 +3776,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         : "Noch keine Bewertung"
     );
     const metrics = this.shadowRoot.querySelector(".metrics");
+    metrics.classList.toggle("overview-expanded", this._mobileOverviewExpanded);
     metrics.innerHTML = `
       <article class="metric nav-metric devices ${this._activeTab === "participants" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="participants" aria-current="${this._activeTab === "participants" ? "page" : "false"}">
         <div class="metric-label-row"><div class="metric-label">Netzwerkgeräte</div><button class="metric-settings" type="button" data-settings-section="devices" data-return-tab="participants" title="Geräteeinstellungen öffnen" aria-label="Geräteeinstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
@@ -3654,7 +3786,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <button class="device-count new ${this._columnFilters.onboarding === "onboarding" ? "active" : ""}" type="button" data-quick-filter="onboarding" data-quick-filter-value="onboarding" title="${onboarding} neue Geräte im Einrichtungsbereich"><strong>${onboarding}</strong><span>NEU</span></button>
         </div>
         ${guestMonitoring ? `<button class="guest-inline" type="button" title="Gastzugang anzeigen"><ha-icon icon="mdi:wifi-star"></ha-icon>${guestClients} ${guestClients === 1 ? "Gast" : "Gäste"} · ${guestInfo.enabled ? "aktiv" : "deaktiviert"}</button>` : ""}
+        <button class="mobile-overview-toggle" type="button" aria-label="Übersicht ein- oder ausklappen" title="Übersicht ein- oder ausklappen" aria-expanded="${this._mobileOverviewExpanded}" aria-controls="mobile-metric-overview"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
       </article>
+      ${alertCount ? `<div class="mobile-overview-actions"><button class="mobile-alert-summary" type="button" data-nav-tab="watch"><ha-icon icon="mdi:alert-outline"></ha-icon>${alertCount} offene Warnungen</button></div>` : ""}
+      <div class="metric-overview" id="mobile-metric-overview">
       <article class="metric nav-metric events-metric ${this._activeTab === "log" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="log" aria-current="${this._activeTab === "log" ? "page" : "false"}">
         <div class="metric-label-row"><div class="metric-label">Ereignisse</div><button class="metric-settings" type="button" data-settings-section="notifications" data-return-tab="log" title="Benachrichtigungen öffnen" aria-label="Benachrichtigungseinstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="metric-status-value"><ha-icon icon="mdi:text-box-search-outline"></ha-icon>${eventCount}</div>
@@ -3677,7 +3812,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <button class="function-count notify ${this._columnFilters.watch === "notify" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="notify" title="Glocke: ${notifications} gesamt, ${notificationsOnline} online"><strong><ha-icon icon="mdi:bell-outline"></ha-icon>${notifications}/${notificationsOnline}</strong><span>Glocke</span></button>
           <button class="function-count presence ${this._columnFilters.watch === "presence" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="presence" title="Anwesenheit: ${presenceDevices} gesamt, ${presenceOnline} online"><strong><ha-icon icon="mdi:home-outline"></ha-icon>${presenceDevices}/${presenceOnline}</strong><span>Anwesenheit</span></button>
         </div>
-      </article>`;
+      </article></div>`;
     const full = !changed;
     const preferencesChanged = full || changed.has("preferences");
     const lifecycleChanged = full || changed.has("lifecycle");
@@ -3702,11 +3837,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
     });
     if (focusState) {
       const selector = focusState.type === "participant-input"
-        ? `[data-column-filter="${focusState.key}"]`
+        ? `${focusState.mobile ? ".mobile-device-controls " : "table "}[data-column-filter="${focusState.key}"]`
         : focusState.type === "log-input"
           ? `[data-log-filter="${focusState.key}"]`
           : focusState.type === "participant-dropdown"
-            ? `.device-list [data-column-filter-key="${focusState.key}"] summary`
+            ? `.device-list ${focusState.mobile ? ".mobile-device-controls " : "table "}[data-column-filter-key="${focusState.key}"] summary`
             : focusState.type === "log-dropdown"
               ? `.log-list [data-log-filter-key="${focusState.key}"] summary`
               : focusState.type === "dns-policy-choice"
@@ -3936,6 +4071,27 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }).join("");
   }
 
+  _matchesDeviceSearch(entity, query) {
+    const terms = String(query || "").trim().toLocaleLowerCase("de-DE").split(/\s+/).filter(Boolean);
+    if (!terms.length) return true;
+    const attr = entity.attributes;
+    const key = attr.nodarion_key || `ip_${attr.ip_address}`;
+    const functions = [
+      this._monitor.monitored.includes(key) ? "Favorit Favoriten überwacht monitored" : "",
+      this._monitor.notifications.includes(key) ? "Glocke Offline-Meldung notify" : "",
+      this._monitor.presence_devices.includes(key) ? "Anwesenheit presence" : "",
+    ];
+    const haystack = [entity.entity_id, attr.friendly_name, attr.hostname, attr.ip_address,
+      attr.mac_address, attr.mac_vendor, attr.mac_vendor_prefix, attr.manufacturer,
+      attr.segment_id, attr.segment_name, attr.vlan_id, attr.vlan_id != null ? `VLAN ${attr.vlan_id}` : "",
+      attr.access_point, attr.connection_type, attr.wifi_band, attr.address_source,
+      attr.link_rate_mbps, attr.signal_strength_percent, attr.dns_queries, attr.dns_last_domain,
+      ...(attr.detection_sources || []), ...(attr.detection_sources || []).map(source => ({fritzbox:"FRITZ!Box", ping_tcp:"Ping/TCP"})[source] || source), ...functions, entity.state === "on" ? "online" : "offline",
+      attr.guest_network ? "Gast Gastzugang guest" : "",
+    ].filter(value => value != null).join(" ").toLocaleLowerCase("de-DE");
+    return terms.every(term => haystack.includes(term));
+  }
+
   _renderCards() {
     const activeFilter = this.shadowRoot.activeElement?.closest?.(
       "[data-column-filter]"
@@ -3945,6 +4101,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       start: activeFilter.selectionStart,
       end: activeFilter.selectionEnd,
       direction: activeFilter.selectionDirection,
+      mobile: Boolean(activeFilter.closest(".mobile-device-controls")),
     } : null;
     const matches = (value, pattern) => {
       const needle = String(pattern || "").toLocaleLowerCase("de-DE");
@@ -3992,6 +4149,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const attr = entity.attributes;
       const filters = this._columnFilters;
       const key = attr.nodarion_key || `ip_${attr.ip_address}`;
+      if (!this._matchesDeviceSearch(entity, filters.search)) return false;
       if (filters.state === "guest" && !attr.guest_network) return false;
       if (["on", "off"].includes(filters.state) && entity.state !== filters.state) return false;
       if (
@@ -4337,12 +4495,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
       .map(([name, count]) => `<button type="button" class="custom-filter-option ${this._columnFilters.mesh === name ? "active" : ""}" data-column-filter-key="mesh" data-column-filter-value="${esc(name)}"><ha-icon icon="${this._columnFilters.mesh === name ? "mdi:check" : "mdi:access-point"}"></ha-icon><span>${esc(name)}</span><span class="custom-filter-count">${count}</span></button>`)
       .join("");
     const selectedMesh = this._columnFilters.mesh || "Alle Mesh-Punkte";
-    const filterNames = { state:"Status", onboarding:"IP-Bereich", vlan:"VLAN", name:"Teilnehmer", ip:"IP-Adresse", mac:"MAC-Adresse", connection:"Verbindung", mesh:"Mesh", rate:"WLAN", address:"Adressvergabe", dns:"AdGuard DNS", source:"Erkannt durch", internet:"Internetzugang", watch:"Überwachung" };
+    const filterNames = { search:"Suche", state:"Status", onboarding:"IP-Bereich", vlan:"VLAN", name:"Teilnehmer", ip:"IP-Adresse", mac:"MAC-Adresse", connection:"Verbindung", mesh:"Mesh", rate:"WLAN", address:"Adressvergabe", dns:"AdGuard DNS", source:"Erkannt durch", internet:"Internetzugang", watch:"Überwachung" };
     const filterValueNames = { on:"Online", off:"Offline", guest:"Gastzugang", onboarding:"Einrichtungsbereich", assigned:"Regulärer Bereich", unknown:"Einrichtung deaktiviert", monitored:"Überwacht", notify:"Offline-Meldung", presence:"Anwesenheit", none:"Keine Funktion", denied:"Gesperrt", pending:"Freigabe ausstehend", error:"Freigabe fehlgeschlagen", unchecked:"Noch nicht geprüft", unmanaged:"Nicht verwaltet", infrastructure:"Netzwerkinfrastruktur", learning:"Lernphase", trusted:"Vertrauenswürdig", allowed:"Freigegeben", ...sourceLabels, ...Object.fromEntries([...segmentCounts.values()].map((segment) => [segment.id, segment.vlanId ? `${segment.name} · VLAN ${segment.vlanId}` : segment.name])) };
     const activeFilters = Object.entries(this._columnFilters).filter(([, value]) => value);
     const filterChips = activeFilters.length ? `<div class="filter-chips" role="status" aria-label="Aktive Filter">${activeFilters.map(([key, value]) => `<button class="filter-chip" type="button" data-clear-column-filter="${esc(key)}" aria-label="Filter ${esc(filterNames[key] || key)} entfernen"><span>${esc(filterNames[key] || key)}: ${esc(filterValueNames[value] || value)}</span><ha-icon icon="mdi:close"></ha-icon></button>`).join("")}<button class="filter-reset" type="button" data-clear-all-filters>Alle Filter zurücksetzen</button></div>` : "";
     const emptyRow = `<tr><td colspan="14"><div class="empty"><ha-icon icon="mdi:filter-off-outline"></ha-icon><strong>Keine passenden Geräte</strong>Filter ändern oder leeren.</div></td></tr>`;
-    grid.innerHTML = `${filterChips}<table aria-label="Netzwerkgeräte">
+    const mobileFilterCount = activeFilters.filter(([key]) => key !== "search").length;
+    const mobileFilter = (label, control) => `<div class="mobile-filter-field"><span>${esc(label)}</span>${control}</div>`;
+    const meshFilter = customFilter("mesh", countedOptions(allEntities.map(entity => entity.attributes.access_point).filter(Boolean), "Alle Mesh-Punkte", "mdi:access-point"));
+    const mobileControls = `<div class="mobile-device-controls"><div class="mobile-search-row"><label class="mobile-device-search"><ha-icon icon="mdi:magnify"></ha-icon><input type="search" data-column-filter="search" value="${esc(this._columnFilters.search || "")}" placeholder="Geräte suchen …" aria-label="Geräte suchen" autocomplete="off"></label><button class="mobile-filter-toggle ${mobileFilterCount ? "active" : ""}" type="button" aria-label="Geräte filtern" aria-expanded="${this._mobileFiltersExpanded}" aria-controls="mobile-device-filters"><ha-icon icon="mdi:filter-variant"></ha-icon>${mobileFilterCount ? `<span>${mobileFilterCount}</span>` : ""}</button></div>
+      <div class="mobile-device-filters" id="mobile-device-filters" ${this._mobileFiltersExpanded ? "" : "hidden"}>
+        ${mobileFilter("Status", stateFilter)}${mobileFilter("IP-Bereich", onboardingFilter)}${mobileFilter("VLAN", vlanFilter)}${mobileFilter("Mesh", meshFilter)}${mobileFilter("Funktion", watchFilter)}${mobileFilter("Verbindung", connectionFilter)}${mobileFilter("Internetzugang", internetFilter)}${mobileFilter("Adressvergabe", addressFilter)}${mobileFilter("Erkannt durch", sourceFilter)}
+      </div></div>`;
+    grid.innerHTML = `${mobileControls}${filterChips}<table aria-label="Netzwerkgeräte">
       <thead>
         <tr>${heading("Status", "state")}${heading("IP-Bereich", "onboarding")}${heading("VLAN", "vlan")}${heading("Teilnehmer", "name")}${heading("IP-Adresse", "ip")}${heading("MAC-Adresse", "mac")}${heading("Verbindung", "connection")}${heading("Mesh-Zugangspunkt", "mesh")}${heading("WLAN-Daten", "rate")}${heading("Adressvergabe", "address")}${heading("AdGuard DNS", "dns")}${heading("Erkannt durch", "source")}<th data-column="internet" class="no-sort">Internetzugang</th><th data-column="watch" class="no-sort">Überwachung</th></tr>
         <tr class="column-filters">
@@ -4369,7 +4534,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     });
     if (activeFilterState) {
       const replacement = grid.querySelector(
-        `[data-column-filter="${activeFilterState.key}"]`
+        `${activeFilterState.mobile ? ".mobile-device-controls " : "table "}[data-column-filter="${activeFilterState.key}"]`
       );
       replacement?.focus({ preventScroll: true });
       if (

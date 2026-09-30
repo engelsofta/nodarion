@@ -77,8 +77,10 @@ class GuiContractTests(unittest.TestCase):
         const_source = (
             ROOT / "custom_components" / "nodarion" / "const.py"
         ).read_text(encoding="utf-8")
-        self.assertIn('FRONTEND_VERSION = "1.29.4"', const_source)
-        self.assertIn('internet-status.mjs?v=1.29.4', PANEL)
+        version_line = next(line for line in const_source.splitlines() if line.startswith("FRONTEND_VERSION ="))
+        version = version_line.split('"')[1]
+        self.assertIn(f'internet-status.mjs?v={version}', PANEL)
+        self.assertIn(f'nodarion-state.mjs?v={version}', PANEL)
 
     def test_dns_stats_are_compact_and_grouped_with_header_actions(self) -> None:
         head = PANEL[PANEL.index('<div class="dns-head">'):]
