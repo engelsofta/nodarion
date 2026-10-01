@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.9";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.9";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.10";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.10";
 
 const esc = (value) =>
   String(value ?? "")
@@ -2749,7 +2749,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .device-list td[data-column="state"]::before { display:none; }
           .device-list .status-cell { flex-direction:row; align-items:center; justify-content:space-between; gap:10px; }
           .device-list .card-actions { justify-content:flex-end; }
-          .device-list .mobile-details { display:grid; }
+          .device-list .mobile-details { display:grid; flex-shrink:0; margin-left:auto; }
+          .device-list .device-label { flex:1; }
           .device-list tbody tr:not(.mobile-expanded) td[data-column="onboarding"],
           .device-list tbody tr:not(.mobile-expanded) td[data-column="mac"],
           .device-list tbody tr:not(.mobile-expanded) td[data-column="connection"],
@@ -4362,6 +4363,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <span class="device-icon ${specialDeviceClass}" title="${esc(deviceIconTitle(entity))}"><ha-icon icon="${deviceIcon(entity)}"></ha-icon></span>
           <div class="device-label"><button class="entity-link" data-key="${esc(key)}" data-name="${esc(name)}" title="Live-Log dieses Geräts anzeigen">${esc(name)}</button>
           <button class="entity-id-link" data-entity-id="${esc(entity.entity_id)}" title="Home-Assistant-Dialog öffnen">${esc(entity.entity_id)}</button></div>
+          <button class="watch mobile-details" type="button" aria-expanded="false" aria-label="Weitere Gerätedetails anzeigen" title="Weitere Gerätedetails anzeigen"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
         </div>
         </td>
         <td data-column="ip" data-label="IP-Adresse" class="mono">${esc(attr.ip_address || "Nicht verfügbar")}</td>
@@ -4378,7 +4380,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
             <button class="watch ${monitored ? "active" : ""}" data-key="${esc(key)}" title="${monitored ? "Überwachung beenden" : "Als wichtig überwachen"}"><ha-icon icon="${monitored ? "mdi:star" : "mdi:star-outline"}"></ha-icon></button>
             <button class="watch notify ${notify ? "active" : ""}" data-key="${esc(key)}" title="${notify ? "Offline-Meldung deaktivieren" : "Bei Offline melden"}"><ha-icon icon="${notify ? "mdi:bell" : "mdi:bell-outline"}"></ha-icon></button>
             <button class="watch presence ${presence ? "active" : ""}" data-key="${esc(key)}" title="${presence ? "Aus Anwesenheitssteuerung entfernen" : `Für Anwesenheitssteuerung verwenden · Offline nach ${Number(this._monitor.rules?.presence_timeout_minutes || 5)} Min.`}"><ha-icon icon="mdi:home-account"></ha-icon></button>
-            <button class="watch mobile-details" type="button" aria-expanded="false" title="Weitere Gerätedetails anzeigen"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
           </div>
         </td>
       </tr>`;

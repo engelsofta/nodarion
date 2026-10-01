@@ -26,6 +26,13 @@ class GuiContractTests(unittest.TestCase):
         self.assertIn("mobile-expanded", PANEL)
         self.assertIn("mobile-details", PANEL)
 
+    def test_mobile_disclosure_is_independent_of_monitoring_column(self) -> None:
+        row = PANEL[PANEL.index('return `<tr class="${online'):]
+        name_cell = row[row.index('<td data-column="name"'):row.index('<td data-column="ip"')]
+        watch_cell = row[row.index('<td data-column="watch"'):row.index('</tr>`;')]
+        self.assertIn('class="watch mobile-details"', name_cell)
+        self.assertNotIn('mobile-details', watch_cell)
+
     def test_device_state_time_survives_home_assistant_restart(self) -> None:
         self.assertIn("this._monitor.online_since?.[key]", PANEL)
         self.assertIn("this._monitor.offline_since?.[key]", PANEL)
