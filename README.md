@@ -73,8 +73,8 @@ AdGuard DNS activity, internet access, and personal monitoring controls.
 <table>
   <tr><th>Dark design</th><th>Light design</th></tr>
   <tr>
-    <td width="50%"><a href="docs/images/teilnehmeruebersicht.png"><img src="docs/images/teilnehmeruebersicht.png" alt="Device overview — Dark design" width="100%"></a></td>
-    <td width="50%"><a href="docs/images/teilnehmeruebersicht-light.png"><img src="docs/images/teilnehmeruebersicht-light.png" alt="Device overview — Light design" width="100%"></a></td>
+    <td width="50%"><a href="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png"><img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png" alt="Device overview — Dark design" width="100%"></a></td>
+    <td width="50%"><a href="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png"><img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png" alt="Device overview — Light design" width="100%"></a></td>
   </tr>
 </table>
 
@@ -86,8 +86,8 @@ time, and direct block or allow actions.
 <table>
   <tr><th>Dark design</th><th>Light design</th></tr>
   <tr>
-    <td width="50%"><a href="docs/images/dns-live.png"><img src="docs/images/dns-live.png" alt="AdGuard DNS Live — Dark design" width="100%"></a></td>
-    <td width="50%"><a href="docs/images/dns-live-light.png"><img src="docs/images/dns-live-light.png" alt="AdGuard DNS Live — Light design" width="100%"></a></td>
+    <td width="50%"><a href="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png"><img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png" alt="AdGuard DNS Live — Dark design" width="100%"></a></td>
+    <td width="50%"><a href="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png"><img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png" alt="AdGuard DNS Live — Light design" width="100%"></a></td>
   </tr>
 </table>
 
