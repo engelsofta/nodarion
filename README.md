@@ -57,21 +57,39 @@ to fix. 😉
 
 See the full [changelog](CHANGELOG.md).
 
-## Insights
+## Two looks. One clear view.
+
+Warm gold accents, clear status colours, and the same network at a glance —
+choose a bright workspace or a dark dashboard. Click any image to explore it.
+
+*Anonymized examples with demo data; light images edited for privacy. The dark and light views were captured
+from different versions, so individual controls and layouts may differ.*
 
 ### Device overview
 
 The central table combines reachability, device state, Mesh access point,
 AdGuard DNS activity, internet access, and personal monitoring controls.
 
-![Device overview in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
+<table>
+  <tr><th>Dark design</th><th>Light design</th></tr>
+  <tr>
+    <td width="50%"><a href="docs/images/teilnehmeruebersicht.png"><img src="docs/images/teilnehmeruebersicht.png" alt="Device overview — Dark design" width="100%"></a></td>
+    <td width="50%"><a href="docs/images/teilnehmeruebersicht-light.png"><img src="docs/images/teilnehmeruebersicht-light.png" alt="Device overview — Light design" width="100%"></a></td>
+  </tr>
+</table>
 
 ### AdGuard DNS Live
 
 Review DNS queries live with history, client mapping, response type, processing
 time, and direct block or allow actions.
 
-![AdGuard DNS Live in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
+<table>
+  <tr><th>Dark design</th><th>Light design</th></tr>
+  <tr>
+    <td width="50%"><a href="docs/images/dns-live.png"><img src="docs/images/dns-live.png" alt="AdGuard DNS Live — Dark design" width="100%"></a></td>
+    <td width="50%"><a href="docs/images/dns-live-light.png"><img src="docs/images/dns-live-light.png" alt="AdGuard DNS Live — Light design" width="100%"></a></td>
+  </tr>
+</table>
 
 ### AI network analysis
 

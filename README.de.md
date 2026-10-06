@@ -66,7 +66,15 @@ angenehmer zu beheben. 😉
 
 Alle Details stehen im [Changelog](CHANGELOG.md).
 
-## Einblicke
+## Zwei Looks. Ein klarer Überblick.
+
+Warme Goldakzente, klare Statusfarben und dein Netzwerk auf einen Blick —
+wahlweise als helle Arbeitsfläche oder dunkles Dashboard. Ein Klick öffnet
+die jeweilige Ansicht in voller Größe.
+
+*Anonymisierte Beispiele mit Demodaten; helle Bilder zum Datenschutz bearbeitet. Die dunklen und hellen Ansichten
+stammen aus unterschiedlichen Versionen; einzelne Bedienelemente und
+Layouts können daher abweichen.*
 
 ### Teilnehmerübersicht
 
@@ -74,14 +82,26 @@ Die zentrale Gerätetabelle führt Erreichbarkeit, Gerätestatus,
 Mesh-Zugangspunkt, AdGuard-DNS-Aktivität, Internetfreigabe und persönliche
 Überwachungsfunktionen in einer gemeinsamen Ansicht zusammen.
 
-![Teilnehmerübersicht in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
+<table>
+  <tr><th>Dunkles Design</th><th>Helles Design</th></tr>
+  <tr>
+    <td width="50%"><a href="docs/images/teilnehmeruebersicht.png"><img src="docs/images/teilnehmeruebersicht.png" alt="Teilnehmerübersicht — Dunkles Design" width="100%"></a></td>
+    <td width="50%"><a href="docs/images/teilnehmeruebersicht-light.png"><img src="docs/images/teilnehmeruebersicht-light.png" alt="Teilnehmerübersicht — Helles Design" width="100%"></a></td>
+  </tr>
+</table>
 
 ### AdGuard DNS-Live
 
 DNS-Anfragen werden live mit Verlauf, Client-Zuordnung, Antworttyp,
 Bearbeitungsdauer und direkter Blockiermöglichkeit dargestellt.
 
-![AdGuard DNS-Live in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
+<table>
+  <tr><th>Dunkles Design</th><th>Helles Design</th></tr>
+  <tr>
+    <td width="50%"><a href="docs/images/dns-live.png"><img src="docs/images/dns-live.png" alt="AdGuard DNS-Live — Dunkles Design" width="100%"></a></td>
+    <td width="50%"><a href="docs/images/dns-live-light.png"><img src="docs/images/dns-live-light.png" alt="AdGuard DNS-Live — Helles Design" width="100%"></a></td>
+  </tr>
+</table>
 
 ### KI-Netzwerkanalyse
 
