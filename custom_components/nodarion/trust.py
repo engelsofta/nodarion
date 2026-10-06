@@ -54,6 +54,13 @@ def effective_mac(previous_mac: str | None, current_mac: str | None) -> str | No
     return normalize_mac(current_mac) or normalize_mac(previous_mac)
 
 
+def mac_identity_changed(previous_mac: str | None, current_mac: str | None) -> bool:
+    """Compare real identities, ignoring formatting and unknown readings."""
+    previous = normalize_mac(previous_mac)
+    current = normalize_mac(current_mac)
+    return bool(previous and current and previous != current)
+
+
 def is_trusted_identity(
     key: str,
     mac: str | None,

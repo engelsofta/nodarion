@@ -22,9 +22,21 @@ is_trusted_identity = _TRUST.is_trusted_identity
 should_prune_offline = _TRUST.should_prune_offline
 normalize_mac = _TRUST.normalize_mac
 effective_mac = _TRUST.effective_mac
+mac_identity_changed = _TRUST.mac_identity_changed
 
 
 class TrustTests(unittest.TestCase):
+    def test_identity_alert_ignores_mac_formatting(self) -> None:
+        self.assertFalse(mac_identity_changed("a4:bb:cc:dd:ee:ff", "A4:BB:CC:DD:EE:FF"))
+        self.assertFalse(mac_identity_changed("a4-bb-cc-dd-ee-ff", "A4:BB:CC:DD:EE:FF"))
+        self.assertFalse(mac_identity_changed(" A4:BB:CC:DD:EE:FF ", "a4:bb:cc:dd:ee:ff"))
+
+    def test_identity_alert_requires_two_real_different_addresses(self) -> None:
+        for unknown in (None, "", "00:00:00:00:00:00"):
+            self.assertFalse(mac_identity_changed(unknown, "A4:BB:CC:DD:EE:FF"))
+            self.assertFalse(mac_identity_changed("A4:BB:CC:DD:EE:FF", unknown))
+        self.assertTrue(mac_identity_changed("A4:BB:CC:DD:EE:FF", "B4:BB:CC:DD:EE:FF"))
+
     def test_zero_mac_is_unknown(self) -> None:
         for mac in (None, "", "00:00:00:00:00:00", "00-00-00-00-00-00", "000000000000"):
             self.assertIsNone(normalize_mac(mac))

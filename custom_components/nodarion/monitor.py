@@ -19,7 +19,7 @@ from homeassistant.helpers.storage import Store
 from .const import DOMAIN
 from .models import NetworkHost, canonical_hostname, normalize_network_segments
 from .monitor_storage import MonitorStoreWriter
-from .trust import is_trusted_identity, is_vpn_connection, normalize_mac
+from .trust import is_trusted_identity, is_vpn_connection, normalize_mac, mac_identity_changed
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.monitor"
@@ -1000,9 +1000,7 @@ class NetworkMonitor:
                 old is not None
                 and self.rules["enabled"]
                 and self.rules["identity_changes"]
-                and old.mac
-                and host.mac
-                and old.mac != host.mac
+                and mac_identity_changed(old.mac, host.mac)
                 and not _is_private_mac(old.mac)
                 and not _is_private_mac(host.mac)
             ):
