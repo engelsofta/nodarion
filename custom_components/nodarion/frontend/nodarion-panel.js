@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.11";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.11";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.12";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.12";
 
 const esc = (value) =>
   String(value ?? "")
@@ -1746,12 +1746,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .presence-name { overflow:hidden; color:#effff8; font-size:12px; font-weight:760; text-overflow:ellipsis; white-space:nowrap; }
         .watch-entity-link { padding:0; color:inherit; background:transparent; border:0; font:inherit; font-weight:inherit; text-align:left; cursor:pointer; }
         .watch-entity-link:hover { color:#bcecff; text-decoration:underline; text-underline-offset:3px; }
-        .presence-state { grid-column:2; margin-top:2px; color:#78998f; font-size:9px; }
+        .presence-state { grid-column:2; margin-top:3px; color:#a7bfb6; font-size:11px; line-height:1.4; }
         .presence-row.home .presence-state { color:#8fd8b1; }
         .presence-timeline { position:relative; height:24px; overflow:hidden; border-radius:8px; background:rgba(2,10,8,.42); border:1px solid var(--ns-line); }
         .presence-timeline::before { content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg,transparent 0,transparent calc(25% - 1px),rgba(255,255,255,.055) 25%); }
         .presence-segment { position:absolute; top:4px; bottom:4px; min-width:2px; border-radius:5px; background:linear-gradient(90deg,rgba(86,199,139,.55),#8fffc2); box-shadow:0 0 8px rgba(143,255,194,.2); }
-        .presence-axis { display:flex; justify-content:space-between; margin:6px 1px 0; color:#61746e; font-size:8px; }
+        .presence-axis { display:flex; justify-content:space-between; margin:6px 1px 0; color:#a7bfb6; font-size:11px; line-height:1.4; }
         .alerts-panel { display:flex; flex-direction:column; max-height:calc(100dvh - 64px); }
         .alerts-panel .alert-list { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding-right:5px; scrollbar-width:thin; scrollbar-color:rgba(240,161,59,.42) transparent; }
         .alerts-panel .alert-list::-webkit-scrollbar { width:7px; }
@@ -2387,6 +2387,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .alert-message { color:#625a52; }
         :host([data-theme="light"]) .alert-time { color:#756d65; }
         :host([data-theme="light"]) .ack { color:#6d460d; background:#fff8e9; border-color:#d9bd8c; }
+        :host([data-theme="light"]) .alert-action { color:#24536b; background:#edf5f8; border-color:#9dbbc9; }
+        :host([data-theme="light"]) .alert-action:hover { color:#173b50; background:#dcebf2; border-color:#668fa3; }
+        :host([data-theme="light"]) .alert-actions button:focus-visible { outline:2px solid #24536b; outline-offset:3px; }
+        :host([data-theme="light"]) .watch-entity-link:hover { color:#24536b; }
         :host([data-theme="light"]) .rule-group { background:#fffdfa; border-color:rgba(91,72,48,.13); }
         :host([data-theme="light"]) .rule-group.basics { background:#fff9ef; border-color:#ead8bc; }
         :host([data-theme="light"]) .rule-group.vlan-settings { background:#f5fafb; border-color:#d7e7eb; }
@@ -2481,7 +2485,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
           background:linear-gradient(90deg,#64ad79,#55d37b);
           box-shadow:0 0 0 1px rgba(45,123,76,.10),0 2px 7px rgba(45,123,76,.15);
         }
-        :host([data-theme="light"]) .presence-axis { color:#625b53; }
+        :host([data-theme="light"]) .presence-axis,
+        :host([data-theme="light"]) .presence-state { color:#514b44; font-weight:600; }
         :host([data-theme="light"]) .settings-view .cleanup-settings .cleanup {
           color:#fff; background:#b83d3d; border-color:#a62f2f;
           box-shadow:0 6px 16px rgba(184,61,61,.18);
