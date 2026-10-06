@@ -70,26 +70,26 @@ from different versions, so individual controls and layouts may differ.*
 The central table combines reachability, device state, Mesh access point,
 AdGuard DNS activity, internet access, and personal monitoring controls.
 
-<table>
-  <tr><th>Dark design</th><th>Light design</th></tr>
-  <tr>
-    <td width="50%"><a href="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png"><img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png" alt="Device overview — Dark design" width="100%"></a></td>
-    <td width="50%"><a href="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png"><img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png" alt="Device overview — Light design" width="100%"></a></td>
-  </tr>
-</table>
+**Dark design**
+
+[![Device overview — Dark design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
+
+**Light design**
+
+[![Device overview — Light design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png)
 
 ### AdGuard DNS Live
 
 Review DNS queries live with history, client mapping, response type, processing
 time, and direct block or allow actions.
 
-<table>
-  <tr><th>Dark design</th><th>Light design</th></tr>
-  <tr>
-    <td width="50%"><a href="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png"><img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png" alt="AdGuard DNS Live — Dark design" width="100%"></a></td>
-    <td width="50%"><a href="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png"><img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png" alt="AdGuard DNS Live — Light design" width="100%"></a></td>
-  </tr>
-</table>
+**Dark design**
+
+[![AdGuard DNS Live — Dark design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
+
+**Light design**
+
+[![AdGuard DNS Live — Light design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png)
 
 ### AI network analysis
 
