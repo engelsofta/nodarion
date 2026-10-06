@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.10";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.10";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.11";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.11";
 
 const esc = (value) =>
   String(value ?? "")
@@ -17,6 +17,8 @@ const EN = new Map(Object.entries({
   "Übersicht ein- oder ausklappen": "Expand or collapse overview",
   "Nodarion gefällt dir?": "Enjoying Nodarion?",
   "Ein Stern auf GitHub sagt Danke.": "A GitHub star says thanks.",
+  "Issue auf GitHub melden": "Report an issue on GitHub",
+  "Fehler gefunden oder eine Idee?": "Found a bug or have an idea?",
   "Nodarion mit einem Stern auf GitHub unterstützen": "Support Nodarion with a star on GitHub",
   "Warnungen und Auffälligkeiten": "Warnings and anomalies",
   "Aktive Hinweise stehen oben, erledigte bleiben als Verlauf erhalten.": "Active notices are shown first; resolved ones remain in the history.",
@@ -2906,6 +2908,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <a class="github-thanks" href="https://github.com/engelsofta/nodarion" target="_blank" rel="noopener noreferrer" aria-label="Nodarion mit einem Stern auf GitHub unterstützen" title="Nodarion mit einem Stern auf GitHub unterstützen">
             <ha-icon icon="mdi:star-outline" aria-hidden="true"></ha-icon>
             <span class="github-thanks-copy"><strong>Nodarion gefällt dir?</strong><small>Ein Stern auf GitHub sagt Danke.</small></span>
+          </a>
+          <a class="github-thanks github-issue" href="https://github.com/engelsofta/nodarion/issues/new/choose" target="_blank" rel="noopener noreferrer" aria-label="Issue auf GitHub melden" title="Issue auf GitHub melden">
+            <ha-icon icon="mdi:bug-outline" aria-hidden="true"></ha-icon>
+            <span class="github-thanks-copy"><strong>Issue auf GitHub melden</strong><small>Fehler gefunden oder eine Idee?</small></span>
           </a>
           <div class="header-actions">
             <button class="header-action connection-status" type="button" title="Verbindungsdetails anzeigen"><ha-icon icon="mdi:lan-connect"></ha-icon><span>Verbindungen werden geladen</span><ha-icon icon="mdi:chevron-down"></ha-icon></button>

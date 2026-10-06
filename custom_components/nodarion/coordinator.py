@@ -62,6 +62,8 @@ from .monitor import NetworkMonitor
 from .fritz import FritzBoxScanner
 from .trust import (
     IdentityChangeTracker,
+    effective_mac,
+    normalize_mac,
     is_configured_router,
     is_vpn_connection,
     should_prune_offline,
@@ -923,7 +925,12 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 )
                 continue
             inventory = self.monitor.host_inventory.get(key, {})
-            previous_mac = inventory.get("mac")
+            previous_mac = normalize_mac(inventory.get("mac"))
+            # Placeholder readings must not erase the persisted identity, even
+            # when FRITZ!Box reports them for several consecutive scans.
+            hosts[key] = host = replace(
+                host, mac=effective_mac(previous_mac, host.mac)
+            )
             trusted = self.monitor.is_trusted(host)
             if trusted and key not in self.monitor.known_hosts:
                 # Carry a MAC-backed approval across DHCP/IP changes.
@@ -951,6 +958,10 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                     trusted = False
             else:
                 self._identity_changes.clear(key)
+            if trusted and host.mac and not previous_mac:
+                await self.monitor.async_trust_host(
+                    key, host, reason="first_valid_mac"
+                )
             if trusted:
                 if state is None and "fritzbox" in host.sources:
                     try:
@@ -1083,7 +1094,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         self.scanner = next(iter(self.scanners.values()), None)
 
     async def async_apply_network_segments(self) -> None:
-        """Apply an edited segment list and refresh discovery immediately."""
+        """Apply edited segments and schedule discovery without delaying saves."""
         self.segments = normalize_network_segments(
             self.monitor.rules["network_segments"]
         )
@@ -1092,7 +1103,9 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             self.fritz_scanner.networks = tuple(
                 segment.ip_network for segment in self.segments
             )
-        await self.async_request_refresh()
+        self.hass.async_create_background_task(
+            self.async_request_refresh(), "Nodarion network segment refresh"
+        )
 
     def _segment_for_ip(self, address: str) -> NetworkSegment | None:
         """Return the configured segment containing an IP address."""

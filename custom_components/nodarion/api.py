@@ -136,8 +136,12 @@ class NodarionView(HomeAssistantView):
             if not isinstance(rules, dict):
                 return self.json_message("Ungültige Regeln", 400)
             try:
+                previous_segments = manager.rules.get("network_segments", [])
                 await manager.async_set_rules(rules)
-                if "network_segments" in rules:
+                if (
+                    "network_segments" in rules
+                    and manager.rules.get("network_segments", []) != previous_segments
+                ):
                     coordinator = self._coordinator(request)
                     if coordinator is not None:
                         await coordinator.async_apply_network_segments()

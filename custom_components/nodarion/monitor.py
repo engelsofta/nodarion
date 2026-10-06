@@ -161,8 +161,8 @@ class NetworkMonitor:
         # Migrate approvals created before MAC-backed trust existed.
         for key in self.known_hosts:
             mac = self.host_inventory.get(key, {}).get("mac")
-            if mac:
-                self.trusted_macs.add(str(mac).upper())
+            if normalized_mac := normalize_mac(mac):
+                self.trusted_macs.add(normalized_mac)
         self.first_seen = dict(data.get("first_seen", {}))
         self.online_since = dict(data.get("online_since", {}))
         self.offline_since = dict(data.get("offline_since", {}))
@@ -263,9 +263,7 @@ class NetworkMonitor:
         """Mark a device as manually approved."""
         changed = key not in self.known_hosts
         self.known_hosts.add(key)
-        if host is not None and host.mac:
-            normalized_mac = normalize_mac(host.mac)
-            assert normalized_mac is not None
+        if host is not None and (normalized_mac := normalize_mac(host.mac)):
             changed = normalized_mac not in self.trusted_macs or changed
             self.trusted_macs.add(normalized_mac)
         if changed:
@@ -290,9 +288,9 @@ class NetworkMonitor:
         """Trust newly discovered devices together during the learning phase."""
         new_keys = keys - self.known_hosts
         new_macs = {
-            normalize_mac(host.mac)
+            normalized_mac
             for key, host in (hosts or {}).items()
-            if key in keys and host.mac
+            if key in keys and (normalized_mac := normalize_mac(host.mac))
         } - self.trusted_macs
         if not new_keys and not new_macs:
             return

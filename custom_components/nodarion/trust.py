@@ -43,7 +43,15 @@ def normalize_mac(value: str | None) -> str | None:
     """Normalize a MAC address for persistent comparisons."""
     if not value:
         return None
-    return value.replace("-", ":").upper()
+    normalized = value.strip().replace("-", ":").upper()
+    if not normalized or normalized.replace(":", "").replace(".", "") == "000000000000":
+        return None
+    return normalized
+
+
+def effective_mac(previous_mac: str | None, current_mac: str | None) -> str | None:
+    """Keep the last known identity while a scan reports no real MAC."""
+    return normalize_mac(current_mac) or normalize_mac(previous_mac)
 
 
 def is_trusted_identity(
