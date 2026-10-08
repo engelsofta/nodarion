@@ -84,11 +84,11 @@ Mesh-Zugangspunkt, AdGuard-DNS-Aktivität, Internetfreigabe und persönliche
 
 **Dunkles Design**
 
-[![Teilnehmerübersicht — Dunkles Design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
+![Teilnehmerübersicht — Dunkles Design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
 
 **Helles Design**
 
-[![Teilnehmerübersicht — Helles Design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png)
+![Teilnehmerübersicht — Helles Design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png)
 
 ### AdGuard DNS-Live
 
@@ -97,11 +97,11 @@ Bearbeitungsdauer und direkter Blockiermöglichkeit dargestellt.
 
 **Dunkles Design**
 
-[![AdGuard DNS-Live — Dunkles Design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
+![AdGuard DNS-Live — Dunkles Design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
 
 **Helles Design**
 
-[![AdGuard DNS-Live — Helles Design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png)
+![AdGuard DNS-Live — Helles Design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png)
 
 ### KI-Netzwerkanalyse
 

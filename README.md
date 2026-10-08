@@ -72,11 +72,11 @@ AdGuard DNS activity, internet access, and personal monitoring controls.
 
 **Dark design**
 
-[![Device overview — Dark design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
+![Device overview — Dark design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht.png)
 
 **Light design**
 
-[![Device overview — Light design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png)
+![Device overview — Light design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/teilnehmeruebersicht-light.png)
 
 ### AdGuard DNS Live
 
@@ -85,11 +85,11 @@ time, and direct block or allow actions.
 
 **Dark design**
 
-[![AdGuard DNS Live — Dark design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
+![AdGuard DNS Live — Dark design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live.png)
 
 **Light design**
 
-[![AdGuard DNS Live — Light design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png)](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png)
+![AdGuard DNS Live — Light design](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/dns-live-light.png)
 
 ### AI network analysis
 
