@@ -17,6 +17,11 @@
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
 </p>
 
+<p align="center">
+  <a href="https://ko-fi.com/angelm11132"><img src="https://img.shields.io/badge/Spendier%20mir%20einen%20Kaffee-FFDD00?style=for-the-badge&logo=kofi&logoColor=black" alt="Andreas auf Ko-fi unterstützen"></a><br>
+  Nodarion gefällt dir? Ein Kaffee unterstützt die Weiterentwicklung und Verbesserungen. ☕
+</p>
+
 > **Mehrere Netze, ein Gesamtbild:** Nodarion führt aktive Ping-/TCP-Scans,
 > FRITZ!Box- und Mesh-Daten sowie die DNS-Aktivitäten aus AdGuard Home pro
 > Teilnehmer zusammen. Statt drei voneinander getrennten Datenquellen entsteht

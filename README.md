@@ -17,6 +17,11 @@
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
 </p>
 
+<p align="center">
+  <a href="https://ko-fi.com/angelm11132"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=kofi&logoColor=black" alt="Support Andreas on Ko-fi"></a><br>
+  Enjoy Nodarion? A coffee helps support development and improvements. ☕
+</p>
+
 > **Multiple networks, one complete picture:** Nodarion combines active ping/TCP scans,
 > FRITZ!Box and Mesh data, and DNS activity from AdGuard Home for each device.
 > Instead of three separate data sources, you get one clear view of devices,
