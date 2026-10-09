@@ -1,0 +1,19 @@
+1
+00:00:00,000 --> 00:00:07,000
+Nodarion brings local network monitoring into Home Assistant. Available directly in HACS.
+
+2
+00:00:07,000 --> 00:00:19,000
+Discover devices across configured IPv4 networks. Add FRITZ!Box for router and Mesh details.
+
+3
+00:00:19,000 --> 00:00:31,000
+Monitor important devices, receive offline alerts, and review state changes and Mesh handovers.
+
+4
+00:00:31,000 --> 00:00:43,000
+Connect AdGuard Home to inspect DNS queries, blocked domains and filter reasons.
+
+5
+00:00:43,000 --> 00:00:54,000
+Search Nodarion in HACS, download, restart Home Assistant, and add the integration. AI is optional.

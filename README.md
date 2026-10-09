@@ -12,7 +12,7 @@
   <a href="https://github.com/engelsofta/nodarion/releases/latest"><img src="https://img.shields.io/github/v/release/engelsofta/nodarion?label=Version&color=d4a33f&cacheSeconds=300&release=1.26.1" alt="Latest version"></a>
   <a href="https://github.com/engelsofta/nodarion/releases"><img src="https://img.shields.io/github/downloads/engelsofta/nodarion/total?label=Downloads&color=d4a33f" alt="Total release downloads"></a>
   <a href="https://www.home-assistant.io/"><img src="https://img.shields.io/badge/Home%20Assistant-Custom-41BDF5?logo=homeassistant&logoColor=white" alt="Home Assistant custom integration"></a>
-  <a href="https://hacs.xyz/"><img src="https://img.shields.io/badge/HACS-Custom-ED7D31" alt="HACS custom repository"></a>
+  <a href="https://hacs.xyz/"><img src="https://img.shields.io/badge/HACS-Available-ED7D31" alt="Available in HACS"></a>
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml/badge.svg" alt="HACS validation"></a>
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
 </p>
@@ -26,6 +26,13 @@ Nodarion is a local Home Assistant custom integration. It scans one or more
 configurable IPv4 networks and creates a connectivity binary sensor for every discovered
 device. Beyond simple reachability, it helps explain where a device is
 connected, how it communicates, and whether its behaviour looks unusual.
+
+## See Nodarion in 54 seconds
+
+[Watch or download the short demo](docs/community/nodarion-demo.en.mp4): device discovery,
+important-device monitoring, and AdGuard DNS activity. English captions; anonymized
+screenshots from an earlier UI version. Basic scanning works without FRITZ!Box,
+AdGuard, or AI.
 
 ## Feedback welcome
 
@@ -102,16 +109,17 @@ recommendations in a clear daily assessment.
 
 ### HACS
 
+Nodarion is included in the default HACS catalog. No custom repository is needed.
+
 <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=engelsofta&repository=nodarion&category=integration">
-  <img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Add Nodarion as a custom HACS repository">
+  <img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open Nodarion in HACS">
 </a>
 
-Use the button above, or add the repository manually:
-
-1. Open **Integrations** in HACS.
-2. Select **Custom repositories** from the menu.
-3. Add `https://github.com/engelsofta/nodarion` as an **Integration** repository.
-4. Install **Engelsoft Nodarion** and restart Home Assistant.
+1. Open HACS and search for **Nodarion**.
+2. Open **Engelsoft Nodarion** and download it.
+3. Restart Home Assistant.
+4. Go to **Settings → Devices & services → Add integration** and search for **Engelsoft Nodarion**.
+5. Enter your local IPv4 network in CIDR notation, for example `192.168.178.0/24`.
 
 ### Manual installation
 
