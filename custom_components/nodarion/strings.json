@@ -2,22 +2,69 @@
   "title": "Engelsoft Nodarion",
   "config": {
     "step": {
+      "services": {
+        "title": "Configure Nodarion",
+        "description": "Choose a section. Changes are applied only after Save & finish.",
+        "menu_options": {
+          "network": "Networks & scanning",
+          "fritz": "FRITZ!Box & Mesh",
+          "adguard": "AdGuard Home",
+          "ai": "AI analysis",
+          "advanced": "Advanced settings",
+          "finish": "Save & finish"
+        }
+      },
+      "reconfigure": {
+        "title": "Configure Nodarion",
+        "description": "Choose a section. Changes are applied only after Save & finish.",
+        "menu_options": {
+          "network": "Networks & scanning",
+          "fritz": "FRITZ!Box & Mesh",
+          "adguard": "AdGuard Home",
+          "ai": "AI analysis",
+          "advanced": "Advanced settings",
+          "finish": "Save & finish"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Configure Nodarion",
+        "description": "Choose a section. Changes are applied only after Save & finish.",
+        "menu_options": {
+          "network": "Networks & scanning",
+          "fritz": "FRITZ!Box & Mesh",
+          "adguard": "AdGuard Home",
+          "ai": "AI analysis",
+          "advanced": "Advanced settings",
+          "finish": "Save & finish"
+        }
+      },
       "user": {
-        "title": "Set up network scanner",
-        "description": "Scan a local IPv4 network. Example: 192.168.1.0/24",
+        "title": "Networks & scanning",
+        "description": "Set the initial network, scan interval and exclusions. Additional networks and VLANs are still managed in the Nodarion panel."
+      },
+      "network": {
+        "title": "Networks & scanning",
+        "description": "Set the initial network, scan interval and exclusions. Additional networks and VLANs are still managed in the Nodarion panel.",
         "data": {
           "network": "Initial network (CIDR; additional VLANs are managed in Nodarion)",
           "scan_interval": "Scan interval (seconds)",
-          "timeout": "Timeout per check (seconds)",
-          "concurrency": "Concurrent checks",
-          "ports": "TCP ports (comma-separated)",
-          "exclude": "Excluded IP addresses (comma-separated)",
-          "offline_after": "Report as offline after failed scans",
-          "remove_after_days": "Remove offline devices after days (0 = never)",
+          "exclude": "Excluded IP addresses (comma-separated)"
+        }
+      },
+      "fritz": {
+        "title": "FRITZ!Box & Mesh",
+        "description": "Optional: Identify devices through FRITZ!Box and Mesh connections. The connection is tested when detection is enabled.",
+        "data": {
           "fritz_enabled": "Use FRITZ!Box detection",
           "fritz_host": "FRITZ!Box address",
           "fritz_user": "FRITZ!Box user",
-          "fritz_password": "FRITZ!Box password",
+          "fritz_password": "FRITZ!Box password"
+        }
+      },
+      "adguard": {
+        "title": "AdGuard Home",
+        "description": "Optional: Add DNS activity and filtering data. The connection is tested when analysis is enabled.",
+        "data": {
           "adguard_enabled": "Use AdGuard Home analysis",
           "adguard_host": "AdGuard Home address",
           "adguard_port": "AdGuard Home port",
@@ -28,19 +75,29 @@
           "adguard_period_hours": "DNS analysis period (hours)"
         }
       },
-      "reconfigure": {
-        "title": "Reconfigure Nodarion",
-        "description": "Connections are tested before the integration reloads.",
+      "advanced": {
+        "title": "Advanced settings",
+        "description": "Adjust connection checks and offline detection. Existing defaults are preserved.",
         "data": {
-          "network": "Initial network (CIDR; additional VLANs are managed in Nodarion)", "scan_interval": "Scan interval (seconds)", "timeout": "Timeout per check (seconds)", "concurrency": "Global concurrent checks across all VLANs", "ports": "TCP ports (comma-separated)", "exclude": "Excluded IP addresses (comma-separated)", "offline_after": "Report as offline after failed scans", "remove_after_days": "Remove offline devices after days (0 = never)", "fritz_enabled": "Use FRITZ!Box detection", "fritz_host": "FRITZ!Box address", "fritz_user": "FRITZ!Box user", "fritz_password": "FRITZ!Box password", "adguard_enabled": "Use AdGuard Home analysis", "adguard_host": "AdGuard Home address", "adguard_port": "AdGuard Home port", "adguard_user": "AdGuard Home user", "adguard_password": "AdGuard Home password", "adguard_ssl": "Use HTTPS", "adguard_verify_ssl": "Verify SSL certificate", "adguard_period_hours": "DNS analysis period (hours)"
+          "timeout": "Timeout per check (seconds)",
+          "concurrency": "Concurrent checks",
+          "ports": "TCP ports (comma-separated)",
+          "offline_after": "Report as offline after failed scans",
+          "remove_after_days": "Remove offline devices after days (0 = never)"
         }
       },
-      "reauth_confirm": {
-        "title": "Reconnect Nodarion",
-        "description": "Update the connection details and verify access.",
+      "ai": {
+        "title": "AI analysis",
+        "description": "Optional: Schedule daily AI analysis using the AI Task integration configured in Home Assistant. Anonymized mode excludes domain names; domains mode includes visited domains. These settings are shared with the Nodarion panel.",
         "data": {
-          "network": "Initial network (CIDR; additional VLANs are managed in Nodarion)", "scan_interval": "Scan interval (seconds)", "timeout": "Timeout per check (seconds)", "concurrency": "Global concurrent checks across all VLANs", "ports": "TCP ports (comma-separated)", "exclude": "Excluded IP addresses (comma-separated)", "offline_after": "Report as offline after failed scans", "remove_after_days": "Remove offline devices after days (0 = never)", "fritz_enabled": "Use FRITZ!Box detection", "fritz_host": "FRITZ!Box address", "fritz_user": "FRITZ!Box user", "fritz_password": "FRITZ!Box password", "adguard_enabled": "Use AdGuard Home analysis", "adguard_host": "AdGuard Home address", "adguard_port": "AdGuard Home port", "adguard_user": "AdGuard Home user", "adguard_password": "AdGuard Home password", "adguard_ssl": "Use HTTPS", "adguard_verify_ssl": "Verify SSL certificate", "adguard_period_hours": "DNS analysis period (hours)"
+          "ai_analysis_enabled": "Enable daily AI analysis",
+          "ai_analysis_time": "Time (HH:MM)",
+          "ai_privacy": "Privacy"
         }
+      },
+      "finish": {
+        "title": "Save & finish",
+        "description": "All enabled local services are tested again before changes are saved. Closing the dialog discards your changes."
       }
     },
     "error": {
@@ -52,7 +109,8 @@
       "adguard_host_required": "An address is required for AdGuard Home analysis",
       "adguard_credentials_incomplete": "Enter both username and password, or leave both blank",
       "cannot_connect": "Could not connect to an enabled local service",
-      "invalid_auth": "The supplied credentials were rejected"
+      "invalid_auth": "The supplied credentials were rejected",
+      "invalid_time": "Enter a valid time in HH:MM format."
     },
     "abort": {
       "already_configured": "The network scanner is already configured",
@@ -63,20 +121,40 @@
   "options": {
     "step": {
       "init": {
-        "title": "Scanner settings",
+        "title": "Configure Nodarion",
+        "description": "Choose a section. Changes are applied only after Save & finish.",
+        "menu_options": {
+          "network": "Networks & scanning",
+          "fritz": "FRITZ!Box & Mesh",
+          "adguard": "AdGuard Home",
+          "ai": "AI analysis",
+          "advanced": "Advanced settings",
+          "finish": "Save & finish"
+        }
+      },
+      "network": {
+        "title": "Networks & scanning",
+        "description": "Set the initial network, scan interval and exclusions. Additional networks and VLANs are still managed in the Nodarion panel.",
         "data": {
           "network": "Legacy initial network (VLANs are managed in Nodarion)",
           "scan_interval": "Scan interval (seconds)",
-          "timeout": "Timeout per check (seconds)",
-          "concurrency": "Concurrent checks",
-          "ports": "TCP ports (comma-separated)",
-          "exclude": "Excluded IP addresses (comma-separated)",
-          "offline_after": "Report as offline after failed scans",
-          "remove_after_days": "Remove offline devices after days (0 = never)",
+          "exclude": "Excluded IP addresses (comma-separated)"
+        }
+      },
+      "fritz": {
+        "title": "FRITZ!Box & Mesh",
+        "description": "Optional: Identify devices through FRITZ!Box and Mesh connections. The connection is tested when detection is enabled.",
+        "data": {
           "fritz_enabled": "Use FRITZ!Box detection",
           "fritz_host": "FRITZ!Box address",
           "fritz_user": "FRITZ!Box user",
-          "fritz_password": "FRITZ!Box password",
+          "fritz_password": "FRITZ!Box password"
+        }
+      },
+      "adguard": {
+        "title": "AdGuard Home",
+        "description": "Optional: Add DNS activity and filtering data. The connection is tested when analysis is enabled.",
+        "data": {
           "adguard_enabled": "Use AdGuard Home analysis",
           "adguard_host": "AdGuard Home address",
           "adguard_port": "AdGuard Home port",
@@ -86,6 +164,30 @@
           "adguard_verify_ssl": "Verify SSL certificate",
           "adguard_period_hours": "DNS analysis period (hours)"
         }
+      },
+      "advanced": {
+        "title": "Advanced settings",
+        "description": "Adjust connection checks and offline detection. Existing defaults are preserved.",
+        "data": {
+          "timeout": "Timeout per check (seconds)",
+          "concurrency": "Concurrent checks",
+          "ports": "TCP ports (comma-separated)",
+          "offline_after": "Report as offline after failed scans",
+          "remove_after_days": "Remove offline devices after days (0 = never)"
+        }
+      },
+      "ai": {
+        "title": "AI analysis",
+        "description": "Optional: Schedule daily AI analysis using the AI Task integration configured in Home Assistant. Anonymized mode excludes domain names; domains mode includes visited domains. These settings are shared with the Nodarion panel.",
+        "data": {
+          "ai_analysis_enabled": "Enable daily AI analysis",
+          "ai_analysis_time": "Time (HH:MM)",
+          "ai_privacy": "Privacy"
+        }
+      },
+      "finish": {
+        "title": "Save & finish",
+        "description": "All enabled local services are tested again before changes are saved. Closing the dialog discards your changes."
       }
     },
     "error": {
@@ -97,16 +199,69 @@
       "adguard_host_required": "An address is required for AdGuard Home analysis",
       "adguard_credentials_incomplete": "Enter both username and password, or leave both blank",
       "cannot_connect": "Could not connect to an enabled local service",
-      "invalid_auth": "The supplied credentials were rejected"
+      "invalid_auth": "The supplied credentials were rejected",
+      "invalid_time": "Enter a valid time in HH:MM format."
     }
   },
   "entity": {
-    "binary_sensor": {"presence": {"name": "Presence"}},
+    "binary_sensor": {
+      "presence": {
+        "name": "Presence"
+      }
+    },
     "sensor": {
-      "dns_queries": {"name": "DNS queries"}, "dns_blocked": {"name": "Blocked DNS queries"}, "dns_blocked_ratio": {"name": "DNS block rate"}, "safe_browsing_blocked": {"name": "Safe Browsing blocked"}, "safe_search_enforced": {"name": "Safe Search enforced"}, "parental_blocked": {"name": "Parental control blocked"}, "rules_count": {"name": "Active filter rules"}, "average_processing": {"name": "DNS processing time"}
+      "dns_queries": {
+        "name": "DNS queries"
+      },
+      "dns_blocked": {
+        "name": "Blocked DNS queries"
+      },
+      "dns_blocked_ratio": {
+        "name": "DNS block rate"
+      },
+      "safe_browsing_blocked": {
+        "name": "Safe Browsing blocked"
+      },
+      "safe_search_enforced": {
+        "name": "Safe Search enforced"
+      },
+      "parental_blocked": {
+        "name": "Parental control blocked"
+      },
+      "rules_count": {
+        "name": "Active filter rules"
+      },
+      "average_processing": {
+        "name": "DNS processing time"
+      }
     },
     "switch": {
-      "protection": {"name": "Overall protection"}, "filtering": {"name": "DNS filtering"}, "safe_browsing": {"name": "Safe Browsing"}, "parental": {"name": "Parental control"}, "safe_search": {"name": "Safe Search"}, "query_log": {"name": "Query log"}
+      "protection": {
+        "name": "Overall protection"
+      },
+      "filtering": {
+        "name": "DNS filtering"
+      },
+      "safe_browsing": {
+        "name": "Safe Browsing"
+      },
+      "parental": {
+        "name": "Parental control"
+      },
+      "safe_search": {
+        "name": "Safe Search"
+      },
+      "query_log": {
+        "name": "Query log"
+      }
+    }
+  },
+  "selector": {
+    "ai_privacy": {
+      "options": {
+        "anonymized": "Anonymized (without domain names)",
+        "domains": "Include domain names"
+      }
     }
   }
 }

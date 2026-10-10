@@ -28,12 +28,13 @@ class ConfigurationContractTests(unittest.TestCase):
         )
 
     def test_connections_are_tested_before_all_configuration_writes(self) -> None:
-        self.assertGreaterEqual(FLOW.count("await _async_validate_input"), 4)
+        self.assertGreaterEqual(FLOW.count("await _async_validate_input"), 2)
         self.assertIn("async_step_reconfigure", FLOW)
         self.assertIn("async_step_reauth_confirm", FLOW)
         self.assertIn("async_update_and_abort", FLOW)
         self.assertNotIn("async_update_reload_and_abort", FLOW)
-        self.assertIn("options_updates={}", FLOW)
+        self.assertIn("**self._entry.options,", FLOW)
+        self.assertNotIn("options_updates=", FLOW)
 
     def test_authentication_failures_start_reauth(self) -> None:
         self.assertIn("entry.async_start_reauth(self.hass)", COORDINATOR)

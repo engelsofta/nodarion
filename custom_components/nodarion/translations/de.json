@@ -2,22 +2,69 @@
   "title": "Engelsoft Nodarion",
   "config": {
     "step": {
+      "services": {
+        "title": "Nodarion einrichten",
+        "description": "Wähle einen Bereich. Änderungen werden erst mit „Speichern & abschließen“ übernommen.",
+        "menu_options": {
+          "network": "Netzwerke & Scan",
+          "fritz": "FRITZ!Box & Mesh",
+          "adguard": "AdGuard Home",
+          "ai": "KI-Analyse",
+          "advanced": "Erweiterte Einstellungen",
+          "finish": "Speichern & abschließen"
+        }
+      },
+      "reconfigure": {
+        "title": "Nodarion einrichten",
+        "description": "Wähle einen Bereich. Änderungen werden erst mit „Speichern & abschließen“ übernommen.",
+        "menu_options": {
+          "network": "Netzwerke & Scan",
+          "fritz": "FRITZ!Box & Mesh",
+          "adguard": "AdGuard Home",
+          "ai": "KI-Analyse",
+          "advanced": "Erweiterte Einstellungen",
+          "finish": "Speichern & abschließen"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Nodarion einrichten",
+        "description": "Wähle einen Bereich. Änderungen werden erst mit „Speichern & abschließen“ übernommen.",
+        "menu_options": {
+          "network": "Netzwerke & Scan",
+          "fritz": "FRITZ!Box & Mesh",
+          "adguard": "AdGuard Home",
+          "ai": "KI-Analyse",
+          "advanced": "Erweiterte Einstellungen",
+          "finish": "Speichern & abschließen"
+        }
+      },
       "user": {
-        "title": "Netzwerkscanner einrichten",
-        "description": "Scanne ein lokales IPv4-Netz. Beispiel: 192.168.1.0/24",
+        "title": "Netzwerke & Scan",
+        "description": "Lege das Startnetz, das Scanintervall und Ausnahmen fest. Weitere Netze und VLANs verwaltest du weiterhin im Nodarion-Panel."
+      },
+      "network": {
+        "title": "Netzwerke & Scan",
+        "description": "Lege das Startnetz, das Scanintervall und Ausnahmen fest. Weitere Netze und VLANs verwaltest du weiterhin im Nodarion-Panel.",
         "data": {
           "network": "Startnetz (CIDR; weitere VLANs werden in Nodarion verwaltet)",
           "scan_interval": "Scanintervall (Sekunden)",
-          "timeout": "Zeitlimit pro Prüfung (Sekunden)",
-          "concurrency": "Gleichzeitige Prüfungen",
-          "ports": "TCP-Ports (kommagetrennt)",
-          "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)",
-          "offline_after": "Nach fehlgeschlagenen Scans als offline melden",
-          "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)",
+          "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)"
+        }
+      },
+      "fritz": {
+        "title": "FRITZ!Box & Mesh",
+        "description": "Optional: Ordne Geräte ihrer FRITZ!Box und ihren Mesh-Verbindungen zu. Bei aktivierter Erkennung wird die Verbindung geprüft.",
+        "data": {
           "fritz_enabled": "FRITZ!Box-Erkennung verwenden",
           "fritz_host": "FRITZ!Box-Adresse",
           "fritz_user": "FRITZ!Box-Benutzer",
-          "fritz_password": "FRITZ!Box-Passwort",
+          "fritz_password": "FRITZ!Box-Passwort"
+        }
+      },
+      "adguard": {
+        "title": "AdGuard Home",
+        "description": "Optional: Ergänze DNS-Aktivitäten und Filterdaten. Bei aktivierter Analyse wird die Verbindung geprüft.",
+        "data": {
           "adguard_enabled": "AdGuard-Home-Auswertung verwenden",
           "adguard_host": "AdGuard-Home-Adresse",
           "adguard_port": "AdGuard-Home-Port",
@@ -28,19 +75,29 @@
           "adguard_period_hours": "DNS-Auswertungszeitraum (Stunden)"
         }
       },
-      "reconfigure": {
-        "title": "Nodarion neu konfigurieren",
-        "description": "Die Verbindungen werden geprüft, bevor die Integration neu geladen wird.",
+      "advanced": {
+        "title": "Erweiterte Einstellungen",
+        "description": "Passe Prüfungen und Offline-Erkennung an. Die bisherigen Standardwerte bleiben erhalten.",
         "data": {
-          "network": "Startnetz (CIDR; weitere VLANs werden in Nodarion verwaltet)", "scan_interval": "Scanintervall (Sekunden)", "timeout": "Zeitlimit pro Prüfung (Sekunden)", "concurrency": "Globale gleichzeitige Prüfungen über alle VLANs", "ports": "TCP-Ports (kommagetrennt)", "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)", "offline_after": "Nach fehlgeschlagenen Scans als offline melden", "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)", "fritz_enabled": "FRITZ!Box-Erkennung verwenden", "fritz_host": "FRITZ!Box-Adresse", "fritz_user": "FRITZ!Box-Benutzer", "fritz_password": "FRITZ!Box-Passwort", "adguard_enabled": "AdGuard-Home-Auswertung verwenden", "adguard_host": "AdGuard-Home-Adresse", "adguard_port": "AdGuard-Home-Port", "adguard_user": "AdGuard-Home-Benutzer", "adguard_password": "AdGuard-Home-Passwort", "adguard_ssl": "HTTPS verwenden", "adguard_verify_ssl": "SSL-Zertifikat prüfen", "adguard_period_hours": "DNS-Auswertungszeitraum (Stunden)"
+          "timeout": "Zeitlimit pro Prüfung (Sekunden)",
+          "concurrency": "Gleichzeitige Prüfungen",
+          "ports": "TCP-Ports (kommagetrennt)",
+          "offline_after": "Nach fehlgeschlagenen Scans als offline melden",
+          "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)"
         }
       },
-      "reauth_confirm": {
-        "title": "Nodarion erneut verbinden",
-        "description": "Verbindungsdaten aktualisieren und den Zugriff prüfen.",
+      "ai": {
+        "title": "KI-Analyse",
+        "description": "Optional: Plane die tägliche KI-Analyse. Sie nutzt die in Home Assistant konfigurierte AI-Task-Anbindung. Anonymisiert werden keine Domainnamen übertragen; mit Domains werden besuchte Domains einbezogen. Diese Einstellungen gelten auch im Nodarion-Panel.",
         "data": {
-          "network": "Startnetz (CIDR; weitere VLANs werden in Nodarion verwaltet)", "scan_interval": "Scanintervall (Sekunden)", "timeout": "Zeitlimit pro Prüfung (Sekunden)", "concurrency": "Globale gleichzeitige Prüfungen über alle VLANs", "ports": "TCP-Ports (kommagetrennt)", "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)", "offline_after": "Nach fehlgeschlagenen Scans als offline melden", "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)", "fritz_enabled": "FRITZ!Box-Erkennung verwenden", "fritz_host": "FRITZ!Box-Adresse", "fritz_user": "FRITZ!Box-Benutzer", "fritz_password": "FRITZ!Box-Passwort", "adguard_enabled": "AdGuard-Home-Auswertung verwenden", "adguard_host": "AdGuard-Home-Adresse", "adguard_port": "AdGuard-Home-Port", "adguard_user": "AdGuard-Home-Benutzer", "adguard_password": "AdGuard-Home-Passwort", "adguard_ssl": "HTTPS verwenden", "adguard_verify_ssl": "SSL-Zertifikat prüfen", "adguard_period_hours": "DNS-Auswertungszeitraum (Stunden)"
+          "ai_analysis_enabled": "Tägliche KI-Analyse aktivieren",
+          "ai_analysis_time": "Uhrzeit (HH:MM)",
+          "ai_privacy": "Datenschutz"
         }
+      },
+      "finish": {
+        "title": "Speichern & abschließen",
+        "description": "Alle aktivierten lokalen Dienste werden erneut geprüft. Erst danach werden die Änderungen gespeichert. Schließen des Dialogs verwirft deine Änderungen."
       }
     },
     "error": {
@@ -52,7 +109,8 @@
       "adguard_host_required": "Für die AdGuard-Home-Auswertung wird eine Adresse benötigt",
       "adguard_credentials_incomplete": "Benutzername und Passwort entweder beide eintragen oder beide leer lassen",
       "cannot_connect": "Ein aktivierter lokaler Dienst ist nicht erreichbar",
-      "invalid_auth": "Die angegebenen Zugangsdaten wurden abgelehnt"
+      "invalid_auth": "Die angegebenen Zugangsdaten wurden abgelehnt",
+      "invalid_time": "Gib eine gültige Uhrzeit im Format HH:MM ein."
     },
     "abort": {
       "already_configured": "Der Netzwerkscanner ist bereits eingerichtet",
@@ -63,20 +121,40 @@
   "options": {
     "step": {
       "init": {
-        "title": "Scanner-Einstellungen",
+        "title": "Nodarion einrichten",
+        "description": "Wähle einen Bereich. Änderungen werden erst mit „Speichern & abschließen“ übernommen.",
+        "menu_options": {
+          "network": "Netzwerke & Scan",
+          "fritz": "FRITZ!Box & Mesh",
+          "adguard": "AdGuard Home",
+          "ai": "KI-Analyse",
+          "advanced": "Erweiterte Einstellungen",
+          "finish": "Speichern & abschließen"
+        }
+      },
+      "network": {
+        "title": "Netzwerke & Scan",
+        "description": "Lege das Startnetz, das Scanintervall und Ausnahmen fest. Weitere Netze und VLANs verwaltest du weiterhin im Nodarion-Panel.",
         "data": {
           "network": "Bisheriges Startnetz (VLANs werden in Nodarion verwaltet)",
           "scan_interval": "Scanintervall (Sekunden)",
-          "timeout": "Zeitlimit pro Prüfung (Sekunden)",
-          "concurrency": "Gleichzeitige Prüfungen",
-          "ports": "TCP-Ports (kommagetrennt)",
-          "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)",
-          "offline_after": "Nach fehlgeschlagenen Scans als offline melden",
-          "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)",
+          "exclude": "Ausgeschlossene IP-Adressen (kommagetrennt)"
+        }
+      },
+      "fritz": {
+        "title": "FRITZ!Box & Mesh",
+        "description": "Optional: Ordne Geräte ihrer FRITZ!Box und ihren Mesh-Verbindungen zu. Bei aktivierter Erkennung wird die Verbindung geprüft.",
+        "data": {
           "fritz_enabled": "FRITZ!Box-Erkennung verwenden",
           "fritz_host": "FRITZ!Box-Adresse",
           "fritz_user": "FRITZ!Box-Benutzer",
-          "fritz_password": "FRITZ!Box-Passwort",
+          "fritz_password": "FRITZ!Box-Passwort"
+        }
+      },
+      "adguard": {
+        "title": "AdGuard Home",
+        "description": "Optional: Ergänze DNS-Aktivitäten und Filterdaten. Bei aktivierter Analyse wird die Verbindung geprüft.",
+        "data": {
           "adguard_enabled": "AdGuard-Home-Auswertung verwenden",
           "adguard_host": "AdGuard-Home-Adresse",
           "adguard_port": "AdGuard-Home-Port",
@@ -86,6 +164,30 @@
           "adguard_verify_ssl": "SSL-Zertifikat prüfen",
           "adguard_period_hours": "DNS-Auswertungszeitraum (Stunden)"
         }
+      },
+      "advanced": {
+        "title": "Erweiterte Einstellungen",
+        "description": "Passe Prüfungen und Offline-Erkennung an. Die bisherigen Standardwerte bleiben erhalten.",
+        "data": {
+          "timeout": "Zeitlimit pro Prüfung (Sekunden)",
+          "concurrency": "Gleichzeitige Prüfungen",
+          "ports": "TCP-Ports (kommagetrennt)",
+          "offline_after": "Nach fehlgeschlagenen Scans als offline melden",
+          "remove_after_days": "Offline-Geräte nach Tagen entfernen (0 = niemals)"
+        }
+      },
+      "ai": {
+        "title": "KI-Analyse",
+        "description": "Optional: Plane die tägliche KI-Analyse. Sie nutzt die in Home Assistant konfigurierte AI-Task-Anbindung. Anonymisiert werden keine Domainnamen übertragen; mit Domains werden besuchte Domains einbezogen. Diese Einstellungen gelten auch im Nodarion-Panel.",
+        "data": {
+          "ai_analysis_enabled": "Tägliche KI-Analyse aktivieren",
+          "ai_analysis_time": "Uhrzeit (HH:MM)",
+          "ai_privacy": "Datenschutz"
+        }
+      },
+      "finish": {
+        "title": "Speichern & abschließen",
+        "description": "Alle aktivierten lokalen Dienste werden erneut geprüft. Erst danach werden die Änderungen gespeichert. Schließen des Dialogs verwirft deine Änderungen."
       }
     },
     "error": {
@@ -97,16 +199,69 @@
       "adguard_host_required": "Für die AdGuard-Home-Auswertung wird eine Adresse benötigt",
       "adguard_credentials_incomplete": "Benutzername und Passwort entweder beide eintragen oder beide leer lassen",
       "cannot_connect": "Ein aktivierter lokaler Dienst ist nicht erreichbar",
-      "invalid_auth": "Die angegebenen Zugangsdaten wurden abgelehnt"
+      "invalid_auth": "Die angegebenen Zugangsdaten wurden abgelehnt",
+      "invalid_time": "Gib eine gültige Uhrzeit im Format HH:MM ein."
     }
   },
   "entity": {
-    "binary_sensor": {"presence": {"name": "Anwesenheit"}},
+    "binary_sensor": {
+      "presence": {
+        "name": "Anwesenheit"
+      }
+    },
     "sensor": {
-      "dns_queries": {"name": "DNS-Anfragen"}, "dns_blocked": {"name": "Blockierte DNS-Anfragen"}, "dns_blocked_ratio": {"name": "DNS-Blockquote"}, "safe_browsing_blocked": {"name": "Safe Browsing blockiert"}, "safe_search_enforced": {"name": "Safe Search aktiviert"}, "parental_blocked": {"name": "Jugendschutz blockiert"}, "rules_count": {"name": "Aktive Filterregeln"}, "average_processing": {"name": "DNS-Verarbeitungszeit"}
+      "dns_queries": {
+        "name": "DNS-Anfragen"
+      },
+      "dns_blocked": {
+        "name": "Blockierte DNS-Anfragen"
+      },
+      "dns_blocked_ratio": {
+        "name": "DNS-Blockquote"
+      },
+      "safe_browsing_blocked": {
+        "name": "Safe Browsing blockiert"
+      },
+      "safe_search_enforced": {
+        "name": "Safe Search aktiviert"
+      },
+      "parental_blocked": {
+        "name": "Jugendschutz blockiert"
+      },
+      "rules_count": {
+        "name": "Aktive Filterregeln"
+      },
+      "average_processing": {
+        "name": "DNS-Verarbeitungszeit"
+      }
     },
     "switch": {
-      "protection": {"name": "Gesamtschutz"}, "filtering": {"name": "DNS-Filterung"}, "safe_browsing": {"name": "Safe Browsing"}, "parental": {"name": "Jugendschutz"}, "safe_search": {"name": "Safe Search"}, "query_log": {"name": "Query-Log"}
+      "protection": {
+        "name": "Gesamtschutz"
+      },
+      "filtering": {
+        "name": "DNS-Filterung"
+      },
+      "safe_browsing": {
+        "name": "Safe Browsing"
+      },
+      "parental": {
+        "name": "Jugendschutz"
+      },
+      "safe_search": {
+        "name": "Safe Search"
+      },
+      "query_log": {
+        "name": "Query-Log"
+      }
+    }
+  },
+  "selector": {
+    "ai_privacy": {
+      "options": {
+        "anonymized": "Anonymisiert (ohne Domainnamen)",
+        "domains": "Mit Domainnamen"
+      }
     }
   }
 }
