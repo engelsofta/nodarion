@@ -110,6 +110,15 @@ recommendations in a clear daily assessment.
 
 ![AI network analysis in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/ki-netzwerkanalyse.png)
 
+## Configuration dialogs
+
+Under **Settings → Devices & services → Nodarion → Configure**, choose
+**Networks & scanning**, **FRITZ!Box & Mesh**, **AdGuard Home**, **AI analysis**, or
+**Advanced settings**. Each section returns to the menu. Select **Save & finish**
+to test enabled local services and apply all changes; closing the dialog discards
+the pending edits. Existing settings and credentials are preserved. AI settings
+are shared with the Nodarion panel; additional networks and VLANs remain in the panel.
+
 ## Installation
 
 ### HACS
@@ -125,6 +134,7 @@ Nodarion is included in the default HACS catalog. No custom repository is needed
 3. Restart Home Assistant.
 4. Go to **Settings → Devices & services → Add integration** and search for **Engelsoft Nodarion**.
 5. Enter your local IPv4 network in CIDR notation, for example `192.168.178.0/24`.
+6. Configure optional services in the section menu, then select **Save & finish**.
 
 ### Manual installation
 

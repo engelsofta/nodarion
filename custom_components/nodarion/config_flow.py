@@ -51,15 +51,39 @@ from .connection_validation import (
 )
 
 
+SECTION_FIELDS = {
+    "network": (CONF_NETWORK, CONF_SCAN_INTERVAL, CONF_EXCLUDE),
+    "fritz": (CONF_FRITZ_ENABLED, CONF_FRITZ_HOST, CONF_FRITZ_USER, CONF_FRITZ_PASSWORD),
+    "adguard": (
+        CONF_ADGUARD_ENABLED, CONF_ADGUARD_HOST, CONF_ADGUARD_PORT,
+        CONF_ADGUARD_USER, CONF_ADGUARD_PASSWORD, CONF_ADGUARD_SSL,
+        CONF_ADGUARD_VERIFY_SSL, CONF_ADGUARD_PERIOD_HOURS,
+    ),
+    "advanced": (CONF_TIMEOUT, CONF_CONCURRENCY, CONF_PORTS, CONF_OFFLINE_AFTER, CONF_REMOVE_AFTER_DAYS),
+}
+AI_FIELDS = ("ai_analysis_enabled", "ai_analysis_time", "ai_privacy")
+
+
 async def _async_validate_input(
-    hass, values: dict[str, Any]
+    hass, values: dict[str, Any], section: str | None = None
 ) -> dict[str, str]:
     """Validate values and test enabled service connections."""
     errors = _validate(values)
+    if section is not None:
+        errors = {
+            key: value for key, value in errors.items()
+            if key in SECTION_FIELDS[section]
+        }
     if errors:
         return errors
+    connection_values = dict(values)
+    if section is not None:
+        if section != "fritz":
+            connection_values[CONF_FRITZ_ENABLED] = False
+        if section != "adguard":
+            connection_values[CONF_ADGUARD_ENABLED] = False
     try:
-        await async_validate_connections(hass, values)
+        await async_validate_connections(hass, connection_values)
     except InvalidAuthError:
         errors["base"] = "invalid_auth"
     except CannotConnectError:
@@ -67,7 +91,7 @@ async def _async_validate_input(
     return errors
 
 
-def _schema(values: dict[str, Any]) -> vol.Schema:
+def _schema(values: dict[str, Any], section: str | None = None) -> vol.Schema:
     def number(minimum: float, maximum: float, step: float = 1):
         return selector.NumberSelector(
             selector.NumberSelectorConfig(
@@ -78,7 +102,7 @@ def _schema(values: dict[str, Any]) -> vol.Schema:
             )
         )
 
-    return vol.Schema(
+    schema = vol.Schema(
         {
             vol.Required(
                 CONF_NETWORK, default=values.get(CONF_NETWORK, DEFAULT_NETWORK)
@@ -171,6 +195,12 @@ def _schema(values: dict[str, Any]) -> vol.Schema:
             ): number(1, 168),
         }
     )
+    if section is None:
+        return schema
+    return vol.Schema({
+        key: value for key, value in schema.schema.items()
+        if key.schema in SECTION_FIELDS[section]
+    })
 
 
 def _validate(data: dict[str, Any]) -> dict[str, str]:
@@ -211,87 +241,164 @@ def _validate(data: dict[str, Any]) -> dict[str, str]:
     return errors
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle initial setup."""
+class SectionFlow:
+    """Shared section dialogs; stage all edits until the user saves."""
+
+    def _start(self, mode, entry=None):
+        self._mode = mode
+        self._entry = entry
+        current = {**entry.data, **entry.options} if entry else {}
+        # Preserve unknown/legacy options and fill every existing default.
+        self._values = {
+            key.schema: key.default()
+            for key in _schema({}).schema
+        }
+        self._values.update(current)
+        self._ai_values = {}
+        self._monitor = None
+
+    def _menu(self):
+        step = {
+            "user": "services", "options": "init",
+            "reconfigure": "reconfigure", "reauth": "reauth_confirm",
+        }[self._mode]
+        return self.async_show_menu(
+            step_id=step,
+            menu_options=["network", "fritz", "adguard", "ai", "advanced", "finish"],
+        )
+
+    async def async_step_services(self, user_input=None):
+        return self._menu()
+
+    async def _async_section(self, section, user_input=None, errors=None):
+        errors = errors or {}
+        values = dict(self._values)
+        if user_input is not None:
+            values.update(user_input)
+            errors = await _async_validate_input(self.hass, values, section)
+            if not errors:
+                self._values = values
+                return self._menu()
+        return self.async_show_form(
+            step_id=section, data_schema=_schema(values, section), errors=errors,
+        )
+
+    async def async_step_network(self, user_input=None):
+        return await self._async_section("network", user_input)
+
+    async def async_step_fritz(self, user_input=None):
+        return await self._async_section("fritz", user_input)
+
+    async def async_step_adguard(self, user_input=None):
+        return await self._async_section("adguard", user_input)
+
+    async def async_step_advanced(self, user_input=None):
+        return await self._async_section("advanced", user_input)
+
+    async def async_step_ai(self, user_input=None):
+        # AI rules remain in the panel's existing monitor storage, not options.
+        if self._monitor is None:
+            self._monitor = self.hass.data.get(DOMAIN, {}).get("monitor")
+            if self._monitor is None:
+                from .monitor import NetworkMonitor
+
+                self._monitor = NetworkMonitor(self.hass)
+                await self._monitor.async_load()
+        values = {**self._monitor.rules, **self._ai_values, **(user_input or {})}
+        errors = {}
+        if user_input is not None:
+            time = str(values["ai_analysis_time"])
+            try:
+                hour, minute = time.split(":")
+                if (
+                    len(hour) != 2 or len(minute) != 2
+                    or not (0 <= int(hour) < 24 and 0 <= int(minute) < 60)
+                ):
+                    raise ValueError
+            except ValueError:
+                errors["ai_analysis_time"] = "invalid_time"
+            if not errors:
+                self._ai_values = {key: values[key] for key in AI_FIELDS}
+                return self._menu()
+        return self.async_show_form(
+            step_id="ai",
+            data_schema=vol.Schema({
+                vol.Required("ai_analysis_enabled", default=values.get("ai_analysis_enabled", False)): selector.BooleanSelector(),
+                vol.Required("ai_analysis_time", default=values.get("ai_analysis_time", "03:15")): str,
+                vol.Required("ai_privacy", default=values.get("ai_privacy", "anonymized")): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=["anonymized", "domains"], translation_key="ai_privacy",
+                    )
+                ),
+            }),
+            errors=errors,
+        )
+
+    async def async_step_finish(self, user_input=None):
+        if user_input is None:
+            return self.async_show_form(step_id="finish", data_schema=vol.Schema({}))
+        # Recheck all enabled connections before any persistent configuration write.
+        # Route failures to the relevant dialog with the attempted values intact.
+        for section in SECTION_FIELDS:
+            errors = await _async_validate_input(self.hass, self._values, section)
+            if errors:
+                return await self._async_section(section, errors=errors)
+        if self._mode == "user":
+            await self.async_set_unique_id(DOMAIN)
+            self._abort_if_unique_id_configured()
+        if self._ai_values:
+            await self._monitor.async_set_rules(self._ai_values)
+        if self._mode == "options":
+            return self.async_create_entry(title="", data=self._values)
+        if self._mode == "user":
+            return self.async_create_entry(title="Engelsoft Nodarion", data=self._values)
+        # Existing options take precedence over data at runtime. Update matching
+        # option keys too, rather than leaving stale values that shadow the edit.
+        return self.async_update_and_abort(
+            self._entry,
+            data_updates=self._values,
+            options={
+                **self._entry.options,
+                **{key: self._values[key] for key in self._entry.options if key in self._values},
+            },
+            reason="reauth_successful" if self._mode == "reauth" else "reconfigure_successful",
+        )
+
+
+class ConfigFlow(SectionFlow, config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle initial setup and connection recovery using the same sections."""
 
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        """Handle user setup."""
-        errors = {}
-        if user_input is not None:
-            errors = await _async_validate_input(self.hass, user_input)
-            if not errors:
-                await self.async_set_unique_id(DOMAIN)
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(
-                    title="Engelsoft Nodarion", data=user_input
-                )
-        return self.async_show_form(
-            step_id="user", data_schema=_schema(user_input or {}), errors=errors
-        )
+        if not hasattr(self, "_values"):
+            self._start("user")
+        return await self.async_step_network(user_input)
 
     async def async_step_reconfigure(self, user_input=None):
-        """Reconfigure addresses, credentials, and scanner parameters."""
-        entry = self._get_reconfigure_entry()
-        values = user_input or {**entry.data, **entry.options}
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            errors = await _async_validate_input(self.hass, user_input)
-            if not errors:
-                return self.async_update_and_abort(
-                    entry,
-                    data_updates=user_input,
-                    options_updates={},
-                    reason="reconfigure_successful",
-                )
-        return self.async_show_form(
-            step_id="reconfigure", data_schema=_schema(values), errors=errors
-        )
+        if not hasattr(self, "_values"):
+            self._start("reconfigure", self._get_reconfigure_entry())
+        return self._menu()
 
     async def async_step_reauth(self, entry_data):
-        """Start credential recovery for the existing entry."""
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(self, user_input=None):
-        """Validate replacement credentials and reload the entry."""
-        entry = self._get_reauth_entry()
-        values = user_input or {**entry.data, **entry.options}
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            errors = await _async_validate_input(self.hass, user_input)
-            if not errors:
-                return self.async_update_and_abort(
-                    entry,
-                    data_updates=user_input,
-                    options_updates={},
-                    reason="reauth_successful",
-                )
-        return self.async_show_form(
-            step_id="reauth_confirm", data_schema=_schema(values), errors=errors
-        )
+        if not hasattr(self, "_values"):
+            self._start("reauth", self._get_reauth_entry())
+        return self._menu()
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        """Return options flow."""
         return OptionsFlow(config_entry)
 
 
-class OptionsFlow(config_entries.OptionsFlow):
-    """Handle editable scanner options."""
+class OptionsFlow(SectionFlow, config_entries.OptionsFlow):
+    """Edit individual sections without discarding unrelated settings."""
 
     def __init__(self, entry) -> None:
-        self.entry = entry
+        self._start("options", entry)
 
     async def async_step_init(self, user_input=None):
-        """Manage options."""
-        errors = {}
-        if user_input is not None:
-            errors = await _async_validate_input(self.hass, user_input)
-            if not errors:
-                return self.async_create_entry(title="", data=user_input)
-        values = user_input or {**self.entry.data, **self.entry.options}
-        return self.async_show_form(
-            step_id="init", data_schema=_schema(values), errors=errors
-        )
+        return self._menu()

@@ -123,6 +123,16 @@ zusammen.
 
 ![KI-Netzwerkanalyse in Engelsoft Nodarion](https://raw.githubusercontent.com/engelsofta/nodarion/main/docs/images/ki-netzwerkanalyse.png)
 
+## Einrichtungsdialoge
+
+Unter **Einstellungen → Geräte & Dienste → Nodarion → Konfigurieren** wählst du
+**Netzwerke & Scan**, **FRITZ!Box & Mesh**, **AdGuard Home**, **KI-Analyse** oder
+**Erweiterte Einstellungen**. Jeder Bereich führt zurück ins Menü. Erst
+**Speichern & abschließen** prüft die aktivierten lokalen Dienste und übernimmt
+alle Änderungen. Schließen des Dialogs verwirft die vorgemerkten Änderungen.
+Bestehende Einstellungen und Zugangsdaten bleiben erhalten. Die KI-Einstellungen
+gelten auch im Nodarion-Panel; zusätzliche Netze und VLANs werden weiterhin dort verwaltet.
+
 ## Installation
 
 ### HACS
@@ -138,6 +148,7 @@ Nodarion ist im Standardkatalog von HACS enthalten. Ein benutzerdefiniertes Repo
 3. Home Assistant neu starten.
 4. Unter **Einstellungen → Geräte & Dienste → Integration hinzufügen** nach **Engelsoft Nodarion** suchen.
 5. Das lokale IPv4-Netz als CIDR eintragen, zum Beispiel `192.168.178.0/24`.
+6. Optionale Dienste im Auswahlmenü einrichten und **Speichern & abschließen** wählen.
 
 ### Manuell
 
