@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.19";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.19";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.27";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.27";
 
 const esc = (value) =>
   String(value ?? "")
@@ -1146,7 +1146,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           --ns-surface: rgba(255,255,255,.035);
           --ns-surface-raised: rgba(255,255,255,.055);
           --ns-field: rgba(16,15,14,.46);
-          --ns-green: #f0a13b;
+          --ns-green: #ccb57b;
           --ns-cyan: #f5d7a3;
           --ns-red: #ff786f;
           display: block;
@@ -1171,17 +1171,17 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         header { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:28px; }
         .brand { display:flex; align-items:center; gap:16px; }
-        .github-thanks { display:flex; align-items:center; justify-content:center; gap:10px; flex:1; min-width:0; padding:9px 12px; border:1px solid var(--ns-line); border-radius:13px; color:var(--ns-text); background:rgba(240,161,59,.045); text-decoration:none; transition:background .18s ease,border-color .18s ease; }
-        .github-thanks > ha-icon { --mdc-icon-size:24px; flex-shrink:0; color:var(--ns-yellow,#f0c774); }
+        .github-thanks { display:flex; align-items:center; justify-content:center; gap:10px; flex:1; min-width:0; padding:9px 12px; border:1px solid var(--ns-line); border-radius:13px; color:var(--ns-text); background:rgba(204,181,123,.045); text-decoration:none; transition:background .18s ease,border-color .18s ease; }
+        .github-thanks > ha-icon { --mdc-icon-size:24px; flex-shrink:0; color:var(--ns-yellow,#d9c58e); }
         .github-thanks-copy { display:grid; gap:3px; }
         .github-thanks strong { font-size:12px; font-weight:750; }
         .github-thanks small { font-size:11px; line-height:1.4; color:var(--ns-muted); }
-        .github-thanks:hover { background:rgba(240,161,59,.11); border-color:var(--ns-yellow,#f0c774); }
-        .github-thanks:focus-visible { outline:2px solid var(--ns-yellow,#f0c774); outline-offset:3px; }
+        .github-thanks:hover { background:rgba(204,181,123,.11); border-color:var(--ns-yellow,#d9c58e); }
+        .github-thanks:focus-visible { outline:2px solid var(--ns-yellow,#d9c58e); outline-offset:3px; }
         @media (max-width:800px) { .github-thanks { display:none; } }
         .header-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; }
         .header-action { min-height:43px; display:flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid var(--ns-line); border-radius:13px; color:#cce5dc; background:rgba(255,255,255,.04); font:inherit; font-size:11px; font-weight:750; white-space:nowrap; cursor:pointer; transition:.18s ease; }
-        .header-action:hover, .header-action.active { color:#fff7e9; border-color:rgba(240,161,59,.38); background:rgba(240,161,59,.1); }
+        .header-action:hover, .header-action.active { color:#fff7e9; border-color:rgba(204,181,123,.38); background:rgba(204,181,123,.1); }
         .header-action ha-icon { --mdc-icon-size:18px; }
         .connection-status { color:#bcecff; }
         .connection-status ha-icon { color:var(--ns-cyan); }
@@ -1195,7 +1195,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           text-decoration:none; cursor:pointer;
           transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
         }
-        .logo:hover { transform:translateY(-2px); border-color:rgba(240,161,59,.7); box-shadow:0 18px 38px rgba(221,139,42,.28),inset 0 1px rgba(255,255,255,.42); }
+        .logo:hover { transform:translateY(-2px); border-color:rgba(204,181,123,.7); box-shadow:0 18px 38px rgba(221,139,42,.28),inset 0 1px rgba(255,255,255,.42); }
         .logo:focus-visible { outline:3px solid color-mix(in srgb,var(--ns-green) 55%,transparent); outline-offset:3px; }
         .logo ha-icon { color:var(--ns-green); --mdc-icon-size:31px; }
         h1 { margin:0; font-size:clamp(26px,3vw,38px); letter-spacing:-1.5px; font-weight:720; }
@@ -1215,10 +1215,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         .metric { min-height:132px; padding:18px 20px; border-radius:17px; position:relative; overflow:hidden; }
         .metric:is(button) { color:inherit; text-align:left; font:inherit; cursor:pointer; transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
-        .metric:is(button):hover { transform:translateY(-2px); border-color:rgba(240,161,59,.4); background:rgba(240,161,59,.09); box-shadow:0 24px 58px rgba(10,8,5,.25), inset 0 1px rgba(255,255,255,.055); }
+        .metric:is(button):hover { transform:translateY(-2px); border-color:rgba(204,181,123,.4); background:rgba(204,181,123,.09); box-shadow:0 24px 58px rgba(10,8,5,.25), inset 0 1px rgba(255,255,255,.055); }
         .nav-metric { width:100%; min-width:0; color:inherit; text-align:left; font:inherit; cursor:pointer; transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
-        .nav-metric:hover { transform:translateY(-2px); border-color:rgba(240,161,59,.4); background:rgba(240,161,59,.09); }
-        .nav-metric.active { border-color:rgba(240,161,59,.72); box-shadow:0 0 0 1px rgba(240,161,59,.24), 0 22px 55px rgba(10,8,5,.22); }
+        .nav-metric:hover { transform:translateY(-2px); border-color:rgba(204,181,123,.4); background:rgba(204,181,123,.09); }
+        .nav-metric.active { border-color:rgba(204,181,123,.72); box-shadow:0 0 0 1px rgba(204,181,123,.24), 0 22px 55px rgba(10,8,5,.22); }
         .metric-status-value { display:flex; align-items:center; gap:8px; margin-top:12px; color:#effff8; font-size:20px; font-weight:780; }
         .metric-status-value ha-icon { color:var(--ns-cyan); --mdc-icon-size:23px; }
         .metric.events-metric { --glow:#ffd766; }
@@ -1231,14 +1231,14 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .metric-label-row { position:relative; z-index:4; display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:25px; }
         .metric-label { color:#9bb8af; font-size:13px; text-transform:uppercase; letter-spacing:1.2px; font-weight:700; }
         .metric-settings { display:grid; place-items:center; flex:0 0 auto; width:26px; height:26px; padding:0; border:1px solid rgba(255,255,255,.1); border-radius:8px; color:#8eaea4; background:rgba(255,255,255,.035); cursor:pointer; transition:.18s ease; }
-        .metric-settings:hover { color:#fff7e9; border-color:rgba(240,161,59,.42); background:rgba(240,161,59,.14); transform:rotate(20deg); }
+        .metric-settings:hover { color:#fff7e9; border-color:rgba(204,181,123,.42); background:rgba(204,181,123,.14); transform:rotate(20deg); }
         .metric-settings ha-icon { --mdc-icon-size:15px; }
         .metric-value { font-size:31px; font-weight:780; margin-top:7px; letter-spacing:-1px; }
         .metric.devices { --glow:var(--ns-green); }
         .device-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:7px; }
         .device-count { appearance:none; min-width:0; border:0; outline:0; padding:5px 7px; color:inherit; background:transparent; text-align:left; font:inherit; cursor:pointer; border-radius:8px; transition:color .18s ease, background .18s ease, transform .18s ease; }
-        .device-count:hover, .function-count:hover { color:#fffaf1; background:rgba(240,161,59,.13); transform:translateY(-1px); }
-        .device-count.active, .function-count.active { background:rgba(240,161,59,.18); box-shadow:inset 0 0 0 1px rgba(240,161,59,.28); }
+        .device-count:hover, .function-count:hover { color:#fffaf1; background:rgba(204,181,123,.13); transform:translateY(-1px); }
+        .device-count.active, .function-count.active { background:rgba(204,181,123,.18); box-shadow:inset 0 0 0 1px rgba(204,181,123,.28); }
         .device-count:focus, .device-count:focus-visible { border:0; outline:0; box-shadow:none; }
         .device-count + .device-count { padding-left:12px; border-left:1px solid var(--ns-line); }
         .device-count strong { display:block; font-size:31px; line-height:1; letter-spacing:-1px; }
@@ -1257,8 +1257,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .function-count span { display:block; margin-top:7px; overflow:hidden; color:#8eaea4; font-size:9px; font-weight:750; text-overflow:ellipsis; text-transform:uppercase; letter-spacing:.65px; white-space:nowrap; }
         .metric.network { --glow:var(--ns-cyan); } .metric.network .metric-value { color:var(--ns-cyan); font-size:20px; margin-top:13px; }
         .metric.quick-filter { width:100%; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-        .metric.quick-filter:hover { border-color:rgba(240,161,59,.4); background:rgba(240,161,59,.09); }
-        .metric.quick-filter.active { border-color:rgba(240,161,59,.62); box-shadow:0 0 0 1px rgba(240,161,59,.2), 0 22px 55px rgba(10,8,5,.22); }
+        .metric.quick-filter:hover { border-color:rgba(204,181,123,.4); background:rgba(204,181,123,.09); }
+        .metric.quick-filter.active { border-color:rgba(204,181,123,.62); box-shadow:0 0 0 1px rgba(204,181,123,.2), 0 22px 55px rgba(10,8,5,.22); }
         .metric.connections { --glow:var(--ns-cyan); width:100%; color:inherit; text-align:left; font:inherit; cursor:pointer; }
         .metric.connections .metric-value { display:flex; align-items:center; justify-content:space-between; color:var(--ns-cyan); font-size:20px; margin-top:13px; }
         .metric.connections ha-icon { --mdc-icon-size:21px; transition:transform .18s ease; }
@@ -1310,12 +1310,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .tab-view[data-view="participants"] { position:relative; }
         .column-config-head { width:48px; min-width:48px; padding:6px !important; text-align:center; }
         .column-picker-button { width:35px; height:35px; display:grid; place-items:center; padding:0; border-radius:9px; color:#dff7ed; background:rgba(80,215,255,.08); border:1px solid rgba(80,215,255,.25); font:inherit; cursor:pointer; }
-        .column-picker-button:hover { color:#fff5e4; background:rgba(240,161,59,.14); border-color:rgba(240,161,59,.38); }
+        .column-picker-button:hover { color:#fff5e4; background:rgba(204,181,123,.14); border-color:rgba(204,181,123,.38); }
         .column-picker-button ha-icon { --mdc-icon-size:19px; }
         .column-picker { position:absolute; z-index:20; right:8px; top:48px; display:grid; grid-template-columns:repeat(2,minmax(150px,1fr)); gap:7px; width:min(390px,calc(100vw - 36px)); padding:12px; border-radius:13px; background:#0b211b; border:1px solid rgba(80,215,255,.25); box-shadow:0 18px 45px rgba(0,0,0,.42); }
         .column-picker[hidden] { display:none; }
         .column-picker label { display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:8px; color:var(--ns-text); font-size:13px; font-weight:600; cursor:pointer; }
-        .column-picker label:hover { color:#fff7e9; background:rgba(240,161,59,.11); }
+        .column-picker label:hover { color:#fff7e9; background:rgba(204,181,123,.11); }
         .column-picker input { width:17px; height:17px; padding:0; accent-color:var(--ns-green); }
         .column-picker-head {
           grid-column:1/-1; display:flex; align-items:center;
@@ -1328,7 +1328,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           border-radius:8px; color:#d8d0c5; background:rgba(255,255,255,.05);
           border:1px solid var(--ns-line); cursor:pointer;
         }
-        .column-picker-close:hover { color:#fff; background:rgba(240,161,59,.14); }
+        .column-picker-close:hover { color:#fff; background:rgba(204,181,123,.14); }
         .column-picker-close ha-icon { --mdc-icon-size:18px; }
         .table-column-picker {
           position:absolute; z-index:12; top:8px; right:18px;
@@ -1354,16 +1354,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         .column-filter::placeholder { color:#58776e; }
         .column-filter.has-value {
-          color:#fff5e5; background-color:rgba(240,161,59,.14);
-          border-color:rgba(240,161,59,.62);
-          box-shadow:inset 3px 0 #f0a13b, 0 0 0 1px rgba(240,161,59,.08);
+          color:#fff5e5; background-color:rgba(204,181,123,.14);
+          border-color:rgba(204,181,123,.62);
+          box-shadow:inset 3px 0 #ccb57b, 0 0 0 1px rgba(204,181,123,.08);
         }
         .column-filter.has-value::placeholder { color:#d6b985; }
         select.column-filter {
           min-width:125px; color-scheme:dark; cursor:pointer;
           background-color:#35322f;
         }
-        select.column-filter:hover { border-color:rgba(240,161,59,.38); }
+        select.column-filter:hover { border-color:rgba(204,181,123,.38); }
         select.column-filter:focus { background-color:#3b3733; }
         select.column-filter option {
           color:#f4eee5; background:#35322f; font-size:13px;
@@ -1387,16 +1387,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
           transform:rotate(45deg) translateY(-2px); transition:transform .15s ease;
         }
         .custom-column-filter[open] summary {
-          border-color:rgba(240,161,59,.62);
-          box-shadow:0 0 0 3px rgba(240,161,59,.10);
+          border-color:rgba(204,181,123,.62);
+          box-shadow:0 0 0 3px rgba(204,181,123,.10);
         }
         .custom-column-filter[open] summary::after {
           transform:rotate(225deg) translate(-2px,-1px);
         }
         .custom-column-filter.has-value summary {
-          color:#fff5e5; background:rgba(240,161,59,.14);
-          border-color:rgba(240,161,59,.62);
-          box-shadow:inset 3px 0 #f0a13b, 0 0 0 1px rgba(240,161,59,.08);
+          color:#fff5e5; background:rgba(204,181,123,.14);
+          border-color:rgba(204,181,123,.62);
+          box-shadow:inset 3px 0 #ccb57b, 0 0 0 1px rgba(204,181,123,.08);
         }
         .custom-filter-menu {
           position:absolute; z-index:30; top:calc(100% + 6px); left:0;
@@ -1412,8 +1412,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
           text-align:left; cursor:pointer; white-space:nowrap;
           text-transform:none; letter-spacing:0;
         }
-        .custom-filter-option:hover { color:#fffaf1; background:rgba(240,161,59,.11); }
-        .custom-filter-option.active { color:#fff6e8; background:rgba(240,161,59,.18); }
+        .custom-filter-option:hover { color:#fffaf1; background:rgba(204,181,123,.11); }
+        .custom-filter-option.active { color:#fff6e8; background:rgba(204,181,123,.18); }
         .custom-filter-option ha-icon { --mdc-icon-size:16px; color:var(--ns-green); }
         .custom-filter-count {
           min-width:25px; padding:2px 6px; border-radius:999px; text-align:center;
@@ -1454,7 +1454,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           background:linear-gradient(90deg,rgba(88,185,214,.18),rgba(88,185,214,.055) 42%,rgba(88,185,214,.025));
         }
         tbody tr.onboarding-row:hover {
-          background:linear-gradient(90deg,rgba(240,185,79,.19),rgba(240,185,79,.055) 42%,rgba(240,161,59,.025));
+          background:linear-gradient(90deg,rgba(240,185,79,.19),rgba(240,185,79,.055) 42%,rgba(204,181,123,.025));
         }
         @keyframes onboarding-shimmer {
           0%,100% { filter:brightness(1); }
@@ -1722,11 +1722,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .settings-view { display:grid; gap:18px; }
         .settings-context-title { display:flex; align-items:center; gap:11px; }
         .settings-back { display:grid; place-items:center; flex:0 0 auto; width:36px; height:36px; padding:0; border:1px solid var(--ns-line); border-radius:10px; color:#cce5dc; background:rgba(255,255,255,.04); cursor:pointer; }
-        .settings-back:hover { color:#fff7e9; border-color:rgba(240,161,59,.4); background:rgba(240,161,59,.12); }
+        .settings-back:hover { color:#fff7e9; border-color:rgba(204,181,123,.4); background:rgba(204,181,123,.12); }
         .settings-back ha-icon { --mdc-icon-size:19px; }
         .adguard-feature-list { display:grid; gap:8px; }
         .adguard-feature { display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; padding:12px 13px; border:1px solid var(--ns-line); border-radius:11px; color:#b9d8cd; background:rgba(255,255,255,.025); font:inherit; text-align:left; cursor:pointer; }
-        .adguard-feature:hover { border-color:rgba(240,161,59,.32); background:rgba(240,161,59,.07); }
+        .adguard-feature:hover { border-color:rgba(204,181,123,.32); background:rgba(204,181,123,.07); }
         .adguard-feature strong, .adguard-feature small { display:block; }
         .adguard-feature small { margin-top:3px; color:#78998f; font-size:10px; }
         .adguard-feature-state { min-width:42px; padding:5px 8px; border-radius:999px; color:#9aa8a3; background:rgba(255,255,255,.06); font-size:10px; font-weight:800; text-align:center; }
@@ -1779,7 +1779,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .presence-sensor-link { display:flex; align-items:center; gap:8px; padding:8px 11px; border-radius:10px; color:#9eaaa6; background:rgba(255,255,255,.035); border:1px solid var(--ns-line); font:inherit; font-size:11px; font-weight:780; cursor:pointer; white-space:nowrap; }
         .presence-sensor-link.on { color:#bff8d8; background:rgba(143,255,194,.08); border-color:rgba(143,255,194,.25); }
         .presence-sensor-link.off { color:#c7c1b8; }
-        .presence-sensor-link:hover { border-color:rgba(240,161,59,.42); box-shadow:0 0 0 3px rgba(240,161,59,.08); }
+        .presence-sensor-link:hover { border-color:rgba(204,181,123,.42); box-shadow:0 0 0 3px rgba(204,181,123,.08); }
         .presence-sensor-link ha-icon { --mdc-icon-size:18px; }
         .presence-list { display:grid; gap:10px; margin-top:14px; }
         .presence-row { display:grid; grid-template-columns:minmax(150px,230px) minmax(240px,1fr); align-items:center; gap:16px; }
@@ -1796,10 +1796,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .presence-segment { position:absolute; top:4px; bottom:4px; min-width:2px; border-radius:5px; background:linear-gradient(90deg,rgba(86,199,139,.55),#8fffc2); box-shadow:0 0 8px rgba(143,255,194,.2); }
         .presence-axis { display:flex; justify-content:space-between; margin:6px 1px 0; color:#a7bfb6; font-size:11px; line-height:1.4; }
         .alerts-panel { display:flex; flex-direction:column; max-height:calc(100dvh - 64px); }
-        .alerts-panel .alert-list { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding-right:5px; scrollbar-width:thin; scrollbar-color:rgba(240,161,59,.42) transparent; }
+        .alerts-panel .alert-list { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding-right:5px; scrollbar-width:thin; scrollbar-color:rgba(204,181,123,.42) transparent; }
         .alerts-panel .alert-list::-webkit-scrollbar { width:7px; }
         .alerts-panel .alert-list::-webkit-scrollbar-track { background:transparent; }
-        .alerts-panel .alert-list::-webkit-scrollbar-thumb { border-radius:999px; background:rgba(240,161,59,.32); }
+        .alerts-panel .alert-list::-webkit-scrollbar-thumb { border-radius:999px; background:rgba(204,181,123,.32); }
         .alert-list { display:grid; gap:9px; }
         .alert-item { --alert-color:#ffd766; display:grid; grid-template-columns:38px 1fr auto; align-items:center; gap:12px; padding:13px; border-radius:13px; background:color-mix(in srgb,var(--alert-color) 5%,rgba(2,10,8,.4)); border:1px solid color-mix(in srgb,var(--alert-color) 22%,transparent); }
         .alert-item.critical { --alert-color:var(--ns-red); }
@@ -1864,10 +1864,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .rule-group h3 { margin:3px 0 4px; color:#c7b99f; font-size:10px; text-transform:uppercase; letter-spacing:1.1px; }
         .rule-group h3 { display:flex; align-items:center; justify-content:space-between; gap:10px; }
         .settings-help-button { display:grid; place-items:center; flex:0 0 auto; width:24px; height:24px; padding:0; border-radius:50%; color:#d8c9b2; background:rgba(255,255,255,.045); border:1px solid rgba(255,246,229,.14); font:800 12px/1 Inter,Roboto,sans-serif; cursor:pointer; }
-        .settings-help-button:hover { color:#fff7e9; background:rgba(240,161,59,.15); border-color:rgba(240,161,59,.42); }
+        .settings-help-button:hover { color:#fff7e9; background:rgba(204,181,123,.15); border-color:rgba(204,181,123,.42); }
         .settings-help-backdrop { position:fixed; z-index:90; inset:0; display:grid; place-items:center; padding:20px; background:rgba(7,6,5,.72); backdrop-filter:blur(7px); }
         .settings-help-backdrop[hidden] { display:none; }
-        .settings-help-dialog { width:min(620px,calc(100vw - 32px)); max-height:min(720px,calc(100dvh - 40px)); overflow:auto; padding:24px; border-radius:18px; color:#eee7dd; background:#393531; border:1px solid rgba(240,161,59,.28); box-shadow:0 26px 80px rgba(0,0,0,.58); }
+        .settings-help-dialog { width:min(620px,calc(100vw - 32px)); max-height:min(720px,calc(100dvh - 40px)); overflow:auto; padding:24px; border-radius:18px; color:#eee7dd; background:#393531; border:1px solid rgba(204,181,123,.28); box-shadow:0 26px 80px rgba(0,0,0,.58); }
         .settings-help-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; }
         .settings-help-head h2 { margin:0; color:#fff8ed; font-size:20px; }
         .settings-help-close { display:grid; place-items:center; width:34px; height:34px; padding:0; border-radius:10px; color:#d8d0c6; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.11); cursor:pointer; }
@@ -1875,7 +1875,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .settings-help-copy { display:grid; gap:12px; }
         .settings-help-copy p { margin:0; color:#c9c1b7; font-size:13px; line-height:1.6; }
         .settings-help-copy strong { color:#f4dfbd; }
-        .rule-group.basics { background:rgba(240,161,59,.045); border-color:rgba(240,161,59,.15); }
+        .rule-group.basics { background:rgba(204,181,123,.045); border-color:rgba(204,181,123,.15); }
         .rule-group.vlan-settings { background:rgba(80,215,255,.035); border-color:rgba(80,215,255,.14); }
         .vlan-settings-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
         .vlan-settings-head h3 { margin:0; }
@@ -1914,12 +1914,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .notify-search-wrap { position:relative; min-width:0; }
         .notify-search-wrap ha-icon { position:absolute; z-index:1; left:9px; top:8px; color:var(--ns-muted); --mdc-icon-size:17px; pointer-events:none; }
         .notify-target-action { padding:0 9px; border:1px solid var(--ns-line); border-radius:9px; color:var(--ns-muted); background:rgba(255,255,255,.035); font:inherit; font-size:9px; font-weight:750; cursor:pointer; }
-        .notify-target-action:hover { color:#fff7e9; border-color:rgba(240,161,59,.38); background:rgba(240,161,59,.12); }
+        .notify-target-action:hover { color:#fff7e9; border-color:rgba(204,181,123,.38); background:rgba(204,181,123,.12); }
         .notify-target-list { display:grid; gap:5px; max-height:210px; overflow:auto; padding-right:3px; scrollbar-gutter:stable; }
         .notify-target { display:grid; grid-template-columns:28px minmax(0,1fr) 24px; align-items:center; gap:9px; min-height:42px; padding:7px 9px; border:1px solid var(--ns-line); border-radius:10px; background:rgba(255,255,255,.018); cursor:pointer; transition:.18s ease; }
         .notify-target[hidden] { display:none; }
-        .notify-target:hover { border-color:rgba(240,161,59,.28); background:rgba(240,161,59,.07); }
-        .notify-target:has(input:checked) { border-color:rgba(240,161,59,.46); background:rgba(240,161,59,.11); box-shadow:inset 3px 0 #e5ad50; }
+        .notify-target:hover { border-color:rgba(204,181,123,.28); background:rgba(204,181,123,.07); }
+        .notify-target:has(input:checked) { border-color:rgba(204,181,123,.46); background:rgba(204,181,123,.11); box-shadow:inset 3px 0 #e5ad50; }
         .notify-target input { position:absolute; width:1px; height:1px; min-height:0; opacity:0; pointer-events:none; }
         .notify-target-icon { display:grid; place-items:center; width:28px; height:28px; border-radius:8px; color:var(--ns-cyan); background:rgba(80,215,255,.09); }
         .notify-target-icon.telegram { color:#69c9f2; background:rgba(45,169,225,.12); }
@@ -2030,7 +2030,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .logo {
           width:52px; height:52px; border-radius:16px;
           color:#2b2115;
-          background:linear-gradient(145deg,#f7c36f,#c77722);
+          background:linear-gradient(145deg,#f0d39a,#cfa45d);
           border-color:rgba(255,229,180,.4);
           box-shadow:0 14px 30px rgba(221,139,42,.20), inset 0 1px rgba(255,255,255,.42);
         }
@@ -2042,7 +2042,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           border-color:rgba(255,241,215,.15); border-radius:999px; padding:11px 17px;
           box-shadow:inset 0 1px rgba(255,255,255,.04);
         }
-        .scan:hover { background:rgba(240,161,59,.16); border-color:rgba(240,161,59,.38); }
+        .scan:hover { background:rgba(204,181,123,.16); border-color:rgba(204,181,123,.38); }
         /* Graphite glass with restrained gold and semantic status accents. */
         .metrics {
           gap:14px; padding:0; border-radius:20px;
@@ -2081,7 +2081,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .metric.connections .metric-value { color:var(--ns-cyan); }
         .metric:is(button):hover {
           background:linear-gradient(135deg,rgba(124,116,105,.68),rgba(71,67,61,.64));
-          border-color:rgba(240,161,59,.32);
+          border-color:rgba(204,181,123,.32);
         }
         .connection-panel {
           background:rgba(67,63,59,.48); border-color:var(--ns-line);
@@ -2106,10 +2106,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
           color-scheme:dark;
           cursor:pointer;
           background-color:#35322f;
-          border-color:rgba(240,161,59,.20);
+          border-color:rgba(204,181,123,.20);
           box-shadow:inset 0 1px rgba(255,255,255,.035);
         }
-        select:hover { border-color:rgba(240,161,59,.40); background-color:#3b3733; }
+        select:hover { border-color:rgba(204,181,123,.40); background-color:#3b3733; }
         select option, select optgroup {
           color:#f8f2e8;
           background:#35322f;
@@ -2119,7 +2119,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           color:#fffaf1;
           background:#9a5d24;
         }
-        input:focus, select:focus { border-color:rgba(240,161,59,.58); box-shadow:0 0 0 3px rgba(240,161,59,.10); }
+        input:focus, select:focus { border-color:rgba(204,181,123,.58); box-shadow:0 0 0 3px rgba(204,181,123,.10); }
         .search ha-icon { color:#b0a99e; }
         .filter { color:#bdb7ad; }
         .table-panel, .log-panel, .dns-panel, .mesh-panel, .watch-panel, .ai-panel {
@@ -2136,35 +2136,35 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .entity-link, .detail-stack strong, .connection-name, .log-device,
         .alert-name, .rule label, .client-name { color:#fffaf1; }
         .device-icon, .log-icon {
-          color:var(--ns-cyan); background:rgba(240,161,59,.10);
-          border-color:rgba(240,161,59,.18);
+          color:var(--ns-cyan); background:rgba(204,181,123,.10);
+          border-color:rgba(204,181,123,.18);
         }
         .device-icon.vpn { color:#d4b9ff; background:rgba(182,140,255,.12); border-color:rgba(182,140,255,.3); }
         .device-icon.guest { color:#ffe08a; background:rgba(255,215,102,.1); border-color:rgba(255,215,102,.3); }
         .device-icon.router { color:#aaffd0; background:rgba(85,242,162,.1); border-color:rgba(85,242,162,.28); }
         .device-icon.mesh { color:#8eb7ff; background:rgba(70,125,255,.12); border-color:rgba(95,145,255,.34); }
         .column-picker-button {
-          color:#f4dfbd; background:rgba(240,161,59,.08); border-color:rgba(240,161,59,.25);
+          color:#f4dfbd; background:rgba(204,181,123,.08); border-color:rgba(204,181,123,.25);
         }
         .column-picker {
-          background:#393531; border-color:rgba(240,161,59,.28);
+          background:#393531; border-color:rgba(204,181,123,.28);
         }
         .column-picker { box-shadow:0 24px 60px rgba(10,8,5,.45); }
         .security-card, .ai-copy article, .client, .connection-card {
           background:rgba(35,32,29,.30); border-color:rgba(255,246,229,.09);
         }
         .save-rules, .approve-internet {
-          color:#2c2115; background:linear-gradient(135deg,#f6bd61,#d88328);
+          color:#2c2115; background:linear-gradient(135deg,#f0d39a,#cfa45d);
           box-shadow:0 8px 22px rgba(224,139,40,.20);
         }
         .internet {
-          color:#f6d8a6; background:rgba(240,161,59,.09); border-color:rgba(240,161,59,.25);
+          color:#f6d8a6; background:rgba(204,181,123,.09); border-color:rgba(204,181,123,.25);
         }
         .ap-node {
-          background:linear-gradient(145deg,rgba(240,161,59,.18),rgba(255,255,255,.045));
-          border-color:rgba(240,161,59,.28);
+          background:linear-gradient(145deg,rgba(204,181,123,.18),rgba(255,255,255,.045));
+          border-color:rgba(204,181,123,.28);
         }
-        ::selection { color:#2b2115; background:#f0a13b; }
+        ::selection { color:#2b2115; background:#ccb57b; }
 
         /* Shared settings design: one visual language across every section. */
         .settings-view .watch-panel { background:var(--ns-panel); border-color:var(--ns-line); box-shadow:0 16px 42px rgba(10,8,5,.18),inset 0 1px rgba(255,255,255,.04); }
@@ -2189,7 +2189,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .settings-view .unit-input { color:var(--ns-text); background:var(--ns-field); border-color:var(--ns-line); }
         .settings-view .unit-input span { color:var(--ns-muted); }
         .settings-view .adguard-feature-state { color:var(--ns-muted); background:var(--ns-surface-raised); }
-        .settings-view .adguard-feature.active .adguard-feature-state, .settings-view .save-rules { color:#2d1b09; background:#e6a23f; }
+        .settings-view .adguard-feature.active .adguard-feature-state, .settings-view .save-rules { color:#2d1b09; background:#ccb57b; }
         .settings-view .query-log-warning { color:#f2d798; background:rgba(230,162,63,.09); border:1px solid rgba(230,162,63,.2); }
 
         /* Light theme follows Home Assistant's active light/dark setting. */
@@ -2614,7 +2614,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .settings-view .unit-input span { color:#5f5952; background:#f0ece6; }
         :host([data-theme="light"]) .settings-view .adguard-feature-state { color:#5f5952; background:#ece8e2; }
         :host([data-theme="light"]) .settings-view .adguard-feature.active .adguard-feature-state,
-        :host([data-theme="light"]) .settings-view .save-rules { color:#2e1c09; background:#e5aa47; box-shadow:0 5px 14px rgba(166,101,25,.18); }
+        :host([data-theme="light"]) .settings-view .save-rules { color:#2e1c09; background:#ccb57b; box-shadow:0 5px 14px rgba(166,101,25,.18); }
         :host([data-theme="light"]) .settings-view .query-log-warning { color:#73500d; background:#fff7df; border-color:#e7d49e; }
         :host([data-theme="light"]) .settings-view .learning-card p { color:#625c54; }
         :host([data-theme="light"]) .settings-view .learning-action { color:#65400f; background:#fff5e3; border-color:#ddbd8d; }
@@ -2883,7 +2883,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .mobile-overview-actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
           .mobile-alert-summary { display:flex; align-items:center; gap:6px; min-height:36px; border:1px solid var(--ns-line); border-radius:9px; background:rgba(255,255,255,.04); color:var(--ns-text,#eee5d5); padding:5px 9px; font:inherit; font-size:12px; cursor:pointer; }
           .mobile-overview-toggle ha-icon, .mobile-alert-summary ha-icon { --mdc-icon-size:18px; }
-          .mobile-alert-summary { color:var(--ns-yellow,#f0c774); }
+          .mobile-alert-summary { color:var(--ns-yellow,#d9c58e); }
           .overview-expanded .mobile-overview-toggle ha-icon { transform:rotate(180deg); }
           .metric-overview { display:none; }
           .overview-expanded .metric-overview { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -2898,7 +2898,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .mobile-device-search:focus-within { border-color:var(--ns-cyan); }
           .mobile-filter-toggle { display:flex; align-items:center; justify-content:center; gap:3px; box-sizing:border-box; min-width:44px; height:44px; padding:0 6px; border:1px solid var(--ns-line); border-radius:10px; background:var(--light-card-bg,rgba(38,35,32,.92)); color:inherit; cursor:pointer; }
           .mobile-filter-toggle ha-icon { --mdc-icon-size:21px; }
-          .mobile-filter-toggle.active { color:var(--ns-yellow,#f0c774); }
+          .mobile-filter-toggle.active { color:var(--ns-yellow,#d9c58e); }
           .mobile-filter-toggle span { font-size:11px; font-weight:700; }
           .mobile-device-filters { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:10px 0; }
           .mobile-device-filters[hidden] { display:none; }
@@ -3070,6 +3070,154 @@ class EngelsoftNodarionPanel extends HTMLElement {
           :host .metrics .metric-overview .metric { min-height:0; }
           :host .metrics .metric-settings { opacity:.85; }
         }
+        /* Shared Engelsoft/Pager room backdrop and warm glass material. */
+        :host {
+          --ns-room-glass:linear-gradient(135deg,rgba(66,62,58,.68),rgba(34,32,30,.76) 55%,rgba(65,51,39,.68));
+          --ns-room-shadow:0 18px 46px rgba(0,0,0,.32),0 2px 9px rgba(0,0,0,.16),inset 0 1px rgba(255,255,255,.20),inset 0 -1px rgba(0,0,0,.20);
+          --ns-room-head:rgba(43,40,37,.94);
+          --ns-line:rgba(235,209,160,.27); --ns-overview-edge:var(--ns-line);
+          --ns-muted:#b8beb8; --ns-cyan:#d9bd8b; --ns-text:#f4f2ed;
+          --ns-panel:var(--ns-room-glass);
+          background:linear-gradient(90deg,rgba(7,8,8,.24),rgba(9,9,8,.42) 48%,rgba(8,7,6,.20)),url("/engelsoft_nodarion/room-interior.png") center / cover fixed,#171512;
+        }
+        :host([data-theme="light"]) {
+          --ns-room-glass:linear-gradient(130deg,rgba(251,249,246,.82),rgba(242,237,231,.76));
+          --ns-room-shadow:0 15px 38px rgba(42,55,71,.15),0 2px 6px rgba(42,55,71,.07),inset 0 1px rgba(255,255,255,.90),inset 0 -1px rgba(70,86,104,.13);
+          --ns-room-head:rgba(247,243,237,.94);
+          --ns-line:rgba(132,110,73,.24); --ns-overview-edge:var(--ns-line);
+          --ns-muted:#62716b; --ns-cyan:#886735; --ns-text:#303b38;
+          background:linear-gradient(115deg,rgba(224,232,229,.65),rgba(237,231,216,.62)),url("/engelsoft_nodarion/room-background.png") center / cover fixed,#e5e5dd;
+        }
+        .shell { max-width:none; margin-inline:auto; isolation:auto; }
+        @media (min-width:1201px) {
+          .shell { width:92%; padding-inline:0; }
+        }
+        :host(:not([data-theme="light"])) :is(.metrics .metric,.table-panel,.log-panel,.dns-panel,.mesh-panel,.watch-panel,.ai-panel,.connection-panel,.toolbar,.guest-modal),
+        :host([data-theme="light"]) :is(.metrics .metric,.table-panel,.log-panel,.dns-panel,.mesh-panel,.watch-panel,.ai-panel,.connection-panel,.toolbar,.guest-modal) {
+          background:var(--ns-room-glass); border:1px solid var(--ns-line);
+          box-shadow:var(--ns-room-shadow); border-radius:25px;
+          backdrop-filter:blur(22px) saturate(120%);
+          -webkit-backdrop-filter:blur(22px) saturate(120%);
+        }
+        :host .metrics .nav-metric.active { border-color:var(--ns-line); box-shadow:var(--ns-room-shadow); }
+        :host .metrics .metric::before, :host .metrics .metric::after { display:none; }
+        :host .device-list th, :host .device-list .column-filters th {
+          background:var(--ns-room-head); border-bottom-color:var(--ns-line);
+          backdrop-filter:blur(22px) saturate(120%);
+          -webkit-backdrop-filter:blur(22px) saturate(120%);
+        }
+        :host .device-list td { border-bottom-color:color-mix(in srgb,var(--ns-line) 65%,transparent); }
+        :host .device-list tr:nth-child(even) { background:rgba(198,163,104,.025); }
+        :host .device-list tr:hover { background:rgba(198,163,104,.07); }
+        :host .device-list .entity-link { color:var(--ns-cyan); }
+        :host .device-list .column-filter {
+          background:rgba(99,100,90,.12); border-color:var(--ns-line); color:var(--ns-text); border-radius:12px;
+        }
+        :host .device-list .column-filter.has-value { background:rgba(198,163,104,.14); border-color:var(--ns-cyan); }
+        :host .device-list .column-filter::placeholder { color:var(--ns-muted); }
+        :host .metrics .metric-settings { color:var(--ns-muted); }
+        :host .device-list .card-actions button, :host .column-picker-button {
+          border-radius:11px; border-color:var(--ns-line); background:rgba(198,163,104,.045);
+        }
+        @media (max-width:800px) {
+          :host .metrics .metric { border-radius:20px; }
+          :host(:not([data-theme="light"])) .table-panel.device-list,
+          :host([data-theme="light"]) .table-panel.device-list { background:transparent; border:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+          :host(:not([data-theme="light"])) .device-list tbody tr,
+          :host([data-theme="light"]) .device-list tbody tr {
+            border:1px solid var(--ns-line); border-radius:20px;
+            background:var(--ns-room-glass); box-shadow:var(--ns-room-shadow);
+            backdrop-filter:blur(22px) saturate(120%); -webkit-backdrop-filter:blur(22px) saturate(120%);
+          }
+        }
+        /* One continuous metric surface: avoid bands from stacked glow layers. */
+        :host(:not([data-theme="light"])) .metrics .metric {
+          background:linear-gradient(135deg,rgba(70,65,60,.66) 0%,rgba(44,40,36,.64) 55%,rgba(65,52,39,.68) 100%);
+          background-repeat:no-repeat; background-origin:border-box;
+          box-shadow:0 12px 32px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.14);
+        }
+        :host([data-theme="light"]) .metrics .metric {
+          background:linear-gradient(135deg,rgba(251,249,246,.82),rgba(242,237,231,.76));
+          background-repeat:no-repeat; background-origin:border-box;
+          box-shadow:0 12px 28px rgba(42,55,71,.12),inset 0 1px rgba(255,255,255,.90);
+        }
+        /* One champagne-gold accent, shared with the scan action. */
+        :host { --ns-action-gold:linear-gradient(135deg,#f0d39a,#cfa45d); --ns-action-ink:#241c10; --ns-yellow:#d9c58e; }
+        :host([data-theme="light"]) { --ns-green:#9a7b3d; --ns-yellow:#886735; }
+        :host .settings-view .save-rules:not(.saved):not(.failed),
+        :host .approve-internet, :host .confirm-primary:not(.danger) {
+          background:var(--ns-action-gold); color:var(--ns-action-ink);
+          box-shadow:0 5px 18px rgba(185,157,96,.13),inset 0 1px rgba(255,255,255,.28);
+        }
+        :host .settings-view .save-rules.saved { background:#76d89d; color:#10271d; }
+        :host .settings-view .save-rules.failed { background:#a94242; color:#fff3f1; }
+        :host .rule input[type="checkbox"], :host .column-picker input,
+        :host .vlan-field.monitoring input { accent-color:#ccb57b; }
+        :host .settings-view .adguard-feature.active .adguard-feature-state { color:#342a16; background:#ccb57b; }
+        :host .watch.active { color:#d9c58e; border-color:rgba(204,181,123,.35); background:rgba(204,181,123,.09); }
+        :host([data-theme="light"]) .watch.active { color:#886735; }
+        :host .tabs .tab.active, :host .filter.active { background:var(--ns-action-gold); color:var(--ns-action-ink); box-shadow:0 5px 16px rgba(185,157,96,.12); }
+        /* Neutral smoked glass and restrained filter states, without olive/yellow fills. */
+        :host { --ns-muted:#bcb7b0; --ns-subtle:#a8a099; --ns-filter-surface:rgba(97,89,80,.14); --ns-filter-edge:rgba(215,199,174,.23); }
+        :host([data-theme="light"]) { --ns-muted:#68615a; --ns-subtle:#797169; --ns-filter-surface:rgba(255,252,248,.82); --ns-filter-edge:rgba(122,105,83,.26); }
+        :host(:is([data-theme="dark"],[data-theme="light"])) :is(.column-filter,select.column-filter,.custom-column-filter summary) {
+          background:var(--ns-filter-surface); color:var(--ns-text); border-color:var(--ns-filter-edge); box-shadow:none;
+        }
+        :host(:is([data-theme="dark"],[data-theme="light"])) :is(.column-filter.has-value,select.column-filter.has-value,.custom-column-filter.has-value summary) {
+          background:var(--ns-filter-surface); color:var(--ns-text); border-color:var(--ns-filter-edge);
+          box-shadow:inset 0 -1px color-mix(in srgb,var(--ns-cyan) 35%,transparent);
+        }
+        :host(:is([data-theme="dark"],[data-theme="light"])) :is(.column-filter:focus-visible,.custom-column-filter summary:focus-visible) {
+          outline:2px solid color-mix(in srgb,var(--ns-cyan) 60%,transparent); outline-offset:2px;
+        }
+        :host(:is([data-theme="dark"],[data-theme="light"])) .custom-filter-option.active {
+          background:var(--ns-surface-raised); color:var(--ns-text); box-shadow:none;
+        }
+        /* Isolate overview cards from participant-table hover compositing. */
+        :host .metrics { position:relative; isolation:isolate; }
+        :host(:not([data-theme="light"])) .metrics .metric,
+        :host([data-theme="light"]) .metrics .metric {
+          backdrop-filter:none; -webkit-backdrop-filter:none;
+        }
+        :host(:not([data-theme="light"])) .metrics .metric {
+          background:linear-gradient(135deg,rgba(63,58,53,.85),rgba(37,34,31,.86) 55%,rgba(57,46,36,.86));
+        }
+        :host(:not([data-theme="light"])) .table-panel.device-list,
+        :host([data-theme="light"]) .table-panel.device-list {
+          box-shadow:inset 0 1px rgba(255,255,255,.14),inset 0 -1px rgba(0,0,0,.12);
+        }
+        /* Light-mode header text must remain readable over the room backdrop. */
+        :host([data-theme="light"]) header { border-bottom-color:rgba(89,72,49,.18); }
+        :host([data-theme="light"]) .version-info { color:#514a40; font-size:11px; font-weight:500; }
+        :host([data-theme="light"]) .eyebrow { color:#725526; }
+        :host([data-theme="light"]) .github-thanks {
+          background:rgba(255,253,248,.90); border-color:rgba(113,91,60,.24);
+          color:#302b25; box-shadow:0 3px 12px rgba(73,56,34,.05);
+        }
+        :host([data-theme="light"]) .github-thanks strong { color:#302b25; font-weight:700; }
+        :host([data-theme="light"]) .github-thanks small { color:#554e44; font-weight:450; }
+        :host([data-theme="light"]) .github-thanks > ha-icon { color:#80612d; }
+        :host([data-theme="light"]) .github-thanks:hover { background:#fffdf8; border-color:#9b8055; }
+        :host([data-theme="light"]) .header-action { color:#453c30; background:rgba(255,253,248,.94); border-color:rgba(113,91,60,.24); }
+        :host([data-theme="light"]) .connection-status span { color:#453c30; }
+        :host([data-theme="light"]) .connection-status ha-icon { color:#80612d; }
+        :host([data-theme="light"]) .scan { color:#46351c; background:#fffaf0; border-color:rgba(113,91,60,.30); }
+        /* Dark icon strokes on light surfaces, including offline rows. */
+        :host([data-theme="light"]) .device-list .device-icon {
+          color:#715523; background:#eee7da; border-color:#bba681;
+          box-shadow:inset 0 1px rgba(255,255,255,.85);
+        }
+        :host([data-theme="light"]) .device-list .device-icon.router { color:#28633f; background:#e1eee3; border-color:#8eb69a; }
+        :host([data-theme="light"]) .device-list .device-icon.mesh { color:#365aa0; background:#e3e9f5; border-color:#9aafd0; }
+        :host([data-theme="light"]) .device-list .device-icon.vpn { color:#704395; background:#ede4f4; border-color:#b49ac9; }
+        :host([data-theme="light"]) .device-list .device-icon.guest { color:#785615; background:#f3ead5; border-color:#c3aa72; }
+        :host([data-theme="light"]) .device-list .device-icon ha-icon { --mdc-icon-size:21px; }
+        :host([data-theme="light"]) .device-list tr.off { opacity:1; }
+        :host([data-theme="light"]) .device-list tr.off .entity-link { color:#6c5a38; }
+        :host([data-theme="light"]) .device-list .card-actions button { color:#635d53; border-color:#bdb3a2; }
+        :host([data-theme="light"]) .device-list .watch.active { color:#805e1c; border-color:#bda46f; background:#f2e7cd; }
+        :host([data-theme="light"]) .device-list .watch.notify.active { color:#245e7b; border-color:#92b2c1; background:#e1eef4; }
+        :host([data-theme="light"]) .device-list .watch.presence.active { color:#28633f; border-color:#8eb69a; background:#e1eee3; }
       </style>
       <div class="shell">
         <header>
