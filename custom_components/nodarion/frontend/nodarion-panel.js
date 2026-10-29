@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.12";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.12";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.19";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.19";
 
 const esc = (value) =>
   String(value ?? "")
@@ -8,11 +8,35 @@ const esc = (value) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 
+// Only link anonymous HTTP endpoints on the exact discovered device address.
+const deviceWebLinks = (entity) => {
+  const attr = entity.attributes || {};
+  if (entity.state !== "on" || !Array.isArray(attr.web_urls)) return [];
+  return attr.web_urls.filter((value) => {
+    try {
+      const url = new URL(value);
+      return ["http:", "https:"].includes(url.protocol)
+        && url.hostname === attr.ip_address && !url.username && !url.password
+        && url.pathname === "/" && !url.search && !url.hash;
+    } catch { return false; }
+  });
+};
+
 // The panel is authored in German. Home Assistant's selected language decides
 // whether those labels are kept or translated; every unsupported language
 // intentionally falls back to English.
 let panelLocale = "en";
 const EN = new Map(Object.entries({
+  "Internetzugang sperren": "Block internet access",
+  "Sperre fehlgeschlagen": "Blocking failed",
+  "Internetzugang konnte nicht gesperrt werden.": "Internet access could not be blocked.",
+  "Gast-WLAN direkt auf der FRITZ!Box ein- oder ausschalten.": "Enable or disable guest Wi-Fi directly on the FRITZ!Box.",
+  "Gast-WLAN": "Guest Wi-Fi",
+  "Wird umgeschaltet …": "Switching …",
+  "Ein": "On",
+  "Aus": "Off",
+  "Gast-WLAN konnte nicht umgeschaltet werden.": "Guest Wi-Fi could not be switched.",
+  "Weboberfläche öffnen": "Open web interface",
   "Nodarion auf GitHub öffnen": "Open Nodarion on GitHub",
   "Übersicht ein- oder ausklappen": "Expand or collapse overview",
   "Nodarion gefällt dir?": "Enjoying Nodarion?",
@@ -55,6 +79,8 @@ const EN = new Map(Object.entries({
   "Noch keine Anwesenheitsgeräte": "No presence devices yet",
   "Niemand zuhause": "Nobody home",
   "Mit dem Gast-WLAN verbinden": "Connect to guest Wi-Fi",
+  "Gastnetz an": "Guest network on",
+  "Gastnetz aus": "Guest network off",
   "Keine Gäste online": "No guests online",
   "Der Gastzugang ist gerade angenehm übersichtlich.": "Guest access is pleasantly quiet right now.",
   "Gäste in Tabelle anzeigen": "Show guests in table",
@@ -1111,8 +1137,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         :host {
-          --ns-bg: #181716;
-          --ns-panel: rgba(76, 72, 67, .50);
+          --ns-bg: #111315;
+          --ns-panel: rgba(29, 32, 35, .80);
           --ns-line: rgba(255, 246, 229, .10);
           --ns-text: #fffaf1;
           --ns-muted: #a9b6b1;
@@ -1128,8 +1154,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
           color-scheme: dark;
           color: var(--ns-text);
           background:
-            radial-gradient(ellipse at 54% 42%, rgba(212, 139, 43, .29), transparent 31rem),
-            radial-gradient(ellipse at 16% 76%, rgba(158, 104, 40, .15), transparent 28rem),
+            radial-gradient(ellipse at 12% 0%, rgba(210, 157, 68, .10), transparent 42rem),
+            radial-gradient(ellipse at 95% 28%, rgba(77, 136, 151, .06), transparent 38rem),
             linear-gradient(135deg, rgba(255,255,255,.025), transparent 48%),
             var(--ns-bg);
           font-family: "Manrope", "Avenir Next", "Segoe UI Variable", "Segoe UI", sans-serif;
@@ -1576,7 +1602,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .watch.active { color:#ffd766; border-color:rgba(255,215,102,.35); background:rgba(255,215,102,.09); }
         .watch.notify.active { color:var(--ns-cyan); border-color:rgba(80,215,255,.35); background:rgba(80,215,255,.09); }
         .watch.presence.active { color:#8fffc2; border-color:rgba(143,255,194,.38); background:rgba(143,255,194,.10); }
-        .internet-state { display:grid; gap:7px; min-width:125px; }
+        .internet-state { display:grid; grid-template-columns:max-content max-content; align-items:center; justify-content:start; gap:7px 9px; min-width:125px; }
+        .internet-state > .internet-hint { grid-column:1 / -1; grid-row:2; }
+        .internet-state > button { grid-column:2; grid-row:1; justify-self:start; width:auto; min-width:0; }
         .internet-label { width:max-content; padding:4px 8px; border-radius:999px; color:#9bb8af; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); font-size:11px; font-weight:750; }
         .internet-label.trusted,
         .internet-label.allowed { color:#aaffd0; background:rgba(85,242,162,.08); border-color:rgba(85,242,162,.25); }
@@ -1589,7 +1617,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .internet-label.error { color:#ffd766; }
         .internet-hint { max-width:210px; color:#819d94; font-size:9px; line-height:1.3; }
         .approve-internet { padding:7px 9px; border-radius:8px; color:#092018; background:var(--ns-green); border:0; font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
-        .approve-internet:disabled { opacity:.55; cursor:wait; }
+        .block-internet { display:inline-flex; align-items:center; gap:5px; padding:5px 9px; border-radius:8px; color:var(--ns-muted); background:var(--ns-surface); border:1px solid var(--ns-line); font:inherit; font-size:11px; line-height:1.4; font-weight:700; cursor:pointer; }
+        .block-internet ha-icon { --mdc-icon-size:13px; }
+        .block-internet:hover { color:var(--ns-red); border-color:var(--ns-red); background:rgba(255,107,120,.06); }
+        .block-internet:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:3px; }
+        .block-internet:disabled, .approve-internet:disabled { opacity:.55; cursor:wait; }
         .status { display:flex; align-items:center; gap:8px; color:var(--state); font-size:12px; text-transform:uppercase; letter-spacing:1px; font-weight:800; white-space:nowrap; }
         .status-cell { display:grid; gap:4px; }
         .status-time { color:#78998f; font-size:10px; line-height:1.45; white-space:pre-line; }
@@ -1621,6 +1653,17 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .guest-qr-copy p { margin:0; color:#83a49a; font-size:12px; line-height:1.5; }
         .guest-qr-copy strong { color:var(--ns-cyan); }
         .guest-qr-unavailable { margin:18px 0; padding:14px; border-radius:12px; color:#83a49a; background:rgba(255,255,255,.025); border:1px dashed rgba(255,255,255,.12); font-size:12px; line-height:1.45; }
+        .device-web-link { display:inline-flex; align-items:center; gap:4px; color:var(--ns-cyan); font-family:inherit; font-size:11px; text-decoration:none; width:fit-content; }
+        .device-web-link:hover { text-decoration:underline; }
+        .device-web-link ha-icon { --mdc-icon-size:14px; }
+        .guest-control { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:18px 0; font-weight:700; }
+        .guest-toggle { display:flex; align-items:center; gap:10px; background:transparent; color:inherit; border:0; font:inherit; cursor:pointer; padding:8px; }
+        .guest-toggle-track { display:block; width:44px; height:26px; border-radius:20px; background:#66756e; padding:3px; box-sizing:border-box; }
+        .guest-toggle-track > span { display:block; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform .15s; }
+        .guest-toggle[aria-checked="true"] .guest-toggle-track { background:var(--ns-green); }
+        .guest-toggle[aria-checked="true"] .guest-toggle-track > span { transform:translateX(18px); }
+        .guest-toggle:disabled { opacity:.5; cursor:wait; }
+        .guest-toggle-error { color:var(--ns-red); }
         .guest-actions { display:flex; justify-content:flex-end; margin-top:18px; }
         .guest-show { display:flex; align-items:center; gap:7px; padding:10px 13px; border-radius:10px; color:#07130f; background:var(--ns-cyan); border:0; font:inherit; font-size:12px; font-weight:800; cursor:pointer; }
         .dot { width:7px; height:7px; border-radius:50%; background:var(--state); box-shadow:0 0 11px var(--state); }
@@ -2000,18 +2043,38 @@ class EngelsoftNodarionPanel extends HTMLElement {
           box-shadow:inset 0 1px rgba(255,255,255,.04);
         }
         .scan:hover { background:rgba(240,161,59,.16); border-color:rgba(240,161,59,.38); }
+        /* Graphite glass with restrained gold and semantic status accents. */
         .metrics {
-          gap:10px; padding:10px; border-radius:17px;
-          background:rgba(91,87,81,.36); border:1px solid rgba(255,246,229,.075);
-          box-shadow:inset 0 1px rgba(255,255,255,.025);
+          gap:14px; padding:0; border-radius:20px;
+          background:transparent; border:0; box-shadow:none;
           backdrop-filter:none;
         }
         .metric {
-          min-height:94px; padding:16px 18px; border-radius:13px;
-          background:linear-gradient(135deg,#504d48,#3e3b38);
-          box-shadow:none; backdrop-filter:none;
+          min-height:150px; padding:18px 20px; border-radius:18px;
+          background:linear-gradient(145deg,rgba(44,46,49,.94),rgba(25,28,31,.96));
+          border-color:rgba(231,224,208,.10);
+          box-shadow:0 10px 28px rgba(0,0,0,.16),inset 0 1px rgba(255,255,255,.055);
+          backdrop-filter:none;
         }
-        .metric::after { display:none; }
+        .metric::before { content:""; position:absolute; top:0; left:22px; right:22px; height:1px; background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--glow) 65%,transparent),transparent); pointer-events:none; }
+        .metric::after { display:block; width:140px; height:110px; opacity:.09; filter:blur(35px); pointer-events:none; }
+        .metric.devices { --glow:#e9bf70; }
+        .metric.events-metric { --glow:#91b9d4; }
+        .metric.dns-metric { --glow:#74d8af; }
+        .metric.watch-metric { --glow:#e9bf70; }
+        .metric-label { font-weight:750; }
+        .metric-note { line-height:1.5; }
+        .nav-metric.active { border-color:rgba(231,185,101,.55); box-shadow:0 0 0 1px rgba(231,185,101,.08),0 12px 30px rgba(0,0,0,.20); }
+        .device-count strong, .metric-value, .function-count strong { font-variant-numeric:tabular-nums; }
+        .metric .device-count.online strong { color:#83ddba; }
+        .metric .device-count.offline strong { color:#a4adb8; }
+        .metric .device-count.new strong { color:#efca86; }
+        .device-count + .device-count, .function-count + .function-count { border-color:rgba(255,255,255,.075); }
+        .metric.dns-metric .metric-status-value, .metric.dns-metric .metric-status-value ha-icon { color:#8ddfbd; }
+        .metric .metric-settings { background:rgba(255,255,255,.025); border-color:rgba(255,255,255,.07); }
+        .nav-metric:hover, .metric:is(button):hover { border-color:rgba(231,185,101,.45); }
+        .metric:focus-visible, .device-count:focus-visible, .function-count:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:3px; }
+
         .metric-label, .security-card span { color:#c1bbb1; font-size:10px; letter-spacing:.8px; }
         .metric-value, .device-count strong { color:#fffaf1; font-weight:650; }
         .device-count.online strong, .metric.network .metric-value,
@@ -2060,16 +2123,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .search ha-icon { color:#b0a99e; }
         .filter { color:#bdb7ad; }
         .table-panel, .log-panel, .dns-panel, .mesh-panel, .watch-panel, .ai-panel {
-          border-radius:16px; background:linear-gradient(145deg,rgba(76,72,67,.56),rgba(46,44,41,.60));
+          border-radius:16px; background:linear-gradient(145deg,rgba(31,34,37,.94),rgba(22,25,28,.96));
           border-color:rgba(255,246,229,.10);
           box-shadow:0 24px 58px rgba(8,6,4,.26), inset 0 1px rgba(255,255,255,.035);
           backdrop-filter:blur(22px);
         }
-        th { color:#bcb5aa; background:rgba(48,45,42,.96); border-bottom-color:rgba(240,161,59,.18); }
-        .column-filters th { background:rgba(43,40,37,.97); }
-        td { color:#e8e1d7; border-bottom-color:rgba(255,246,229,.075); }
-        tbody tr:nth-child(even) { background:rgba(255,255,255,.02); }
-        tbody tr:hover { background:rgba(240,161,59,.075); }
+        th { color:#aeb4bc; background:#202427; border-bottom-color:rgba(231,185,101,.17); }
+        .column-filters th { background:#191d20; }
+        td { color:#e5e7eb; border-bottom-color:rgba(255,255,255,.055); }
+        tbody tr:nth-child(even) { background:rgba(255,255,255,.012); }
+        tbody tr:hover { background:rgba(231,185,101,.055); }
         .entity-link, .detail-stack strong, .connection-name, .log-device,
         .alert-name, .rule label, .client-name { color:#fffaf1; }
         .device-icon, .log-icon {
@@ -2898,6 +2961,115 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }
         :host([data-theme="dark"]) .settings-view .unit-input input:not([type="checkbox"]):not([type="color"]) { background:transparent; }
         :host([data-theme="dark"]) .settings-view .unit-input span { background:rgba(255,238,209,.035); }
+        :host(:not([data-theme="light"])) .github-thanks { background:rgba(255,255,255,.018); border-color:rgba(255,255,255,.065); }
+        :host(:not([data-theme="light"])) .scan { color:#241c10; background:linear-gradient(135deg,#f0d39a,#cfa45d); border-color:#eed3a2; box-shadow:0 5px 20px rgba(215,171,95,.12),inset 0 1px rgba(255,255,255,.35); }
+        :host(:not([data-theme="light"])) .scan:hover { background:#f4dcae; }
+        :host(:not([data-theme="light"])) .column-filter { background:#252a2e; color:#e7e9ec; border-color:rgba(255,255,255,.09); }
+        :host(:not([data-theme="light"])) .column-filter::placeholder { color:#929ba5; }
+        :host(:not([data-theme="light"])) .column-filter.has-value { background:rgba(231,185,101,.10); border-color:rgba(231,185,101,.5); }
+        :host(:not([data-theme="light"])) .device-list tr.on { --state:#83ddba; }
+        :host(:not([data-theme="light"])) .entity-id-link { color:#929aa5; font-size:10px; }
+        :host(:not([data-theme="light"])) .status-time { color:#929aa5; }
+        :host(:not([data-theme="light"])) .device-icon { box-shadow:inset 0 1px rgba(255,255,255,.06); }
+        .device-list .entity-link { font-weight:750; letter-spacing:-.15px; }
+        .device-list .internet-label { padding:5px 9px; border-radius:8px; }
+        .device-list .internet-hint { max-width:235px; line-height:1.5; }
+        .device-list .device-web-link { margin-top:3px; padding:4px 7px; border:1px solid color-mix(in srgb,var(--ns-cyan) 20%,transparent); border-radius:6px; background:color-mix(in srgb,var(--ns-cyan) 5%,transparent); }
+        .device-list .device-web-link:hover { background:color-mix(in srgb,var(--ns-cyan) 12%,transparent); text-decoration:none; }
+        :host([data-theme="light"]) .metrics { background:transparent; border:0; box-shadow:none; }
+        :host([data-theme="light"]) .metric::after { opacity:.045; }
+        :host([data-theme="light"]) .metric .device-count.online strong { color:#237453; }
+        :host([data-theme="light"]) .metric .device-count.offline strong { color:#6c7380; }
+        :host([data-theme="light"]) .metric .device-count.new strong { color:#91601a; }
+        :host([data-theme="light"]) .metric.dns-metric .metric-status-value,
+        :host([data-theme="light"]) .metric.dns-metric .metric-status-value ha-icon { color:#237453; }
+        @media (min-width:1201px) {
+          .metrics .device-count strong { font-size:36px; font-weight:750; letter-spacing:-1.5px; }
+          .metrics .metric-value { font-size:34px; font-weight:750; }
+          .metrics .metric-label { font-size:10px; letter-spacing:1.2px; }
+        }
+        @media (max-width:800px) {
+          .metric::before { left:16px; right:16px; }
+          .metric::after { width:90px; height:70px; }
+        }
+        @media (max-width:800px) {
+          :host(:not([data-theme="light"])) .device-list tbody tr { background:linear-gradient(135deg,#24272a,#1a1e21); border-color:rgba(255,255,255,.09); box-shadow:0 8px 20px rgba(0,0,0,.12); }
+        }
+        @media (prefers-reduced-motion:reduce) {
+          .nav-metric, .device-count, .function-count, .scan, .device-list tr { transition:none; }
+          .nav-metric:hover, .metric:is(button):hover, .scan:hover { transform:none; }
+        }
+        /* Fine overview: quiet surfaces, lighter type and line-only selections. */
+        :host { --ns-overview-edge:rgba(232,229,219,.085); }
+        :host([data-theme="light"]) { --ns-overview-edge:rgba(88,71,49,.13); }
+        :host .metrics { gap:12px; }
+        :host .metrics .metric {
+          border-radius:15px; border-color:var(--ns-overview-edge);
+          box-shadow:0 5px 16px rgba(0,0,0,.08),inset 0 1px rgba(255,255,255,.025);
+        }
+        :host(:not([data-theme="light"])) .metrics .metric {
+          background:linear-gradient(140deg,rgba(36,39,42,.85),rgba(25,28,31,.88));
+        }
+        :host([data-theme="light"]) .metrics .metric { background:linear-gradient(140deg,rgba(255,255,255,.85),rgba(247,244,239,.82)); box-shadow:0 4px 14px rgba(78,58,34,.045); }
+        :host .metrics .metric::before { opacity:.3; left:22px; right:22px; }
+        :host .metrics .metric::after { width:85px; height:65px; opacity:.045; filter:blur(28px); }
+        :host .metrics .nav-metric.active { border-color:var(--ns-overview-edge); box-shadow:0 5px 16px rgba(0,0,0,.08); }
+        :host .metrics .nav-metric.active::before { opacity:.8; }
+        :host .metrics .nav-metric:hover { transform:none; border-color:color-mix(in srgb,var(--ns-cyan) 25%,var(--ns-overview-edge)); }
+        :host .metrics .metric-label { font-size:11px; font-weight:550; text-transform:none; letter-spacing:.2px; }
+        :host .metrics .metric-label-row { min-height:22px; }
+        :host .metrics .metric-note { font-size:10px; font-weight:400; opacity:.9; }
+        :host .metrics .metric-status-value { font-size:19px; font-weight:550; gap:7px; }
+        :host .metrics .metric-status-value ha-icon { --mdc-icon-size:19px; }
+        :host .metrics .device-count, :host .metrics .function-count {
+          position:relative; border:0; border-radius:0; padding:4px 8px 7px;
+          background:transparent; box-shadow:none; transform:none;
+        }
+        :host .metrics .device-count.active, :host .metrics .function-count.active,
+        :host .metrics .device-count:hover, :host .metrics .function-count:hover { background:transparent; box-shadow:none; transform:none; }
+        :host .metrics .device-count::after, :host .metrics .function-count::after {
+          content:""; position:absolute; left:8px; right:8px; bottom:0; height:1px;
+          border-radius:1px; background:var(--ns-cyan); opacity:0; pointer-events:none;
+        }
+        :host .metrics .device-count.active::after, :host .metrics .function-count.active::after { opacity:.85; }
+        :host .metrics .device-count:not(.active):hover::after, :host .metrics .function-count:not(.active):hover::after { opacity:.3; }
+        :host .metrics .device-count + .device-count::before,
+        :host .metrics .function-count + .function-count::before {
+          content:""; position:absolute; left:0; top:25%; bottom:30%; width:1px;
+          background:var(--ns-overview-edge); pointer-events:none;
+        }
+        :host .metrics .device-count strong { font-weight:550; letter-spacing:-.8px; }
+        :host .metrics .function-count strong { font-weight:550; letter-spacing:-.5px; }
+        :host .metrics .device-count span, :host .metrics .function-count span { font-weight:500; text-transform:none; letter-spacing:.2px; margin-top:4px; }
+        :host .metrics .function-count ha-icon { --mdc-icon-size:15px; }
+        :host .metrics .metric-settings {
+          width:24px; height:24px; padding:4px; border:0; border-radius:7px;
+          background:transparent; box-shadow:none; color:var(--ns-muted); opacity:.65;
+        }
+        :host .metrics .metric-settings:hover, :host .metrics .metric-settings:focus-visible {
+          opacity:1; color:var(--ns-cyan); background:var(--ns-surface-raised); transform:none;
+        }
+        :host .metrics .metric-settings:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:2px; }
+        :host .metrics .guest-inline {
+          gap:5px; margin-top:4px; padding:2px 0; border:0; border-radius:4px; background:transparent;
+          color:var(--ns-muted); font-size:10px; font-weight:450; box-shadow:none;
+        }
+        :host .metrics .guest-inline:hover { background:transparent; color:var(--ns-cyan); }
+        :host .metrics .guest-inline:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:3px; }
+        :host .metrics .guest-inline ha-icon { --mdc-icon-size:13px; opacity:.8; }
+        @media (min-width:801px) {
+          :host .metrics { align-items:stretch; }
+          :host .metrics .metric { min-height:126px; padding:12px 17px; }
+          :host .metrics .device-count strong { font-size:32px; }
+          :host .metrics .metric-value { font-size:30px; font-weight:550; letter-spacing:-.8px; }
+          :host .metrics .function-count strong { font-size:22px; }
+          :host .metrics .function-counts, :host .metrics .device-counts { margin-top:5px; }
+        }
+        @media (max-width:800px) {
+          :host .metrics .device-count, :host .metrics .function-count { padding-bottom:6px; }
+          :host .metrics .metric-overview .metric { min-height:0; }
+          :host .metrics .metric-settings { opacity:.85; }
+        }
       </style>
       <div class="shell">
         <header>
@@ -3079,7 +3251,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         }));
         return;
       }
-      const approveInternet = event.target.closest(".approve-internet");
+      const approveInternet = event.target.closest(".approve-internet, .block-internet");
       if (approveInternet) {
         this._approveInternet(approveInternet);
         return;
@@ -3122,6 +3294,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
       }
     });
     this.shadowRoot.querySelector(".guest-modal-host").addEventListener("click", (event) => {
+      if (event.target.closest(".guest-toggle")) {
+        this._toggleGuest();
+        return;
+      }
       if (event.target.closest(".guest-show")) {
         this._columnFilters.state = "guest";
         this._guestModalOpen = false;
@@ -3795,9 +3971,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <div class="device-counts">
           <button class="device-count online ${this._columnFilters.state === "on" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="on" title="Nur Online-Geräte anzeigen"><strong>${online}</strong><span>Online</span></button>
           <button class="device-count offline ${this._columnFilters.state === "off" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="off" title="Nur Offline-Geräte anzeigen"><strong>${entities.length - online}</strong><span>Offline</span></button>
-          <button class="device-count new ${this._columnFilters.onboarding === "onboarding" ? "active" : ""}" type="button" data-quick-filter="onboarding" data-quick-filter-value="onboarding" title="${onboarding} neue Geräte im Einrichtungsbereich"><strong>${onboarding}</strong><span>NEU</span></button>
+          <button class="device-count new ${this._columnFilters.onboarding === "onboarding" ? "active" : ""}" type="button" data-quick-filter="onboarding" data-quick-filter-value="onboarding" title="${onboarding} neue Geräte im Einrichtungsbereich"><strong>${onboarding}</strong><span>Neu</span></button>
         </div>
-        ${guestMonitoring ? `<button class="guest-inline" type="button" title="Gastzugang anzeigen"><ha-icon icon="mdi:wifi-star"></ha-icon>${guestClients} ${guestClients === 1 ? "Gast" : "Gäste"} · ${guestInfo.enabled ? "aktiv" : "deaktiviert"}</button>` : ""}
+        ${guestMonitoring ? `<button class="guest-inline" type="button" title="Gastzugang anzeigen"><ha-icon icon="mdi:wifi-star"></ha-icon><span>${guestInfo.enabled ? "Gastnetz an" : "Gastnetz aus"}</span><span aria-hidden="true">·</span><span>${guestClients} ${guestClients === 1 ? "Gast" : "Gäste"}</span></button>` : ""}
         <button class="mobile-overview-toggle" type="button" aria-label="Übersicht ein- oder ausklappen" title="Übersicht ein- oder ausklappen" aria-expanded="${this._mobileOverviewExpanded}" aria-controls="mobile-metric-overview"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
       </article>
       ${alertCount ? `<div class="mobile-overview-actions"><button class="mobile-alert-summary" type="button" data-nav-tab="watch"><ha-icon icon="mdi:alert-outline"></ha-icon>${alertCount} offene Warnungen</button></div>` : ""}
@@ -3943,6 +4119,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
   }
 
   async _approveInternet(button) {
+    if (button.classList.contains("block-internet")) {
+      const name = button.dataset.name || button.dataset.key;
+      if (!await this._confirm({ title:"Internetzugang sperren", message:`Internetzugang für „${name}“ sperren? Das Gerät bleibt im Heimnetz erreichbar. Die Sperre bleibt auch während der Lernphase bestehen.`, confirmLabel:"Sperren", danger:true })) return;
+      button.disabled = true;
+      try {
+        await this._stateClient.mutate({ action:"block_internet", key:button.dataset.key });
+      } catch (error) {
+        await this._confirm({ title:"Sperre fehlgeschlagen", message:error?.body?.message || error?.message || "Internetzugang konnte nicht gesperrt werden.", confirmLabel:"Schließen", danger:true, showCancel:false });
+      } finally {
+        button.disabled = false;
+      }
+      return;
+    }
     const name = button.dataset.name || button.dataset.key;
     if (!await this._confirm({ title:"Gerät freigeben", message:`Internetzugang für „${name}“ freigeben und das Gerät dauerhaft bestätigen?`, confirmLabel:"Freigeben" })) return;
     button.disabled = true;
@@ -3961,6 +4150,22 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }
   }
 
+  async _toggleGuest() {
+    if (this._guestToggleBusy) return;
+    const enabled = !Boolean(this._monitor.guest_access?.enabled);
+    this._guestToggleBusy = true;
+    this._renderGuest();
+    try {
+      await this._stateClient.mutate({ action:"set_guest_enabled", enabled });
+      this._guestToggleError = "";
+    } catch (error) {
+      this._guestToggleError = error?.body?.message || error?.message || "Gast-WLAN konnte nicht umgeschaltet werden.";
+    } finally {
+      this._guestToggleBusy = false;
+      this._renderGuest();
+    }
+  }
+
   _renderGuest() {
     const host = this.shadowRoot.querySelector(".guest-modal-host");
     if (!host) return;
@@ -3970,7 +4175,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }
     const info = this._monitor.guest_access || {};
     const guests = this._entities().filter((entity) =>
-      entity.state === "on" && entity.attributes.guest_network
+      info.enabled && entity.state === "on" && entity.attributes.guest_network
     );
     const since = this._monitor.guest_since || {};
     const detail = (label, value) => `<div class="guest-status-card"><span>${esc(label)}</span><strong>${esc(value ?? "Nicht verfügbar")}</strong></div>`;
@@ -3987,7 +4192,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ? `<div class="guest-qr"><img src="${esc(qrCode)}" alt="QR-Code für das Gast-WLAN ${esc(info.ssid || "")}"><div class="guest-qr-copy"><h3>Mit dem Gast-WLAN verbinden</h3><p>QR-Code mit der Handykamera scannen und direkt mit <strong>${esc(info.ssid || "dem Gast-WLAN")}</strong> verbinden.</p></div></div>`
       : `<div class="guest-qr-unavailable">${info.qr_code_restricted ? "Der WLAN-QR-Code ist nur für Home-Assistant-Administratoren sichtbar." : info.enabled ? "Die FRITZ!Box konnte für dieses Gast-WLAN keinen QR-Code bereitstellen." : "Der QR-Code ist verfügbar, sobald der Gastzugang aktiv ist."}</div>`;
     host.innerHTML = `<div class="guest-modal-backdrop"><section class="guest-modal" role="dialog" aria-modal="true" aria-labelledby="guest-modal-title">
-      <div class="guest-modal-head"><div><h2 id="guest-modal-title"><ha-icon icon="mdi:wifi-star"></ha-icon>FRITZ!Box-Gastzugang</h2><p>Nur lesende Anzeige – Nodarion verändert hier keine FRITZ!Box-Einstellungen.</p></div><button class="guest-close" type="button" aria-label="Schließen"><ha-icon icon="mdi:close"></ha-icon></button></div>
+      <div class="guest-modal-head"><div><h2 id="guest-modal-title"><ha-icon icon="mdi:wifi-star"></ha-icon>FRITZ!Box-Gastzugang</h2><p>Gast-WLAN direkt auf der FRITZ!Box ein- oder ausschalten.</p></div><button class="guest-close" type="button" aria-label="Schließen"><ha-icon icon="mdi:close"></ha-icon></button></div>
+      <div class="guest-control"><span>Gast-WLAN</span><button class="guest-toggle" type="button" role="switch" aria-label="Gast-WLAN" aria-checked="${Boolean(info.enabled)}" ${this._guestToggleBusy || !info.available || info.ap_type !== "guest" ? "disabled" : ""}><span class="guest-toggle-track"><span></span></span><strong>${this._guestToggleBusy ? "Wird umgeschaltet …" : info.enabled ? "Ein" : "Aus"}</strong></button></div>
+      ${this._guestToggleError ? `<p class="guest-toggle-error" role="alert">${esc(this._guestToggleError)}</p>` : ""}
       <div class="guest-status-grid">
         ${detail("Status", info.available === false ? "Nicht verfügbar" : info.enabled ? "Aktiv" : "Deaktiviert")}
         ${detail("Gäste online", guests.length)}
@@ -4284,7 +4491,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         && !attr.guest_network
         && Boolean(attr.internet_approval_required);
       const wanAccess = isFritzRouter ? "granted" : attr.wan_access;
-      const learningActive = Boolean(this._monitor.learning?.active);
+      const learningActive = Boolean(this._monitor.learning?.active) && !attr.internet_manually_blocked;
       const knownHost = Boolean(attr.trusted)
         || this._monitor.known_hosts.includes(key);
       const internetStatus = internetStatusFor({
@@ -4298,7 +4505,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       });
       const internetLabel = internetStatus.label;
       const internetClass = internetStatus.cssClass;
-      const internetHint = networkInfrastructure
+      const internetHint = (!attr.internet_control_available && attr.internet_control_reason) || (networkInfrastructure
         ? "Router und Mesh-Komponenten werden nicht durch den FRITZ!Box-Hostfilter gesteuert."
         : vpnConnection
         ? "VPN-Verbindungen werden nicht durch den FRITZ!Box-Hostfilter gesteuert."
@@ -4306,7 +4513,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           ? "Der Gastzugang wird durch die FRITZ!Box verwaltet."
           : internetClass === "error"
             ? "Die FRITZ!Box konnte die gewünschte Änderung nicht ausführen."
-            : approvalRequired ? "Freigabe durch einen Administrator erforderlich." : "";
+            : approvalRequired ? "Freigabe durch einen Administrator erforderlich." : "");
       const specialDeviceClass = vpnConnection
         ? "vpn"
         : attr.guest_network ? "guest" : isFritzRouter ? "router" : networkInfrastructure ? "mesh" : "";
@@ -4377,7 +4584,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <button class="watch mobile-details" type="button" aria-expanded="false" aria-label="Weitere Gerätedetails anzeigen" title="Weitere Gerätedetails anzeigen"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
         </div>
         </td>
-        <td data-column="ip" data-label="IP-Adresse" class="mono">${esc(attr.ip_address || "Nicht verfügbar")}</td>
+        <td data-column="ip" data-label="IP-Adresse" class="mono"><div class="detail-stack"><span>${esc(attr.ip_address || "Nicht verfügbar")}</span>${deviceWebLinks(entity).map((url, index, links) => `<a class="device-web-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(url)}"><ha-icon icon="mdi:open-in-new"></ha-icon>${links.length === 1 ? "Weboberfläche öffnen" : esc(new URL(url).protocol.replace(":", "").toUpperCase() + (new URL(url).port ? " · " + new URL(url).port : ""))}</a>`).join("")}</div></td>
         <td data-column="mac" data-label="MAC-Adresse" class="mono" title="${esc(vendorTitle)}">${esc(attr.mac_address || "Nicht erkannt")}${attr.mac_vendor ? `<span class="mac-vendor" title="${esc(vendorTitle)}"><ha-icon icon="mdi:factory"></ha-icon>${esc(attr.mac_vendor)}</span>` : ""}${privateMac ? `<span class="private-mac" title="Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus"><ha-icon icon="mdi:incognito"></ha-icon>Privat / randomisiert</span>` : ""}</td>
         <td data-column="connection" data-label="Verbindung"><div class="detail-stack"><strong>${esc(connection)}</strong></div></td>
         <td data-column="mesh" data-label="Mesh-Punkt"><div class="detail-stack"><strong>${esc(accessPoint)}</strong></div></td>
@@ -4385,7 +4592,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <td data-column="address" data-label="Adressvergabe"><div class="detail-stack"><strong>${esc(addressSource || "Nicht verfügbar")}</strong>${addressSource === "DHCP" && lease ? `<small>Noch ${esc(lease)}</small>` : ""}</div></td>
         <td data-column="dns" data-label="AdGuard DNS" title="${esc(dnsTitle)}"><button class="dns-live-link" type="button" data-ip="${esc(attr.ip_address)}" data-name="${esc(name)}" title="DNS-Live-Log für ${esc(name)} öffnen"><span class="detail-stack"><strong class="${attr.adguard_bypass_suspected ? "dns-alert" : ""}">${esc(dnsPrimary)}</strong>${dnsSecondary ? `<span class="rating ${dnsAssessment?.level || "okay"}" title="Anteil blockierter DNS-Anfragen: ${esc(dnsAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(dnsSecondary)} · ${esc(dnsAssessment?.label || "")}</span></span>` : ""}</span></button></td>
         <td data-column="source" data-label="Erkannt durch">${esc(sources)}</td>
-        <td data-column="internet" data-label="Internetzugang"><div class="internet-state"><span class="internet-label ${esc(internetClass)}">${esc(internetLabel)}</span>${internetHint ? `<small class="internet-hint">${esc(internetHint)}</small>` : ""}${approvalRequired ? `<button class="approve-internet" data-key="${esc(key)}" data-name="${esc(name)}" data-entity-id="${esc(entity.entity_id)}">Freigeben</button>` : ""}</div></td>
+        <td data-column="internet" data-label="Internetzugang"><div class="internet-state"><span class="internet-label ${esc(internetClass)}">${esc(internetLabel)}</span>${internetHint ? `<small class="internet-hint">${esc(internetHint)}</small>` : ""}${(approvalRequired && attr.internet_control_available) ? `<button class="approve-internet" data-key="${esc(key)}" data-name="${esc(name)}" data-entity-id="${esc(entity.entity_id)}">Freigeben</button>` : attr.internet_control_available ? `<button class="block-internet" data-key="${esc(key)}" data-name="${esc(name)}" title="Internetzugang sperren"><ha-icon icon="mdi:lock-outline"></ha-icon>Sperren</button>` : ""}</div></td>
         <td data-column="watch" data-label="Überwachung">
           <div class="card-actions">
             <button class="watch ${monitored ? "active" : ""}" data-key="${esc(key)}" title="${monitored ? "Überwachung beenden" : "Als wichtig überwachen"}"><ha-icon icon="${monitored ? "mdi:star" : "mdi:star-outline"}"></ha-icon></button>

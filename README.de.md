@@ -161,7 +161,7 @@ Nodarion ist im Standardkatalog von HACS enthalten. Ein benutzerdefiniertes Repo
 
 ## FRITZ!Box-Gastzugang
 
-Nodarion liest den Gastzugang lokal und ausschließlich lesend über TR-064 aus. Die Übersicht zeigt Status, WLAN-Name, gemeldete Sicherheitseinstellungen und aktuell verbundene Gäste. Gastgeräte erhalten in der Teilnehmerliste eine Kennzeichnung und können dort gefiltert werden. Verbindungen und Trennungen erscheinen im Live-Log; optional warnt die Überwachung bei neuen Gästen, Aktivität zur Ruhezeit oder ungewöhnlich langer Verbindung.
+Nodarion liest den Gastzugang lokal über TR-064 aus. Im Gastzugangsfenster können Administratoren das Gast-WLAN direkt ein- und ausschalten. Der Schalter zeigt den bestätigten Routerzustand; Fehler werden direkt angezeigt. Die Übersicht zeigt Status, WLAN-Name, gemeldete Sicherheitseinstellungen und aktuell verbundene Gäste. Gastgeräte erhalten in der Teilnehmerliste eine Kennzeichnung und können dort gefiltert werden. Verbindungen und Trennungen erscheinen im Live-Log; optional warnt die Überwachung bei neuen Gästen, Aktivität zur Ruhezeit oder ungewöhnlich langer Verbindung.
 
 Über den Schalter **Gastnetz anzeigen und überwachen** in den Überwachungseinstellungen lässt sich die Funktion vollständig ausblenden. Dann erscheinen Gastzugang, Gastgeräte, zugehörige Protokolle und Warnungen nirgends in Nodarion.
 
@@ -277,6 +277,15 @@ MAC-Wechsel muss in zwei aufeinanderfolgenden Prüfungen bestätigt werden, bevo
 Nodarion die Freigabe entzieht. Alle Freigaben, Sperren, Entzüge,
 Durchsetzungsfehler und Bereinigungen erscheinen mit Ursache im Live-Log.
 
+Bei unterstützten FRITZ!Box-Heimnetzgeräten kann der Internetzugang in der
+Teilnehmertabelle jederzeit mit „Sperren“ und „Freigeben“ geändert werden.
+Eine manuelle Sperre bleibt auch während der Lernphase und nach Neustarts
+bestehen. Bei bekannter MAC-Adresse folgt sie dem Gerät bei einem IP-Wechsel.
+Ohne bekannte MAC-Adresse gilt sie zunächst für die IP-Adresse. Router,
+Mesh-Komponenten, VPN- und Gastgeräte sind von diesen Aktionen ausgenommen.
+Eine fehlgeschlagene Router-Aktion wird als Fehler angezeigt und nicht als
+erfolgreiche manuelle Änderung gespeichert. Die lokale Kommunikation bleibt möglich.
+
 Die Statusanzeige unterscheidet zwischen „Vertrauenswürdig“, „Freigegeben“,
 „Noch nicht geprüft“ und „Gesperrt“. Während der Lernphase werden alle in dieser
 Zeit tatsächlich erkannten Teilnehmer unabhängig von der Erkennungsquelle als
@@ -319,3 +328,24 @@ die zusammengefassten Netzwerkdaten das lokale System.
 ## Lizenz
 
 Engelsoft Nodarion wird unter der [MIT-Lizenz](LICENSE) veröffentlicht.
+
+### Geräte-Weboberflächen direkt öffnen
+
+In der Teilnehmertabelle erscheinen neben der IP-Adresse nur dann Links,
+wenn das Gerät auf HTTP/HTTPS tatsächlich antwortet. Geprüft werden HTTPS
+auf 443/8443 und HTTP auf 80/8080. Bei mehreren Treffern erscheinen getrennte
+Links; sie öffnen jeweils einen neuen Browser-Tab. Auch eine Weboberfläche
+mit Anmeldung wird erkannt. Ein offener TCP-Port allein genügt nicht.
+
+Die Prüfung ist auf online gemeldete Geräte in den konfigurierten, überwachten
+Netzen begrenzt. Pro Scan werden höchstens acht Geräte im Hintergrund geprüft, mit insgesamt
+höchstens acht gleichzeitigen Anfragen und zehn Sekunden Zeitlimit je Anfrage.
+Die Netzwerk- und Anwesenheitserkennung wartet nicht auf Webantworten.
+„Jetzt scannen“ verwirft auch die Webprüfungen und startet sie neu.
+Erfolgreiche Prüfungen gelten fünf Minuten, erfolglose zwei Minuten; neue
+Geräte werden über die folgenden Scans verteilt geprüft. Bei Offline-Status,
+Identitätswechsel oder abgelaufenem Ergebnis wird der Link ausgeblendet.
+Es werden keine Anmeldedaten geschickt, Weiterleitungen nicht automatisch
+verfolgt und keine Seiteninhalte heruntergeladen. Die TLS-Erkennung akzeptiert
+lokale selbstsignierte Zertifikate; beim Öffnen prüft der Browser selbst.
+Der Browser muss das Gerätenetz erreichen können, etwa im Heimnetz oder per VPN.

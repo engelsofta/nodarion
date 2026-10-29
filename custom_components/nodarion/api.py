@@ -91,6 +91,19 @@ class NodarionView(HomeAssistantView):
         action = data.get("action", "set_host")
         if isinstance(action, str) and action.startswith("adguard_"):
             return await self._adguard_action(request, action, data)
+        if action == "set_guest_enabled":
+            enabled = data.get("enabled")
+            if type(enabled) is not bool:
+                return self.json_message("Ungültiger Gast-WLAN-Zustand", 400)
+            coordinator = self._coordinator(request)
+            if coordinator is None or coordinator.fritz_scanner is None:
+                return self.json_message("FRITZ!Box ist nicht eingerichtet", 503)
+            try:
+                await coordinator.fritz_scanner.async_set_guest_enabled(enabled)
+            except Exception as err:
+                _LOGGER.exception("Could not change FRITZ!Box guest WLAN")
+                return self.json_message(f"Gast-WLAN konnte nicht umgeschaltet werden: {err}", 502)
+            return self.json(self._frontend_state(request, manager))
         if action == "cleanup_inactive":
             coordinator = self._coordinator(request)
             if coordinator is None:
@@ -107,9 +120,10 @@ class NodarionView(HomeAssistantView):
                 return self.json_message("Integration ist nicht geladen", 503)
             for scanner in coordinator.scanners.values():
                 scanner.request_full_discovery()
+            await coordinator.async_reset_web_discovery()
             await coordinator.async_request_refresh()
             return self.json(self._frontend_state(request, manager))
-        if action == "approve_internet":
+        if action in {"approve_internet", "block_internet"}:
             key = data.get("key")
             coordinator = self._coordinator(request)
             if (
@@ -119,17 +133,21 @@ class NodarionView(HomeAssistantView):
             ):
                 return self.json_message("Ungültiger Teilnehmer", 400)
             try:
-                await coordinator.async_approve_internet_access(key)
+                if action == "block_internet":
+                    await coordinator.async_block_internet_access(key)
+                else:
+                    await coordinator.async_approve_internet_access(key)
             except Exception as err:
                 _LOGGER.exception(
-                    "Could not approve internet access for %s",
+                    "Could not change internet access for %s",
                     key,
                 )
                 return self.json_message(
-                    f"Internetzugang konnte nicht freigegeben werden: {err}",
+                    f"Internetzugang konnte nicht geändert werden: {err}",
                     502,
                 )
-            await manager.async_acknowledge_new_device_alerts(key)
+            if action == "approve_internet":
+                await manager.async_acknowledge_new_device_alerts(key)
             return self.json(self._frontend_state(request, manager))
         if action == "set_rules":
             rules = data.get("rules")

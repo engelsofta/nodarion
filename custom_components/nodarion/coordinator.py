@@ -69,6 +69,7 @@ from .trust import (
     should_prune_offline,
 )
 from .scanner import NetworkScanner
+from .web_discovery import DeviceWebDiscovery
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,6 +98,8 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         self._reauth_started = False
         self._options = options
         self.monitor = monitor
+        self._web_discovery = DeviceWebDiscovery()
+        self._web_discovery_task: asyncio.Task[None] | None = None
         self.offline_after = int(options.get(CONF_OFFLINE_AFTER, DEFAULT_OFFLINE_AFTER))
         self.remove_after_days = int(
             options.get(CONF_REMOVE_AFTER_DAYS, DEFAULT_REMOVE_AFTER_DAYS)
@@ -629,6 +632,8 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                             and self.adguard_scanner.data_complete
                         ),
                     )
+        for key, host in tuple(found.items()):
+            found[key] = replace(host, web_urls=self._web_discovery.urls_for(host))
         await self.monitor.async_process(previous, found)
         self._priority_offline_keys = {
             key for key, host in found.items()
@@ -650,7 +655,48 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             },
         }
         self.monitor.async_maybe_schedule_ai_analysis(self, found)
+        if self._web_discovery_task is None or self._web_discovery_task.done():
+            self._web_discovery_task = self.hass.async_create_background_task(
+                self._async_discover_web_interfaces(dict(found)), "Nodarion web discovery"
+            )
         return found
+
+    async def _async_discover_web_interfaces(self, snapshot: dict[str, NetworkHost]) -> None:
+        """Allow slow web servers without delaying presence/network updates."""
+        try:
+            await self._web_discovery.async_update(
+                snapshot.values(), [segment.ip_network for segment in self.segments]
+            )
+            if not self.data:
+                return
+            current = dict(self.data)
+            changed = False
+            for key, host in tuple(current.items()):
+                eligible = self._web_discovery.eligible(
+                    host, [segment.ip_network for segment in self.segments]
+                )
+                urls = self._web_discovery.urls_for(host) if eligible else ()
+                if urls != host.web_urls:
+                    current[key] = replace(host, web_urls=urls)
+                    changed = True
+            if changed:
+                self.async_set_updated_data(current)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _LOGGER.exception("Device web discovery failed")
+
+    async def async_reset_web_discovery(self) -> None:
+        """Discard cached results before an explicit user scan."""
+        task = self._web_discovery_task
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        self._web_discovery_task = None
+        self._web_discovery.clear_cache()
 
     def _sync_priority_recovery_task(self) -> None:
         """Run one lightweight loop only while important devices are offline."""
@@ -762,6 +808,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
 
     async def async_shutdown(self) -> None:
         """Stop the optional priority recovery loop."""
+        await self.async_reset_web_discovery()
         task = self._priority_recovery_task
         self._priority_recovery_task = None
         self._priority_offline_keys.clear()
@@ -824,10 +871,36 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         """Block newly discovered FRITZ!Box clients until manual approval."""
         if not self.monitor.internet_guard_initialized:
             return
+        manually_blocked = set()
+        for key, host in tuple(hosts.items()):
+            if not self.monitor.is_internet_blocked(host) or not self.can_control_internet(host):
+                continue
+            manually_blocked.add(key)
+            if host.mac and key in self.monitor.blocked_internet:
+                await self.monitor.async_set_internet_blocked(host, True)
+            state = self._wan_access_by_ip.get(host.ip)
+            if state != "denied" and perf_counter() >= self._wan_retry_after.get(host.ip, 0):
+                try:
+                    state = await self.fritz_scanner.async_set_wan_access(host.ip, False)
+                    self._wan_access_by_ip[host.ip] = state
+                    self._wan_retry_after.pop(host.ip, None)
+                except Exception as err:
+                    state = "error"
+                    self._wan_access_by_ip[host.ip] = state
+                    self._wan_retry_after[host.ip] = perf_counter() + 300
+                    await self.monitor.async_record_internet_event(
+                        "internet_enforcement_failed", host,
+                        f"Manuelle Sperre konnte nicht wiederhergestellt werden: {err}",
+                        desired="denied", actual="error",
+                    )
+            hosts[key] = replace(host, wan_access=state,
+                desired_wan_access="denied", internet_approval_required=True)
         if self.monitor.is_learning:
-            trustable_keys = set(hosts)
+            trustable_keys = set(hosts) - manually_blocked
             release_failures: set[str] = set()
             for key, host in tuple(hosts.items()):
+                if key in manually_blocked:
+                    continue
                 if (
                     host.guest_network
                     or host.vpn_connection
@@ -897,6 +970,8 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             return
         now = perf_counter()
         for key, host in tuple(hosts.items()):
+            if key in manually_blocked:
+                continue
             if self._is_protected_infrastructure(host):
                 self._wan_access_by_ip.pop(host.ip, None)
                 self._wan_retry_after.pop(host.ip, None)
@@ -1025,12 +1100,52 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 internet_approval_required=True,
             )
 
+    def can_control_internet(self, host: NetworkHost) -> bool:
+        """Limit manual controls to supported ordinary FRITZ!Box LAN clients."""
+        return self.internet_control_reason(host) is None
+
+    def internet_control_reason(self, host: NetworkHost) -> str | None:
+        """Explain why a device has no supported manual WAN action."""
+        if self.fritz_scanner is None:
+            return "FRITZ!Box-Anbindung ist nicht eingerichtet."
+        if self._is_protected_infrastructure(host):
+            return "Router und Mesh-Komponenten sind von der Internetsperre ausgenommen."
+        if host.guest_network or host.segment_role == "guest":
+            return "Gastgeräte werden über den Gastzugang verwaltet."
+        if host.vpn_connection:
+            return "VPN-Verbindungen sind über den Hostfilter nicht steuerbar."
+        if not host.segment_monitoring:
+            return "Die Überwachung für dieses Netz ist deaktiviert."
+        if "fritzbox" not in host.sources:
+            return "Gerät ist aktuell nicht als FRITZ!Box-Teilnehmer erkannt; nur per Ping/TCP."
+        return None
+
+    async def async_block_internet_access(self, key: str) -> str:
+        """Block one device explicitly, including during the learning phase."""
+        host = (self.data or {}).get(key)
+        if host is None or not self.can_control_internet(host):
+            raise ValueError("Internetzugang für dieses Gerät nicht steuerbar")
+        state = await self.fritz_scanner.async_set_wan_access(host.ip, False)
+        await self.monitor.async_set_internet_blocked(host, True)
+        self._wan_access_by_ip[host.ip] = state
+        self._wan_retry_after.pop(host.ip, None)
+        await self.monitor.async_record_internet_event(
+            "internet_blocked", host, "Internetzugang manuell gesperrt.",
+            desired="denied", actual=state,
+        )
+        self.async_set_updated_data({**self.data, key: replace(host,
+            wan_access=state, desired_wan_access="denied", internet_approval_required=True)})
+        return state
+
     async def async_approve_internet_access(self, key: str) -> str:
         """Unblock and trust one device after explicit user confirmation."""
         if self.fritz_scanner is None or not self.data or key not in self.data:
             raise ValueError("Device or FRITZ!Box integration unavailable")
         host = self.data[key]
+        if not self.can_control_internet(host):
+            raise ValueError("Internetzugang für dieses Gerät nicht steuerbar")
         state = await self.fritz_scanner.async_set_wan_access(host.ip, True)
+        await self.monitor.async_set_internet_blocked(host, False)
         self._wan_access_by_ip[host.ip] = state
         self._wan_retry_after.pop(host.ip, None)
         await self.monitor.async_trust_host(key, host, reason="manual")

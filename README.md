@@ -187,7 +187,7 @@ Nodarion is included in the default HACS catalog. No custom repository is needed
 
 ## FRITZ!Box guest access
 
-Nodarion reads guest access locally and in read-only mode over TR-064. It shows
+Nodarion reads guest access locally over TR-064. Administrators can enable or disable guest Wi-Fi directly in the guest dialog. The switch shows the confirmed router state and displays errors inline. It shows
 the state, Wi-Fi name, reported security settings, and connected guests. Guest
 devices can be labelled and filtered in the device table. Connections and
 disconnections appear in the live log, with optional warnings for new guests,
@@ -258,3 +258,18 @@ is used, the summarized network data leaves the local system.
 ## License
 
 Engelsoft Nodarion is released under the [MIT License](LICENSE).
+
+### Open detected device web interfaces
+
+The participant table links to device web interfaces only after a real HTTP
+response, including authentication responses. Discovery checks HTTPS on ports
+443/8443 and HTTP on 80/8080 for online devices in configured monitored networks.
+Links open in a new browser tab; offline devices have no link. Results expire
+after five minutes (positive) or two minutes (negative), and identity changes
+invalidate cached results. Up to eight devices are checked per scan with eight
+concurrent requests and a ten-second timeout per request. Checks run in the
+background without delaying presence updates. An explicit scan clears web results
+and starts fresh checks. Discovery sends no
+credentials, follows no redirects, and reads no response body. Local self-signed
+TLS certificates are accepted for detection; browsers validate them when opening
+the link. The browser needs access to the device network, locally or through VPN.

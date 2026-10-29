@@ -213,7 +213,7 @@ class NetworkHostEntity(
             identifiers={(DOMAIN, self._key)},
             name=host.display_name,
             manufacturer=vendor.name if vendor else "Network device",
-            configuration_url=f"http://{host.ip}",
+            configuration_url=host.web_urls[0] if host.web_urls and host.online else None,
         )
 
     @property
@@ -288,6 +288,10 @@ class NetworkHostEntity(
             "adguard_data_complete": host.adguard_data_complete,
             "adguard_bypass_suspected": host.adguard_bypass_suspected,
             "wan_access": host.wan_access,
+            "web_urls": list(host.web_urls) if host.online else [],
+            "internet_control_available": self.coordinator.can_control_internet(host),
+            "internet_control_reason": self.coordinator.internet_control_reason(host),
+            "internet_manually_blocked": self.coordinator.monitor.is_internet_blocked(host),
             "desired_wan_access": host.desired_wan_access,
             "internet_approval_required": host.internet_approval_required,
             "trusted": self.coordinator.monitor.is_trusted(host),

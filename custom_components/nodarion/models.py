@@ -177,6 +177,7 @@ class NetworkHost:
     wan_access: str | None = None
     desired_wan_access: str | None = None
     internet_approval_required: bool = False
+    web_urls: tuple[str, ...] = ()
     guest_network: bool = False
     vpn_connection: bool = False
     network_infrastructure: bool | None = None

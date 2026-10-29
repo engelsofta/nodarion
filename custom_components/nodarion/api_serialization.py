@@ -44,6 +44,9 @@ def serialize_frontend_state(
             attributes["mac_address"] = host.mac
             attributes["detection_sources"] = list(host.sources)
             attributes["trusted"] = manager.is_trusted(host)
+            attributes["internet_control_available"] = coordinator.can_control_internet(host)
+            attributes["internet_control_reason"] = coordinator.internet_control_reason(host)
+            attributes["internet_manually_blocked"] = manager.is_internet_blocked(host)
             attributes["trust_status"] = manager.trust_status(host)
             participants.append(
                 {

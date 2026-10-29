@@ -315,10 +315,47 @@ class FritzBoxScanner:
             _LOGGER.debug("FRITZ!Box mesh topology unavailable: %s", err)
         return active_hosts, topology_data, router_info, guest_info
 
+    async def async_set_guest_enabled(self, enabled: bool) -> dict[str, Any]:
+        """Switch only a positively identified guest WLAN outside HA's loop."""
+        if type(enabled) is not bool:
+            raise ValueError("Guest WLAN state must be boolean")
+        if self._scan_future is not None:
+            await asyncio.shield(self._scan_future)
+        info = await self.hass.async_add_executor_job(self._set_guest_enabled, enabled)
+        self.guest_info = info
+        return dict(info)
+
+    def _set_guest_enabled(self, enabled: bool) -> dict[str, Any]:
+        """Verify WLAN role before writing, then read the actual resulting state."""
+        hosts = FritzHosts(address=self.address, user=self.user,
+            password=self.password, timeout=5.0)
+        guest = FritzGuestWLAN(fc=hosts.fc)
+        service = str(guest.service)
+        service_name = service if service.startswith("WLANConfiguration") else f"WLANConfiguration{service}"
+        extension = hosts.fc.call_action(service_name, "X_AVM-DE_GetWLANExtInfo")
+        if str(extension.get("NewX_AVM-DE_APType", "")).lower() != "guest":
+            raise ValueError("Kein eindeutig erkanntes Gast-WLAN verfügbar")
+        if enabled:
+            guest.enable()
+        else:
+            guest.disable()
+        actual = self._as_bool(guest.is_enabled)
+        if actual != enabled:
+            raise RuntimeError("Die FRITZ!Box hat den gewünschten Gast-WLAN-Zustand noch nicht bestätigt. Bitte erneut prüfen.")
+        info = self._get_guest_data(hosts, [])
+        if not info.get("available"):
+            # The toggle was confirmed even if ancillary details could not be read.
+            info = {**self.guest_info, "available": True, "enabled": actual}
+        info["enabled"] = actual
+        if not actual:
+            info.pop("qr_code", None)
+            info["clients"] = 0
+        return info
+
     def _get_guest_data(
         self, hosts: FritzHosts, active_hosts: list[dict[str, Any]]
     ) -> dict[str, Any]:
-        """Annotate active hosts and return read-only guest WLAN status."""
+        """Annotate active hosts and return guest WLAN status."""
         guest_info: dict[str, Any] = {
             "available": False,
             "enabled": False,
