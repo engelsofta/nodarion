@@ -265,10 +265,11 @@ The participant table links to device web interfaces only after a real HTTP
 response, including authentication responses. Discovery checks HTTPS on ports
 443/8443 and HTTP on 80/8080 for online devices in configured monitored networks.
 Links open in a new browser tab; offline devices have no link. Results expire
-after five minutes (positive) or two minutes (negative), and identity changes
-invalidate cached results. Up to eight devices are checked per scan with eight
+after 24 hours and persist across restarts and temporary offline periods, and identity changes
+invalidate cached results. An independent background loop checks up to eight devices per batch with eight
 concurrent requests and a ten-second timeout per request. Checks run in the
-background without delaying presence updates. An explicit scan clears web results
+background without delaying presence updates, including with the GUI closed.
+The loop waits five seconds between batches and publishes each completed device immediately. An explicit scan clears web results
 and starts fresh checks. Discovery sends no
 credentials, follows no redirects, and reads no response body. Local self-signed
 TLS certificates are accepted for detection; browsers validate them when opening

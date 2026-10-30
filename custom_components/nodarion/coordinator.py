@@ -99,6 +99,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         self._options = options
         self.monitor = monitor
         self._web_discovery = DeviceWebDiscovery()
+        self._web_discovery.restore_cache(monitor.web_discovery_results)
         self._web_discovery_task: asyncio.Task[None] | None = None
         self.offline_after = int(options.get(CONF_OFFLINE_AFTER, DEFAULT_OFFLINE_AFTER))
         self.remove_after_days = int(
@@ -657,36 +658,49 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         self.monitor.async_maybe_schedule_ai_analysis(self, found)
         if self._web_discovery_task is None or self._web_discovery_task.done():
             self._web_discovery_task = self.hass.async_create_background_task(
-                self._async_discover_web_interfaces(dict(found)), "Nodarion web discovery"
+                self._async_web_discovery_loop(), "Nodarion web discovery"
             )
         return found
+
+    async def _async_web_discovery_loop(self) -> None:
+        """Drain discovery batches independently of scans and browser clients."""
+        while True:
+            if self.data:
+                await self._async_discover_web_interfaces(dict(self.data))
+            await asyncio.sleep(5)
+
+    def _publish_web_results(self) -> None:
+        """Publish metadata without resetting the regular network-scan timer."""
+        if not self.data:
+            return
+        current = dict(self.data)
+        networks = [segment.ip_network for segment in self.segments]
+        changed = False
+        for key, host in tuple(current.items()):
+            urls = (self._web_discovery.urls_for(host)
+                if self._web_discovery.eligible(host, networks) else ())
+            if urls != host.web_urls:
+                current[key] = replace(host, web_urls=urls)
+                changed = True
+        if changed:
+            self.data = current
+            self.async_update_listeners()
 
     async def _async_discover_web_interfaces(self, snapshot: dict[str, NetworkHost]) -> None:
         """Allow slow web servers without delaying presence/network updates."""
         try:
             await self._web_discovery.async_update(
-                snapshot.values(), [segment.ip_network for segment in self.segments]
+                snapshot.values(), [segment.ip_network for segment in self.segments],
+                on_update=self._publish_web_results,
             )
-            if not self.data:
-                return
-            current = dict(self.data)
-            changed = False
-            for key, host in tuple(current.items()):
-                eligible = self._web_discovery.eligible(
-                    host, [segment.ip_network for segment in self.segments]
-                )
-                urls = self._web_discovery.urls_for(host) if eligible else ()
-                if urls != host.web_urls:
-                    current[key] = replace(host, web_urls=urls)
-                    changed = True
-            if changed:
-                self.async_set_updated_data(current)
+            self._publish_web_results()
+            await self.monitor.async_save_web_results(self._web_discovery.export_cache())
         except asyncio.CancelledError:
             raise
         except Exception:
             _LOGGER.exception("Device web discovery failed")
 
-    async def async_reset_web_discovery(self) -> None:
+    async def async_reset_web_discovery(self, *, clear_cache: bool = True) -> None:
         """Discard cached results before an explicit user scan."""
         task = self._web_discovery_task
         if task is not None and not task.done():
@@ -696,7 +710,9 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             except asyncio.CancelledError:
                 pass
         self._web_discovery_task = None
-        self._web_discovery.clear_cache()
+        if clear_cache:
+            self._web_discovery.clear_cache()
+            await self.monitor.async_save_web_results({})
 
     def _sync_priority_recovery_task(self) -> None:
         """Run one lightweight loop only while important devices are offline."""
@@ -808,7 +824,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
 
     async def async_shutdown(self) -> None:
         """Stop the optional priority recovery loop."""
-        await self.async_reset_web_discovery()
+        await self.async_reset_web_discovery(clear_cache=False)
         task = self._priority_recovery_task
         self._priority_recovery_task = None
         self._priority_offline_keys.clear()

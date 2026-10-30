@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.27";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.27";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.29";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.29";
 
 const esc = (value) =>
   String(value ?? "")

@@ -7,12 +7,13 @@ from dataclasses import dataclass
 import ipaddress
 import re
 import ssl
-from time import monotonic
+from time import time
+import math
 
 
 ENDPOINTS = (("https", 443), ("http", 80), ("https", 8443), ("http", 8080))
-POSITIVE_TTL = 300
-NEGATIVE_TTL = 120
+POSITIVE_TTL = 24 * 60 * 60
+NEGATIVE_TTL = POSITIVE_TTL
 MAX_DEVICES_PER_SCAN = 8
 REQUEST_TIMEOUT = 10
 
@@ -53,19 +54,49 @@ class DeviceWebDiscovery:
         """Force fresh HTTP checks after an explicit scan request."""
         self._cache.clear()
 
+    def export_cache(self) -> dict:
+        """Use wall-clock timestamps so results survive process restarts."""
+        return {ip: {"identity": item.identity, "checked": item.checked,
+            "urls": list(item.urls)} for ip, item in self._cache.items()}
+
+    def restore_cache(self, values) -> None:
+        """Restore only well-formed anonymous endpoints on their exact IP."""
+        if not isinstance(values, dict):
+            return
+        for ip, item in values.items():
+            try:
+                address = ipaddress.ip_address(ip)
+                if address.version != 4 or not isinstance(item, dict):
+                    continue
+                checked = float(item["checked"])
+                if not math.isfinite(checked) or checked < 0 or checked > time() + 60:
+                    continue
+                identity = item["identity"]
+                if not isinstance(identity, str):
+                    continue
+                allowed = {f"{scheme}://{ip}{':' + str(port) if port not in {80, 443} else ''}/"
+                    for scheme, port in ENDPOINTS}
+                urls = item["urls"]
+                if not isinstance(urls, list) or any(url not in allowed for url in urls):
+                    continue
+                self._cache[ip] = WebResult(identity, checked, tuple(urls))
+            except (ValueError, TypeError, KeyError):
+                continue
+
     def urls_for(self, host, now: float | None = None) -> tuple[str, ...]:
         result = self._cache.get(host.ip)
-        current = monotonic() if now is None else now
+        current = time() if now is None else now
         if (not host.online or result is None or result.identity != self.identity(host)
                 or current - result.checked >= POSITIVE_TTL):
             return ()
         return result.urls
 
-    async def async_update(self, hosts, networks) -> None:
-        candidates = {host.ip: host for host in hosts if self.eligible(host, networks)}
+    async def async_update(self, hosts, networks, *, on_update=None) -> None:
+        known = {host.ip: host for host in hosts}
+        candidates = {ip: host for ip, host in known.items() if self.eligible(host, networks)}
         self._cache = {ip: result for ip, result in self._cache.items()
-            if ip in candidates and result.identity == self.identity(candidates[ip])}
-        now = monotonic()
+            if ip in known and result.identity == self.identity(known[ip])}
+        now = time()
         due = [host for ip, host in candidates.items() if ip not in self._cache
             or now - self._cache[ip].checked >= (
                 POSITIVE_TTL if self._cache[ip].urls else NEGATIVE_TTL)]
@@ -84,7 +115,9 @@ class DeviceWebDiscovery:
             responses = await asyncio.gather(*(endpoint(host.ip, scheme, port)
                 for scheme, port in ENDPOINTS))
             urls = tuple(url for url in responses if url is not None)
-            self._cache[host.ip] = WebResult(self.identity(host), monotonic(), urls)
+            self._cache[host.ip] = WebResult(self.identity(host), time(), urls)
+            if on_update is not None:
+                on_update()
 
         await asyncio.gather(*(device(host) for host in due))
 

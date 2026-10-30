@@ -338,11 +338,12 @@ Links; sie öffnen jeweils einen neuen Browser-Tab. Auch eine Weboberfläche
 mit Anmeldung wird erkannt. Ein offener TCP-Port allein genügt nicht.
 
 Die Prüfung ist auf online gemeldete Geräte in den konfigurierten, überwachten
-Netzen begrenzt. Pro Scan werden höchstens acht Geräte im Hintergrund geprüft, mit insgesamt
+Netzen begrenzt. Ein unabhängiger Hintergrundlauf prüft höchstens acht Geräte je Paket, mit insgesamt
 höchstens acht gleichzeitigen Anfragen und zehn Sekunden Zeitlimit je Anfrage.
+Nach jedem Paket wartet der Hintergrundlauf fünf Sekunden und prüft dann weitere fällige Geräte, auch bei geschlossener GUI. Fertige Geräteergebnisse werden sofort veröffentlicht.
 Die Netzwerk- und Anwesenheitserkennung wartet nicht auf Webantworten.
 „Jetzt scannen“ verwirft auch die Webprüfungen und startet sie neu.
-Erfolgreiche Prüfungen gelten fünf Minuten, erfolglose zwei Minuten; neue
+Erfolgreiche und erfolglose Prüfungen gelten 24 Stunden und bleiben über Neustarts sowie vorübergehende Offline-Zeiten gespeichert; neue
 Geräte werden über die folgenden Scans verteilt geprüft. Bei Offline-Status,
 Identitätswechsel oder abgelaufenem Ergebnis wird der Link ausgeblendet.
 Es werden keine Anmeldedaten geschickt, Weiterleitungen nicht automatisch

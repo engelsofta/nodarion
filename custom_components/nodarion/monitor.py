@@ -110,6 +110,7 @@ class NetworkMonitor:
         self.known_hosts: set[str] = set()
         self.trusted_macs: set[str] = set()
         self.blocked_internet: set[str] = set()
+        self.web_discovery_results: dict[str, Any] = {}
         self.host_inventory: dict[str, dict[str, Any]] = {}
         self.first_seen: dict[str, str] = {}
         self.online_since: dict[str, str] = {}
@@ -150,6 +151,7 @@ class NetworkMonitor:
         self.rules.pop("absence_sensor_enabled", None)
         self.known_hosts = set(data.get("known_hosts", []))
         self.blocked_internet = set(data.get("blocked_internet", []))
+        self.web_discovery_results = data.get("web_discovery_results", {})
         self.trusted_macs = {
             normalized
             for mac in data.get("trusted_macs", [])
@@ -248,6 +250,12 @@ class NetworkMonitor:
         return is_trusted_identity(
             host.key, host.mac, self.known_hosts, self.trusted_macs
         )
+
+    async def async_save_web_results(self, results: dict) -> None:
+        """Persist web checks only when a completed batch changes them."""
+        if results != self.web_discovery_results:
+            self.web_discovery_results = results
+            await self._async_save(immediate=False)
 
     def is_internet_blocked(self, host: NetworkHost) -> bool:
         """Match explicit denials by MAC, falling back to IP for unknown MACs."""
@@ -1752,6 +1760,7 @@ class NetworkMonitor:
             "known_hosts": sorted(self.known_hosts),
             "trusted_macs": sorted(self.trusted_macs),
             "blocked_internet": sorted(self.blocked_internet),
+            "web_discovery_results": self.web_discovery_results,
             "host_inventory": self.host_inventory,
             "first_seen": self.first_seen,
             "online_since": self.online_since,

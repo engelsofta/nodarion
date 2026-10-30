@@ -86,15 +86,15 @@ class WebDiscoveryTests(TestCase):
         d=web.DeviceWebDiscovery();h=host();net=[ipaddress.ip_network("192.168.1.0/24")]
         async def probe(ip,scheme,port):
             return f"{scheme}://{ip}/" if port==80 else None
-        with patch.object(web.asyncio,"gather",gather),patch.object(d,"async_probe",AsyncMock(side_effect=probe)) as check,patch.object(web,"monotonic",return_value=100):
+        with patch.object(web.asyncio,"gather",gather),patch.object(d,"async_probe",AsyncMock(side_effect=probe)) as check,patch.object(web,"time",return_value=100):
             await d.async_update([h],net)
             self.assertEqual(check.await_count,4)
             await d.async_update([h],net)
             self.assertEqual(check.await_count,4)
             self.assertEqual(d.urls_for(h,101),("http://192.168.1.20/",))
-        with patch.object(web.asyncio,"gather",gather),patch.object(d,"async_probe",AsyncMock(return_value=None)),patch.object(web,"monotonic",return_value=500):
+        with patch.object(web.asyncio,"gather",gather),patch.object(d,"async_probe",AsyncMock(return_value=None)),patch.object(web,"time",return_value=100+web.POSITIVE_TTL+1):
             await d.async_update([h],net)
-            self.assertFalse(d.urls_for(h,501))
+            self.assertFalse(d.urls_for(h,100+web.POSITIVE_TTL+2))
 
     @immediate
     async def test_batches_are_bounded_and_do_not_starve_new_devices(self):
@@ -123,3 +123,53 @@ class WebDiscoveryTests(TestCase):
         d._cache["192.168.1.20"]=web.WebResult("aa",100,())
         d.clear_cache()
         self.assertFalse(d._cache)
+
+    @immediate
+    async def test_finished_devices_publish_without_waiting_for_whole_batch(self):
+        d=web.DeviceWebDiscovery();hosts=[host("192.168.1.20"),host("192.168.1.21")]
+        events=[]
+        async def probe(ip,scheme,port):
+            if ip.endswith("21"):
+                self.assertEqual(len(events),1)
+            return f"http://{ip}/" if port==80 else None
+        with patch.object(web.asyncio,"gather",gather),patch.object(d,"async_probe",probe):
+            await d.async_update(hosts,[ipaddress.ip_network("192.168.1.0/24")],
+                on_update=lambda:events.append(dict(d._cache)))
+        self.assertEqual(len(events),2)
+        self.assertIn("192.168.1.20",events[0])
+        self.assertNotIn("192.168.1.21",events[0])
+
+    @immediate
+    async def test_daily_cache_survives_restart_and_temporary_offline(self):
+        d=web.DeviceWebDiscovery();h=host();net=[ipaddress.ip_network("192.168.1.0/24")]
+        d._cache[h.ip]=web.WebResult(d.identity(h),100,("http://192.168.1.20/",))
+        restored=web.DeviceWebDiscovery();restored.restore_cache(d.export_cache())
+        with patch.object(web,"time",return_value=3600),patch.object(web.asyncio,"gather",gather),patch.object(restored,"async_probe",AsyncMock()) as probe:
+            await restored.async_update([host(online=False)],net)
+            self.assertFalse(restored.urls_for(host(online=False)))
+            await restored.async_update([h],net)
+            probe.assert_not_called()
+            self.assertTrue(restored.urls_for(h))
+
+    @immediate
+    async def test_negative_result_also_waits_a_day(self):
+        d=web.DeviceWebDiscovery();h=host();net=[ipaddress.ip_network("192.168.1.0/24")]
+        d._cache[h.ip]=web.WebResult(d.identity(h),100,())
+        with patch.object(web,"time",return_value=3600),patch.object(web.asyncio,"gather",gather),patch.object(d,"async_probe",AsyncMock(return_value=None)) as probe:
+            await d.async_update([h],net)
+            probe.assert_not_called()
+
+    @immediate
+    async def test_ip_or_mac_change_is_checked_immediately(self):
+        for h in (host(mac="BB"),host("192.168.1.21")):
+            d=web.DeviceWebDiscovery();old=host()
+            d._cache[old.ip]=web.WebResult(d.identity(old),100,("http://192.168.1.20/",))
+            with patch.object(web,"time",return_value=101),patch.object(web.asyncio,"gather",gather),patch.object(d,"async_probe",AsyncMock(return_value=None)) as probe:
+                await d.async_update([h],[ipaddress.ip_network("192.168.1.0/24")])
+                self.assertEqual(probe.await_count,4)
+
+    def test_restore_rejects_external_links_and_invalid_timestamps(self):
+        d=web.DeviceWebDiscovery()
+        for checked,urls in ((float("nan"),[]),(float("inf"),[]),(100,["https://outside.invalid/"])):
+            d.restore_cache({"192.168.1.20":{"identity":"aa","checked":checked,"urls":urls}})
+            self.assertFalse(d._cache)
