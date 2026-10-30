@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.29";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.29";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.31";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.31";
 
 const esc = (value) =>
   String(value ?? "")
@@ -20,6 +20,19 @@ const deviceWebLinks = (entity) => {
         && url.pathname === "/" && !url.search && !url.hash;
     } catch { return false; }
   });
+};
+
+const deviceWebControl = (entity) => {
+  const urls = [...new Set(deviceWebLinks(entity))];
+  if (!urls.length) return "";
+  const icon = '<ha-icon icon="mdi:open-in-new"></ha-icon>';
+  if (urls.length === 1) return `<a class="device-web-link" href="${esc(urls[0])}" target="_blank" rel="noopener noreferrer" title="${esc(urls[0])}">GUI ${icon}</a>`;
+  const id = `device-gui-${String(entity.attributes.ip_address).replaceAll(".", "-")}`;
+  return `<button type="button" class="device-web-link device-gui-button" popovertarget="${esc(id)}" aria-label="GUI auswählen">GUI ${icon}</button><div id="${esc(id)}" class="device-gui-menu" popover="auto">${urls.map(value => {
+    const url = new URL(value);
+    const label = url.protocol.replace(":", "").toUpperCase() + (url.port ? " · " + url.port : "");
+    return `<a href="${esc(value)}" target="_blank" rel="noopener noreferrer" title="${esc(value)}">${esc(label)} ${icon}</a>`;
+  }).join("")}</div>`;
 };
 
 // The panel is authored in German. Home Assistant's selected language decides
@@ -3218,6 +3231,21 @@ class EngelsoftNodarionPanel extends HTMLElement {
         :host([data-theme="light"]) .device-list .watch.active { color:#805e1c; border-color:#bda46f; background:#f2e7cd; }
         :host([data-theme="light"]) .device-list .watch.notify.active { color:#245e7b; border-color:#92b2c1; background:#e1eef4; }
         :host([data-theme="light"]) .device-list .watch.presence.active { color:#28633f; border-color:#8eb69a; background:#e1eee3; }
+        .device-ip-line { display:flex; align-items:center; gap:8px; white-space:nowrap; min-height:28px; }
+        .device-list .device-ip-line .device-web-link {
+          display:inline-flex; flex:0 0 auto; align-items:center; gap:4px; margin:0;
+          height:26px; padding:4px 7px; font-family:inherit; font-size:11px; font-weight:600; line-height:1.2; cursor:pointer;
+          white-space:nowrap; text-decoration:none; box-sizing:border-box;
+        }
+        .device-gui-menu {
+          position:fixed; inset:auto; margin:0; width:190px; padding:6px;
+          border:1px solid var(--ns-line); border-radius:12px;
+          background:#2c2823; color:var(--ns-text); box-shadow:0 12px 32px rgba(0,0,0,.3);
+        }
+        .device-gui-menu a { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px; border-radius:7px; font-family:inherit; font-size:12px; font-weight:600; line-height:1.3; color:var(--ns-text); text-decoration:none; }
+        .device-gui-menu a:hover, .device-gui-menu a:focus-visible { background:var(--ns-surface-raised); }
+        .device-gui-menu ha-icon { --mdc-icon-size:15px; }
+        :host([data-theme="light"]) .device-gui-menu { background:#fffaf2; }
       </style>
       <div class="shell">
         <header>
@@ -3688,7 +3716,18 @@ class EngelsoftNodarionPanel extends HTMLElement {
         this.shadowRoot.querySelector(".column-picker").hidden = true;
       }
     );
+    this.shadowRoot.querySelector(".device-list").addEventListener("scroll", () => {
+      this.shadowRoot.querySelectorAll(".device-gui-menu:popover-open").forEach(menu => menu.hidePopover());
+    }, { passive:true });
     this.shadowRoot.addEventListener("click", (event) => {
+      const guiButton = event.target.closest(".device-gui-button");
+      if (guiButton) {
+        const menu = this.shadowRoot.getElementById(guiButton.getAttribute("popovertarget"));
+        const rect = guiButton.getBoundingClientRect();
+        const menuHeight = menu.querySelectorAll("a").length * 38 + 14;
+        menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 198))}px`;
+        menu.style.top = `${rect.bottom + menuHeight < window.innerHeight - 8 ? rect.bottom + 5 : Math.max(8, rect.top - menuHeight - 5)}px`;
+      }
       const clickedDropdown = event.target.closest(".custom-column-filter");
       this.shadowRoot.querySelectorAll(".custom-column-filter[open]").forEach(
         (dropdown) => {
@@ -4732,7 +4771,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <button class="watch mobile-details" type="button" aria-expanded="false" aria-label="Weitere Gerätedetails anzeigen" title="Weitere Gerätedetails anzeigen"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
         </div>
         </td>
-        <td data-column="ip" data-label="IP-Adresse" class="mono"><div class="detail-stack"><span>${esc(attr.ip_address || "Nicht verfügbar")}</span>${deviceWebLinks(entity).map((url, index, links) => `<a class="device-web-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(url)}"><ha-icon icon="mdi:open-in-new"></ha-icon>${links.length === 1 ? "Weboberfläche öffnen" : esc(new URL(url).protocol.replace(":", "").toUpperCase() + (new URL(url).port ? " · " + new URL(url).port : ""))}</a>`).join("")}</div></td>
+        <td data-column="ip" data-label="IP-Adresse" class="mono"><div class="device-ip-line"><span>${esc(attr.ip_address || "Nicht verfügbar")}</span>${deviceWebControl(entity)}</div></td>
         <td data-column="mac" data-label="MAC-Adresse" class="mono" title="${esc(vendorTitle)}">${esc(attr.mac_address || "Nicht erkannt")}${attr.mac_vendor ? `<span class="mac-vendor" title="${esc(vendorTitle)}"><ha-icon icon="mdi:factory"></ha-icon>${esc(attr.mac_vendor)}</span>` : ""}${privateMac ? `<span class="private-mac" title="Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus"><ha-icon icon="mdi:incognito"></ha-icon>Privat / randomisiert</span>` : ""}</td>
         <td data-column="connection" data-label="Verbindung"><div class="detail-stack"><strong>${esc(connection)}</strong></div></td>
         <td data-column="mesh" data-label="Mesh-Punkt"><div class="detail-stack"><strong>${esc(accessPoint)}</strong></div></td>
