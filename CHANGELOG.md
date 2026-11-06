@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.28.0 — The radar got a glow-up. The filters got the broom. 🧹
+
+> The radar got a glow-up. The filters got the broom. 🧹
+
+### Easier setup
+- Added a Marketplace quick start to the English and German guides.
+- Setup suggests an IPv4 subnet when Home Assistant finds one eligible network. FRITZ!Box and AdGuard Home remain optional.
+- The first scan runs in the background. The device list shows progress, empty results, and errors with troubleshooting hints.
+
+### A fresh look
+- New gold radar icon, matching light and dark wordmarks, and a matching panel icon.
+
+### Fixes
+- Declared the Home Assistant network dependency so subnet suggestions work during setup.
+- Column labels and filters now stay together when scrolling Events on desktop, with an opaque header that keeps rows from showing through.
+- Clearing a device filter with × now clears its dashboard highlight immediately. Resetting all filters clears all highlights.
+
+Integration **1.28.0** · Frontend **1.29.33**
+
 ## 1.28.0-beta.3 — 🧹 Clingy filters? Swept away.
 
 - **Device filters:** Clearing a filter with its × or resetting all filters now clears the matching dashboard highlights immediately. Any remaining active filters stay highlighted.

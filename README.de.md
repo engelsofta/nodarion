@@ -12,7 +12,7 @@
 <h1 align="center">Engelsoft Nodarion für Home Assistant</h1>
 
 <p align="center">
-  <a href="https://github.com/engelsofta/nodarion/releases/latest"><img src="https://img.shields.io/github/v/release/engelsofta/nodarion?label=Version&color=d4a33f&cacheSeconds=300&release=1.27.0" alt="Aktuelle Version"></a>
+  <a href="https://github.com/engelsofta/nodarion/releases/latest"><img src="https://img.shields.io/github/v/release/engelsofta/nodarion?label=Version&color=d4a33f&cacheSeconds=300" alt="Aktuelle Version"></a>
   <a href="https://github.com/engelsofta/nodarion/releases"><img src="https://img.shields.io/github/downloads/engelsofta/nodarion/total?label=Downloads&color=d4a33f" alt="Downloads aller Releases"></a>
   <a href="https://www.home-assistant.io/"><img src="https://img.shields.io/badge/Home%20Assistant-Custom-41BDF5?logo=homeassistant&logoColor=white" alt="Home Assistant Custom Integration"></a>
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
