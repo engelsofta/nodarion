@@ -8,6 +8,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.components.network import async_get_adapters
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
@@ -373,6 +374,24 @@ class ConfigFlow(SectionFlow, config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         if not hasattr(self, "_values"):
             self._start("user")
+            candidates = set()
+            for adapter in await async_get_adapters(self.hass):
+                if not adapter["enabled"]:
+                    continue
+                for ipv4 in adapter["ipv4"]:
+                    address = ipaddress.IPv4Interface(
+                        f"{ipv4['address']}/{ipv4['network_prefix']}"
+                    )
+                    if (
+                        20 <= address.network.prefixlen <= 30
+                        and not address.ip.is_loopback
+                        and not address.ip.is_link_local
+                    ):
+                        candidates.add(address.network)
+            # Require an explicit subnet when Home Assistant sees several LANs.
+            self._values[CONF_NETWORK] = (
+                str(candidates.pop()) if len(candidates) == 1 else ""
+            )
         return await self.async_step_network(user_input)
 
     async def async_step_reconfigure(self, user_input=None):

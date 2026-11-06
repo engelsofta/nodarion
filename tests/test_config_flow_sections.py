@@ -62,6 +62,7 @@ def load_flow():
             SelectSelectorConfig=lambda **kwargs: kwargs,
         ),
         "async_validate_connections": AsyncMock(),
+        "async_get_adapters": AsyncMock(return_value=[]),
         "InvalidAuthError": type("InvalidAuthError", (Exception,), {}),
         "CannotConnectError": type("CannotConnectError", (Exception,), {}),
     })
@@ -159,14 +160,33 @@ class SectionFlowTests(unittest.IsolatedAsyncioTestCase):
     async def test_new_setup_uses_existing_defaults_and_creates_only_on_finish(self):
         flow = self.ns["ConfigFlow"]()
         flow.hass = self.hass
+        self.ns["async_get_adapters"].return_value = [
+            {"enabled": True, "ipv4": [{"address": "192.0.2.12", "network_prefix": 24}]},
+            {"enabled": False, "ipv4": [{"address": "198.51.100.8", "network_prefix": 24}]},
+        ]
         first = await flow.async_step_user()
         self.assertEqual(first["step_id"], "network")
+        self.assertEqual(first["data_schema"]({})["network"], "192.0.2.0/24")
         result = await flow.async_step_network({"network": "192.0.2.0/24"})
         self.assertEqual(result["type"], "menu")
         saved = await flow.async_step_finish({})
         self.assertEqual(saved["type"], "create_entry")
         self.assertEqual(saved["data"]["ports"], self.ns["DEFAULT_PORTS"])
         self.assertFalse(saved["data"]["fritz_enabled"])
+
+    async def test_new_setup_requires_manual_network_when_detection_is_ambiguous(self):
+        flow = self.ns["ConfigFlow"]()
+        flow.hass = self.hass
+        self.ns["async_get_adapters"].return_value = [
+            {"enabled": True, "ipv4": [
+                {"address": "192.0.2.12", "network_prefix": 24},
+                {"address": "198.51.100.8", "network_prefix": 24},
+            ]},
+        ]
+        first = await flow.async_step_user()
+        self.assertEqual(first["data_schema"]({})["network"], "")
+        invalid = await flow.async_step_user({"network": ""})
+        self.assertEqual(invalid["errors"], {"network": "invalid_network"})
 
     async def test_reconfigure_and_reauth_update_shadowing_options(self):
         for mode in ("reconfigure", "reauth"):

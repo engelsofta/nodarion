@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.28.0-beta.1 — Marketplace quick start and a new look
+
+- Added a Home Assistant Marketplace quick start to the English and German READMEs.
+- Setup suggests an IPv4 subnet when Home Assistant identifies a single eligible network. FRITZ!Box and AdGuard Home remain optional.
+- The first scan runs in the background. The device list shows when the scan is running, found no devices or failed, with a hint on what to check.
+- Introduced a gold radar icon inspired by Engelsoft Home, matching light and dark GitHub wordmarks, and a matching icon in the Nodarion panel.
+
+Integration **1.28.0-beta.1** · Frontend **1.29.32**
+
 ## 1.27.19 — Tiny button. Big GUI energy. ↗️
 
 > Your device links stopped doing squats. The table can finally sit still.

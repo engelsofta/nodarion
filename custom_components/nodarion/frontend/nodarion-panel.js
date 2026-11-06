@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.31";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.31";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.32";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.32";
 
 const esc = (value) =>
   String(value ?? "")
@@ -1202,15 +1202,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .connection-status.open ha-icon:last-child { transform:rotate(180deg); }
         .version-info { color:#73958a; font-size:11px; margin-top:4px; min-height:14px; }
         .logo {
-          width:58px; height:58px; display:grid; place-items:center; border-radius:18px;
-          background:linear-gradient(145deg, rgba(85,242,162,.22), rgba(80,215,255,.08));
-          border:1px solid rgba(85,242,162,.3); box-shadow:0 0 40px rgba(85,242,162,.12);
-          text-decoration:none; cursor:pointer;
-          transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+          width:58px; height:58px; flex:none; display:block; border-radius:18px;
+          transition:transform .18s ease;
         }
-        .logo:hover { transform:translateY(-2px); border-color:rgba(204,181,123,.7); box-shadow:0 18px 38px rgba(221,139,42,.28),inset 0 1px rgba(255,255,255,.42); }
+        .logo:hover { transform:translateY(-2px); }
         .logo:focus-visible { outline:3px solid color-mix(in srgb,var(--ns-green) 55%,transparent); outline-offset:3px; }
-        .logo ha-icon { color:var(--ns-green); --mdc-icon-size:31px; }
+        .logo img { display:block; width:100%; height:100%; }
         h1 { margin:0; font-size:clamp(26px,3vw,38px); letter-spacing:-1.5px; font-weight:720; }
         .eyebrow { color:var(--ns-cyan); font-size:10px; letter-spacing:2.8px; font-weight:750; text-transform:uppercase; margin-bottom:5px; }
         .scan {
@@ -2040,14 +2037,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
           border-bottom:1px solid rgba(255,255,255,.035);
           padding-bottom:20px;
         }
-        .logo {
-          width:52px; height:52px; border-radius:16px;
-          color:#2b2115;
-          background:linear-gradient(145deg,#f0d39a,#cfa45d);
-          border-color:rgba(255,229,180,.4);
-          box-shadow:0 14px 30px rgba(221,139,42,.20), inset 0 1px rgba(255,255,255,.42);
-        }
-        .logo ha-icon { color:#342516; --mdc-icon-size:27px; }
         .version-info, .metric-note, .entity, .entity-id-link, .status-time,
         .log-date, .alert-time { color:#aaa49a; }
         .scan {
@@ -2750,7 +2739,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .connection-status span { overflow:hidden; text-overflow:ellipsis; }
           .brand { min-width:0; gap:11px; }
           .logo { width:46px; height:46px; border-radius:14px; }
-          .logo ha-icon { --mdc-icon-size:25px; }
           h1 { font-size:27px; }
           .version-info { font-size:9px; }
           .scan { flex:0 0 44px; width:44px; height:44px; justify-content:center; padding:0; }
@@ -3251,7 +3239,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <header>
           <div class="brand">
             <button class="ha-menu" type="button" title="Home-Assistant-Menü öffnen" aria-label="Home-Assistant-Menü öffnen"><ha-icon icon="mdi:menu"></ha-icon></button>
-            <a class="logo" href="https://github.com/engelsofta/nodarion" target="_blank" rel="noopener noreferrer" title="Nodarion auf GitHub öffnen" aria-label="Nodarion auf GitHub öffnen"><ha-icon icon="mdi:shield-search"></ha-icon></a>
+            <a class="logo" href="https://github.com/engelsofta/nodarion" target="_blank" rel="noopener noreferrer" title="Nodarion auf GitHub öffnen" aria-label="Nodarion auf GitHub öffnen"><img src="/engelsoft_nodarion_icon.png" alt=""></a>
             <div>
               <div class="eyebrow">Engelsoft</div>
               <h1>Nodarion</h1>
@@ -4200,6 +4188,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._renderGuest();
       this._renderCards();
       this._renderMesh();
+    } else if (statusChanged && entities.length === 0) {
+      this._renderCards();
     }
     if (eventsChanged) this._renderLog();
     if (statusChanged) this._renderDnsLive();
@@ -4496,6 +4486,26 @@ class EngelsoftNodarionPanel extends HTMLElement {
       attr.guest_network ? "Gast Gastzugang guest" : "",
     ].filter(value => value != null).join(" ").toLocaleLowerCase("de-DE");
     return terms.every(term => haystack.includes(term));
+  }
+
+  _emptyScanMessage() {
+    const german = panelLocale === "de";
+    const scanner = this._monitor.connection_status?.scanner;
+    if (!scanner) {
+      return german ? "Scanstatus wird geladen …" : "Loading scan status…";
+    }
+    if (!scanner.last_checked) {
+      return german
+        ? "<strong>Erster Netzwerkscan läuft …</strong>Je nach Netzgröße kann das etwas dauern."
+        : "<strong>First network scan in progress…</strong>This can take a while, depending on the network size.";
+    }
+    const title = scanner.available
+      ? (german ? "Keine Geräte gefunden" : "No devices found")
+      : (german ? "Netzwerkscan fehlgeschlagen" : "Network scan failed");
+    const hint = german
+      ? "Prüfe unter Einstellungen → Allgemein das überwachte IPv4-Netz und ob Home Assistant es erreichen kann. Wähle danach „Jetzt scannen“."
+      : "Check the monitored IPv4 network under Settings → General and make sure Home Assistant can reach it. Then select Scan now.";
+    return `<strong>${title}</strong>${hint}`;
   }
 
   _renderCards() {
@@ -4905,7 +4915,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const filterValueNames = { on:"Online", off:"Offline", guest:"Gastzugang", onboarding:"Einrichtungsbereich", assigned:"Regulärer Bereich", unknown:"Einrichtung deaktiviert", monitored:"Überwacht", notify:"Offline-Meldung", presence:"Anwesenheit", none:"Keine Funktion", denied:"Gesperrt", pending:"Freigabe ausstehend", error:"Freigabe fehlgeschlagen", unchecked:"Noch nicht geprüft", unmanaged:"Nicht verwaltet", infrastructure:"Netzwerkinfrastruktur", learning:"Lernphase", trusted:"Vertrauenswürdig", allowed:"Freigegeben", ...sourceLabels, ...Object.fromEntries([...segmentCounts.values()].map((segment) => [segment.id, segment.vlanId ? `${segment.name} · VLAN ${segment.vlanId}` : segment.name])) };
     const activeFilters = Object.entries(this._columnFilters).filter(([, value]) => value);
     const filterChips = activeFilters.length ? `<div class="filter-chips" role="status" aria-label="Aktive Filter">${activeFilters.map(([key, value]) => `<button class="filter-chip" type="button" data-clear-column-filter="${esc(key)}" aria-label="Filter ${esc(filterNames[key] || key)} entfernen"><span>${esc(filterNames[key] || key)}: ${esc(filterValueNames[value] || value)}</span><ha-icon icon="mdi:close"></ha-icon></button>`).join("")}<button class="filter-reset" type="button" data-clear-all-filters>Alle Filter zurücksetzen</button></div>` : "";
-    const emptyRow = `<tr><td colspan="14"><div class="empty"><ha-icon icon="mdi:filter-off-outline"></ha-icon><strong>Keine passenden Geräte</strong>Filter ändern oder leeren.</div></td></tr>`;
+    const emptyRow = `<tr><td colspan="14"><div class="empty" role="status">${allEntities.length
+      ? '<ha-icon icon="mdi:filter-off-outline"></ha-icon><strong>Keine passenden Geräte</strong>Filter ändern oder leeren.'
+      : this._emptyScanMessage()}</div></td></tr>`;
     const mobileFilterCount = activeFilters.filter(([key]) => key !== "search").length;
     const mobileFilter = (label, control) => `<div class="mobile-filter-field"><span>${esc(label)}</span>${control}</div>`;
     const meshFilter = customFilter("mesh", countedOptions(allEntities.map(entity => entity.attributes.access_point).filter(Boolean), "Alle Mesh-Punkte", "mdi:access-point"));

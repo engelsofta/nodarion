@@ -4,14 +4,14 @@
     "step": {
       "services": {
         "title": "Nodarion einrichten",
-        "description": "Wähle einen Bereich. Änderungen werden erst mit „Speichern & abschließen“ übernommen.",
+        "description": "Das Startnetz ist ausgewählt. Du kannst direkt mit dem Netzwerkscan starten. FRITZ!Box, AdGuard Home und KI sind optional.",
         "menu_options": {
           "network": "Netzwerke & Scan",
           "fritz": "FRITZ!Box & Mesh",
           "adguard": "AdGuard Home",
           "ai": "KI-Analyse",
           "advanced": "Erweiterte Einstellungen",
-          "finish": "Speichern & abschließen"
+          "finish": "Speichern und Scan starten"
         }
       },
       "reconfigure": {
@@ -44,7 +44,7 @@
       },
       "network": {
         "title": "Netzwerke & Scan",
-        "description": "Lege das Startnetz, das Scanintervall und Ausnahmen fest. Weitere Netze und VLANs verwaltest du weiterhin im Nodarion-Panel.",
+        "description": "Prüfe den Netzvorschlag oder gib dein IPv4-Netz ein, zum Beispiel 192.168.178.0/24. Weitere Netze verwaltest du im Nodarion-Panel.",
         "data": {
           "network": "Startnetz (CIDR; weitere VLANs werden in Nodarion verwaltet)",
           "scan_interval": "Scanintervall (Sekunden)",

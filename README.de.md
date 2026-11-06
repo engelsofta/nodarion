@@ -1,5 +1,8 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/custom_components/nodarion/brand/logo.png" alt="Engelsoft Nodarion" width="600">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/engelsofta/nodarion/main/custom_components/nodarion/brand/dark_logo@2x.png">
+    <img src="https://raw.githubusercontent.com/engelsofta/nodarion/main/custom_components/nodarion/brand/logo@2x.png" alt="Engelsoft Nodarion" width="600">
+  </picture>
 </div>
 
 <p align="center">
@@ -12,8 +15,6 @@
   <a href="https://github.com/engelsofta/nodarion/releases/latest"><img src="https://img.shields.io/github/v/release/engelsofta/nodarion?label=Version&color=d4a33f&cacheSeconds=300&release=1.27.0" alt="Aktuelle Version"></a>
   <a href="https://github.com/engelsofta/nodarion/releases"><img src="https://img.shields.io/github/downloads/engelsofta/nodarion/total?label=Downloads&color=d4a33f" alt="Downloads aller Releases"></a>
   <a href="https://www.home-assistant.io/"><img src="https://img.shields.io/badge/Home%20Assistant-Custom-41BDF5?logo=homeassistant&logoColor=white" alt="Home Assistant Custom Integration"></a>
-  <a href="https://hacs.xyz/"><img src="https://img.shields.io/badge/HACS-Available-ED7D31" alt="In HACS verfügbar"></a>
-  <a href="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hacs.yml/badge.svg" alt="HACS-Validierung"></a>
   <a href="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml"><img src="https://github.com/engelsofta/nodarion/actions/workflows/hassfest.yml/badge.svg" alt="Hassfest"></a>
 </p>
 
@@ -135,20 +136,15 @@ gelten auch im Nodarion-Panel; zusätzliche Netze und VLANs werden weiterhin dor
 
 ## Installation
 
-### HACS
+### Schnellstart im Home Assistant Marketplace
 
-Nodarion ist im Standardkatalog von HACS enthalten. Ein benutzerdefiniertes Repository ist nicht erforderlich.
+[**Nodarion im Marketplace öffnen**](https://my.home-assistant.io/redirect/marketplace_repository/?owner=engelsofta&repository=nodarion&category=integration)
 
-<a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=engelsofta&repository=nodarion&category=integration">
-  <img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Nodarion in HACS öffnen">
-</a>
-
-1. HACS öffnen und nach **Nodarion** suchen.
-2. **Engelsoft Nodarion** öffnen und herunterladen.
-3. Home Assistant neu starten.
-4. Unter **Einstellungen → Geräte & Dienste → Integration hinzufügen** nach **Engelsoft Nodarion** suchen.
-5. Das lokale IPv4-Netz als CIDR eintragen, zum Beispiel `192.168.178.0/24`.
-6. Optionale Dienste im Auswahlmenü einrichten und **Speichern & abschließen** wählen.
+1. Ab Home Assistant 2026.11 findest du **Nodarion** unter **Einstellungen → Marketplace**. Öffne den Eintrag und installiere ihn. Falls Home Assistant einen Neustart anfordert, führe ihn durch.
+2. Gehe zu **Einstellungen → Geräte & Dienste → Integration hinzufügen** und wähle **Engelsoft Nodarion**.
+3. Prüfe das vorgeschlagene IPv4-Netz oder trage es selbst ein, zum Beispiel `192.168.178.0/24`. Wähle **Speichern und Scan starten**. FRITZ!Box und AdGuard Home sind optional und lassen sich später hinzufügen.
+4. Öffne **Nodarion** in der Seitenleiste. Der erste Scan läuft automatisch im Hintergrund. Gefundene Geräte erscheinen in der Teilnehmerliste.
+5. Bleibt die Liste leer, prüfe unter **Einstellungen → Allgemein** im Nodarion-Panel das überwachte IPv4-Netz und seine Erreichbarkeit vom Home-Assistant-System aus. Wähle danach **Jetzt scannen**.
 
 ### Manuell
 

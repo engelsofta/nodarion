@@ -123,9 +123,16 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
         return
 
     if not hass.data.get(static_marker):
-        panel_dir = Path(__file__).parent / "frontend"
+        integration_dir = Path(__file__).parent
         await hass.http.async_register_static_paths(
-            [StaticPathConfig(_STATIC_URL, str(panel_dir), False)]
+            [
+                StaticPathConfig(_STATIC_URL, str(integration_dir / "frontend"), False),
+                StaticPathConfig(
+                    f"{_STATIC_URL}_icon.png",
+                    str(integration_dir / "brand" / "icon.png"),
+                    False,
+                ),
+            ]
         )
         hass.data[static_marker] = True
 

@@ -4,14 +4,14 @@
     "step": {
       "services": {
         "title": "Configure Nodarion",
-        "description": "Choose a section. Changes are applied only after Save & finish.",
+        "description": "Your initial network is selected. You can start scanning now. FRITZ!Box, AdGuard Home, and AI are optional.",
         "menu_options": {
           "network": "Networks & scanning",
           "fritz": "FRITZ!Box & Mesh",
           "adguard": "AdGuard Home",
           "ai": "AI analysis",
           "advanced": "Advanced settings",
-          "finish": "Save & finish"
+          "finish": "Save and start scanning"
         }
       },
       "reconfigure": {
@@ -44,7 +44,7 @@
       },
       "network": {
         "title": "Networks & scanning",
-        "description": "Set the initial network, scan interval and exclusions. Additional networks and VLANs are still managed in the Nodarion panel.",
+        "description": "Confirm the suggested network or enter your IPv4 network, for example 192.168.178.0/24. You can manage additional networks in the Nodarion panel.",
         "data": {
           "network": "Initial network (CIDR; additional VLANs are managed in Nodarion)",
           "scan_interval": "Scan interval (seconds)",
