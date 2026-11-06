@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.28.0-beta.3 — 🧹 Clingy filters? Swept away.
+
+- **Device filters:** Clearing a filter with its × or resetting all filters now clears the matching dashboard highlights immediately. Any remaining active filters stay highlighted.
+- **Events:** Column labels and filters now scroll as one sticky header on desktop. Event rows no longer show through the header.
+
+Integration **1.28.0-beta.3** · Frontend **1.29.33**
+
 ## 1.28.0-beta.2 — Network dependency fix
 
 - Declared Home Assistant's `network` component as a dependency for the IPv4 subnet suggestion during initial setup.

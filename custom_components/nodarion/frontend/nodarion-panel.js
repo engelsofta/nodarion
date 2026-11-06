@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.32";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.32";
+import { internetStatusFor } from "./internet-status.mjs?v=1.29.33";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.33";
 
 const esc = (value) =>
   String(value ?? "")
@@ -1510,7 +1510,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .log-clear ha-icon { --mdc-icon-size:15px; }
         .log-list { overflow:auto; max-height:70vh; border:1px solid var(--ns-line); border-radius:13px; }
         .log-table { width:100%; min-width:1020px; border-collapse:collapse; }
-        .log-table th { padding:13px 16px; font-size:11px; }
+        .log-table thead { position:sticky; top:0; z-index:3; background:#292823; }
+        :host([data-theme="light"]) .log-table thead { background:#f5f3ef; }
+        .log-table th { position:relative; padding:13px 16px; font-size:11px; }
         .log-filters th { padding:8px; background:rgba(255,255,255,.018); }
         .log-filters .column-filter { width:100%; min-width:140px; box-sizing:border-box; }
         .log-filters .custom-column-filter { width:100%; min-width:170px; }
@@ -2755,6 +2757,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           .log-table, .log-table tbody,
           .dns-table, .dns-table tbody { display:block; width:100%; min-width:0; }
           .device-list thead, .log-table thead { display:block; width:100%; }
+          .log-table thead { position:static; background:none !important; }
           .device-list thead > tr:first-child,
           .log-table thead > tr:first-child,
           .dns-table thead { display:none; }
@@ -4509,6 +4512,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
   }
 
   _renderCards() {
+    for (const button of this.shadowRoot.querySelectorAll(".metrics [data-quick-filter]")) {
+      const { quickFilter, quickFilterValue } = button.dataset;
+      button.classList.toggle("active", this._columnFilters[quickFilter] === quickFilterValue);
+    }
     const activeFilter = this.shadowRoot.activeElement?.closest?.(
       "[data-column-filter]"
     );
