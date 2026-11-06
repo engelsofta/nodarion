@@ -5,7 +5,8 @@
   "config_flow": true,
   "dependencies": [
     "frontend",
-    "http"
+    "http",
+    "network"
   ],
   "documentation": "https://github.com/engelsofta/nodarion",
   "integration_type": "service",
@@ -16,5 +17,5 @@
     "segno==1.6.6"
   ],
   "single_config_entry": true,
-  "version": "1.28.0-beta.1"
+  "version": "1.28.0-beta.2"
 }

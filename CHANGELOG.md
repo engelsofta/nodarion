@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.28.0-beta.2 — Network dependency fix
+
+- Declared Home Assistant's `network` component as a dependency for the IPv4 subnet suggestion during initial setup.
+
+Integration **1.28.0-beta.2** · Frontend **1.29.32**
+
 ## 1.28.0-beta.1 — Marketplace quick start and a new look
 
 - Added a Home Assistant Marketplace quick start to the English and German READMEs.
