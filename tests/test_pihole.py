@@ -68,6 +68,19 @@ class PiHoleTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.scanner.available)
         self.assertFalse(self.scanner.data_complete)
 
+    async def test_disk_history_fills_old_window_without_replacing_live_ram(self):
+        now = datetime.now(timezone.utc).timestamp()
+        recent = {"time": now - 1, "domain": "example.org", "status": "CACHE", "client": {"ip": "192.0.2.2"}, "id": 8}
+        older = {**recent, "id": 7, "time": now - 4000}
+        self.scanner._async_request = AsyncMock(side_effect=[
+            {"queries": [recent], "recordsFiltered": 1, "earliest_timestamp": now - 1800, "earliest_timestamp_disk": now - 90000},
+            {"queries": [older], "recordsFiltered": 1},
+        ])
+        stats = await self.scanner.async_scan()
+        self.assertEqual(stats["192.0.2.2"].queries, 2)
+        self.assertEqual(self.scanner._async_request.call_args.kwargs["params"]["disk"], "true")
+        self.assertEqual(self.scanner._async_request.call_args.kwargs["params"]["until"], now - 1800)
+
     async def test_max_entries_marks_partial_data(self):
         self.scanner.max_entries = 1
         self.scanner._async_request = AsyncMock(return_value={"queries": [{"time": datetime.now(timezone.utc).timestamp(), "domain": "example.org", "status": "CACHE", "client": {"ip": "192.0.2.2"}}], "recordsFiltered": 2, "cursor": 1})

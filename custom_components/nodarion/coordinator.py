@@ -151,7 +151,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                 "interval_seconds": FRITZ_SCAN_INTERVAL_SECONDS,
             },
             "adguard": {
-                "label": "AdGuard",
+                "label": self.adguard_scanner.provider_name if self.adguard_scanner else "DNS",
                 "configured": self.adguard_scanner is not None,
                 "available": False,
                 "duration_ms": None,

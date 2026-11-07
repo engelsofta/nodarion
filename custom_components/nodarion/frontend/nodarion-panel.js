@@ -188,9 +188,9 @@ const EN = new Map(Object.entries({
   "Gastzugang anzeigen": "Show guest access", "Nur Geräte im Gastzugang anzeigen": "Show guest access devices only",
   "Noch keine Bewertung": "No rating yet", "Einen kleinen Moment": "Just a moment",
   "Freigabe fehlgeschlagen": "Access approval failed", "KI-Analyse fehlgeschlagen": "AI analysis failed",
-  "Keine Offline-Geräte gefunden.": "No offline devices found.", "AdGuard-Änderung fehlgeschlagen.": "AdGuard change failed.",
-  "AdGuard Home ist nicht erreichbar.": "AdGuard Home is unreachable.",
-  "DNS-Anbieter ist in Nodarion nicht aktiviert oder nicht erreichbar": "AdGuard Home is not enabled in Nodarion or is unreachable",
+  "Keine Offline-Geräte gefunden.": "No offline devices found.", "DNS-Änderung fehlgeschlagen.": "DNS change failed.",
+  "DNS-Anbieter ist nicht erreichbar.": "DNS provider is unreachable.",
+  "DNS-Anbieter ist in Nodarion nicht aktiviert oder nicht erreichbar": "DNS provider is not enabled in Nodarion or is unreachable",
   "Bereinigung konnte nicht ausgeführt werden.": "Cleanup could not be performed.",
   "DNS-Live nach": "Filter DNS Live by", "ausgewählt": "selected", "Keine Bewertung": "No rating",
   "Gast zur Ruhezeit": "Guest during quiet hours", "Aktivität zur Ruhezeit": "Activity during quiet hours",
@@ -1092,7 +1092,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._adguardConfig = {
         ...this._adguardConfig,
         loading: false,
-        error: error?.message || "AdGuard-Konfiguration ist nicht erreichbar.",
+        error: error?.message || "DNS-Konfiguration ist nicht erreichbar.",
       };
     }
     this._dnsRenderedSignature = "";
@@ -1126,7 +1126,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         this._renderSettings();
       }
     } catch (error) {
-      await this._confirm({ title:"Änderung fehlgeschlagen", message:error?.message || "AdGuard-Änderung fehlgeschlagen.", confirmLabel:"Schließen", danger:true, showCancel:false });
+      await this._confirm({ title:"Änderung fehlgeschlagen", message:error?.message || "DNS-Änderung fehlgeschlagen.", confirmLabel:"Schließen", danger:true, showCancel:false });
     }
   }
 
@@ -1159,7 +1159,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         needsRender = true;
       }
     } catch (error) {
-      const message = error?.message || "AdGuard Home ist nicht erreichbar.";
+      const message = error?.message || "DNS-Anbieter ist nicht erreichbar.";
       needsRender = this._dnsLive.error !== message;
       this._dnsLive.error = message;
     } finally {
@@ -5728,7 +5728,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
             </section>
             </div>
             <div class="settings-tab-panel dns-settings-panel" role="tabpanel" data-settings-panel="dns" ${this._settingsTab === "dns" ? "" : "hidden"}>
-              <section class="rule-group adguard-control-settings"><h3>Schutzfunktionen<button class="settings-help-button" type="button" data-settings-help="adguard" title="Schutzfunktionen erklären" aria-label="Hilfe zu den AdGuard-Schutzfunktionen">?</button></h3><div class="adguard-feature-list">${adguardSwitches}</div><div class="query-log-warning"><ha-icon icon="mdi:alert-outline"></ha-icon>${this._dnsProvider().id === "pihole" ? "Protokollierung und Datenschutzstufe werden in Pi-hole eingestellt." : "Das Ausschalten des Query-Logs unterbricht DNS-Live und reduziert die Auswertung."}</div></section>${piHoleRules}
+              <section class="rule-group adguard-control-settings"><h3>Schutzfunktionen<button class="settings-help-button" type="button" data-settings-help="adguard" title="Schutzfunktionen erklären" aria-label="Hilfe zu den DNS-Schutzfunktionen">?</button></h3><div class="adguard-feature-list">${adguardSwitches}</div><div class="query-log-warning"><ha-icon icon="mdi:alert-outline"></ha-icon>${this._dnsProvider().id === "pihole" ? "Protokollierung und Datenschutzstufe werden in Pi-hole eingestellt." : "Das Ausschalten des Query-Logs unterbricht DNS-Live und reduziert die Auswertung."}</div></section>${piHoleRules}
             </div>
             <div class="settings-tab-panel ai-maintenance-panel" role="tabpanel" data-settings-panel="ai-maintenance" ${this._settingsTab === "ai-maintenance" ? "" : "hidden"}>
             <section class="rule-group ai-config-settings">
