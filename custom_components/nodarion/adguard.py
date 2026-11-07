@@ -64,6 +64,11 @@ class ClientDnsStats:
 class AdGuardScanner:
     """Fetch the bounded AdGuard query log and aggregate it by client."""
 
+    provider = "adguard"
+    provider_name = "AdGuard Home"
+    supported_features = frozenset({"protection", "filtering", "safe_browsing", "parental", "safe_search", "query_log"})
+    capabilities = frozenset({"domain_policy", "domain_rules", "client_policy", "filters", "rewrites"})
+
     def __init__(
         self,
         hass: HomeAssistant,
