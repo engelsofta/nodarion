@@ -1,5 +1,7 @@
 name: Pi-hole 6 disposable API test
 on:
+  push:
+    branches: [codex/pihole6-api-test]
   workflow_dispatch:
 permissions:
   contents: read
