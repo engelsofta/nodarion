@@ -159,33 +159,66 @@ class PiHoleScanner(AdGuardScanner):
             end = datetime.now(timezone.utc)
             cutoff = end - timedelta(hours=self.period_hours)
             entries = []
-            cursor = None
+            seen = set()
             complete = False
             try:
                 async with asyncio.timeout(120):
-                    while len(entries) < self.max_entries:
-                        params = {
-                            "from": cutoff.timestamp(),
-                            "until": end.timestamp(),
-                            "length": min(1000, self.max_entries - len(entries)),
-                            "disk": "true",
-                        }
-                        if cursor is not None:
-                            params["cursor"] = cursor
-                        data = await self._async_request(
-                            "GET", "queries", params=params
-                        )
-                        page = data.get("queries", [])
-                        entries.extend(self._normalize(item) for item in page)
-                        next_cursor = data.get("cursor")
-                        if not page or len(entries) >= int(
-                            data.get("recordsFiltered", len(entries) + 1)
-                        ):
-                            complete = True
+                    # Disk may lag behind RAM by a minute. Always collect RAM
+                    # first, then fill the older part of the window from disk.
+                    until = end.timestamp()
+                    disk_needed = False
+                    for disk in (False, True):
+                        if disk and not disk_needed:
                             break
-                        if next_cursor is None or next_cursor == cursor:
+                        cursor = None
+                        fetched = 0
+                        complete = False
+                        while len(entries) < self.max_entries:
+                            params = {
+                                "from": cutoff.timestamp(),
+                                "until": until,
+                                "length": min(1000, self.max_entries - len(entries)),
+                                "disk": "true" if disk else "false",
+                            }
+                            if cursor is not None:
+                                params["cursor"] = cursor
+                            data = await self._async_request(
+                                "GET", "queries", params=params
+                            )
+                            if not disk and cursor is None:
+                                earliest = float(data.get("earliest_timestamp") or 0)
+                                disk_earliest = float(
+                                    data.get("earliest_timestamp_disk") or 0
+                                )
+                                disk_needed = disk_earliest > 0 and (
+                                    not earliest or earliest > cutoff.timestamp()
+                                )
+                                if earliest:
+                                    until = min(until, earliest)
+                            page = data.get("queries", [])
+                            fetched += len(page)
+                            for raw in page:
+                                key = (
+                                    raw.get("time"),
+                                    str(raw.get("client")),
+                                    raw.get("domain"),
+                                    raw.get("type"),
+                                    raw.get("id"),
+                                )
+                                if key not in seen:
+                                    seen.add(key)
+                                    entries.append(self._normalize(raw))
+                            next_cursor = data.get("cursor")
+                            if not page or fetched >= int(
+                                data.get("recordsFiltered", fetched + 1)
+                            ):
+                                complete = True
+                                break
+                            if next_cursor is None or next_cursor == cursor:
+                                break
+                            cursor = next_cursor
+                        if not complete:
                             break
-                        cursor = next_cursor
                 self.available = True
                 self.last_error = None
                 self._cached_entries = sorted(
