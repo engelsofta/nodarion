@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title description">
+  <title id="title">Pi-hole joins the party. Ads weren't invited.</title>
+  <desc id="description">New in Nodarion 1.29: Pi-hole 6 support with per-device DNS insights, live queries and native protection controls.</desc>
+  <defs>
+    <linearGradient id="surface" x2="1" y2="1"><stop stop-color="#302d28"/><stop offset=".55" stop-color="#171715"/><stop offset="1" stop-color="#362b1e"/></linearGradient>
+    <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#edcf94"/><stop offset="1" stop-color="#ad874a"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#cfac69" stop-opacity=".16"/><stop offset="1" stop-color="#cfac69" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x="1" y="1" width="1198" height="298" rx="28" fill="url(#surface)" stroke="#8e7954" stroke-opacity=".6"/>
+  <ellipse cx="1060" cy="150" rx="200" ry="148" fill="url(#glow)"/>
+  <g fill="none" stroke="#d9bb7c">
+    <circle cx="140" cy="150" r="91" stroke-opacity=".1"/>
+    <circle cx="140" cy="150" r="75" stroke-opacity=".45" fill="#d2b77c" fill-opacity=".055"/>
+    <path d="M217 110h22V61h714v49h28" stroke-opacity=".22" stroke-dasharray="3 7"/>
+    <circle cx="239" cy="61" r="4" fill="#d9bb7c" stroke="none"/>
+    <circle cx="953" cy="61" r="4" fill="#d9bb7c" stroke="none"/>
+  </g>
+  <text x="140" y="179" text-anchor="middle" font-family="Georgia,serif" font-size="98" fill="url(#gold)">π</text>
+  <g font-family="Arial,Helvetica,sans-serif">
+    <text x="270" y="91" fill="#d4b97e" font-size="14" font-weight="700" letter-spacing="3">NEW IN NODARION 1.29</text>
+    <text x="268" y="148" fill="#f1eee7" font-size="44" font-weight="700">Pi-hole joins the party.</text>
+    <text x="270" y="192" fill="#d9c18e" font-size="32">Ads weren't invited.</text>
+    <text x="270" y="246" fill="#bdb7ad" font-size="17">Per-device DNS insights · Live queries · Native controls</text>
+  </g>
+  <path d="M1051 89l57 23v44c0 36-22 56-57 72-35-16-57-36-57-72v-44z" fill="#d5b77a" fill-opacity=".07" stroke="url(#gold)" stroke-width="2"/>
+  <path d="M1028 155l17 17 31-37" fill="none" stroke="#dbbf85" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

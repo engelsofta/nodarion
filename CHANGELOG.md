@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.29.0 — Pi-hole joins the party. Ads weren't invited. 🕳️🛡️
+
+Pi-hole 6 joins AdGuard Home as a supported DNS provider. Pick your DNS bouncer; Nodarion brings the guest list, device insights and controls together in Home Assistant.
+
+### Added
+
+- **Pi-hole 6 setup:** select your DNS provider in setup, options or reconfiguration. Existing AdGuard setups continue to work without migration.
+- **Per-device DNS insights:** query counts, blocked queries, block rates, top domains and the existing privacy-aware AI snapshots.
+- **DNS Live:** current queries, client filtering and activity charts in the existing Nodarion interface.
+- **Native protection control:** switch Pi-hole DNS blocking on or off directly from Home Assistant.
+- **Exact-domain policies:** allow, block and remove domain rules for all currently configured Pi-hole groups, with confirmation before changes.
+
+### Improved
+
+- Pi-hole API sessions support application passwords, session reuse, automatic renewal and cleanup on unload.
+- Query scans combine current RAM records with older database history, with bounded pagination and partial-data flags.
+- DNS settings show only the selected provider's supported controls. AdGuard keeps its six existing switches; Pi-hole exposes its own protection switch.
+- Clearer DNS connection labels, direct-save hints and a compact mobile settings header.
+- New Pi-hole feature banner and setup guidance in both English and German READMEs.
+
+### Setup and compatibility
+Choose **Pi-hole 6** under **Nodarion → Configure → DNS provider**. Enter the host, actual web/API port and an application password; leave the username empty. Pi-hole must identify individual clients for per-device statistics.
+
+One DNS provider is active at a time. Pi-hole 5 is not supported. Client-specific rules, regex rules, lists, rewrites, logging and privacy remain managed in Pi-hole. Nodarion's exact-domain block action removes an existing exact allow rule for that domain; other Pi-hole policies can still influence the DNS response.
+
+### Validation
+The underlying implementation passed **123 Python tests**, **10 frontend tests**, desktop/mobile browser checks, HACS and Hassfest. API behavior was exercised against an isolated official **Pi-hole 2026.10.1** container using synthetic DNS queries, including application-password login, session recovery, protection controls and domain CRUD. This does not establish behavior on every Home Assistant or Pi-hole installation.
+
+Integration **1.29.0** · Frontend **1.30.0**
+
+
 ## 1.29.0-beta.1 — Two DNS bouncers. One guest list. 🕳️🛡️
 
 Pi-hole 6 joins AdGuard Home as an optional DNS provider. Same Nodarion dashboard, a second DNS bouncer at the door.

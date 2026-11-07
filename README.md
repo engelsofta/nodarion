@@ -23,8 +23,26 @@
   Enjoy Nodarion? A coffee helps support development and improvements. ☕
 </p>
 
+![Pi-hole 6 is here: Pi-hole joins the party. Ads weren't invited.](https://raw.githubusercontent.com/engelsofta/nodarion/v1.29.0/docs/images/pihole-support.png)
+
+## 🕳️ Pi-hole 6 is here. Same dashboard. More choice.
+
+**Your DNS blocker now has a seat at the Nodarion table.** Choose **Pi-hole 6 or AdGuard Home** and see DNS activity alongside your network devices, FRITZ!Box and Mesh data — right inside Home Assistant.
+
+| See what is happening | Take control |
+| --- | --- |
+| DNS requests, blocked queries and block rates per device | Native Pi-hole protection switch |
+| Live query log with client filtering and activity charts | Allow or block exact domains across your configured Pi-hole groups |
+| Top domains and the existing privacy-aware AI analysis | Application-password login with automatic session recovery |
+
+**Already using AdGuard?** Keep your setup. Pi-hole is an additional choice, with provider-specific controls and no required migration. One DNS provider is active at a time.
+
+**Get started:** [Pi-hole setup and compatibility](#pi-hole-6) · [What's new in 1.29.0](https://github.com/engelsofta/nodarion/releases/tag/v1.29.0)
+
+---
+
 > **Multiple networks, one complete picture:** Nodarion combines active ping/TCP scans,
-> FRITZ!Box and Mesh data, and DNS activity from AdGuard Home for each device.
+> FRITZ!Box and Mesh data, and DNS activity from Pi-hole 6 or AdGuard Home for each device.
 > Instead of three separate data sources, you get one clear view of devices,
 > connections, and anomalies — including local rules and optional AI analysis.
 
@@ -51,6 +69,9 @@ more relaxed place. Praise is a valid bug report too — it is simply much nicer
 to fix. 😉
 
 ## What is new in the current build
+
+> [!TIP]
+> **New in 1.29.0: Pi-hole 6 support.** DNS Live, per-device statistics, native protection controls and exact-domain policies — alongside continued AdGuard Home support.
 
 > [!IMPORTANT]
 > **VLAN support is here:** configure and monitor multiple network segments,
@@ -271,7 +292,7 @@ credentials, follows no redirects, and reads no response body. Local self-signed
 TLS certificates are accepted for detection; browsers validate them when opening
 the link. The browser needs access to the device network, locally or through VPN.
 
-### Pi-hole 6 (beta)
+### Pi-hole 6
 
 In **Settings → Devices & services → Nodarion → Configure → DNS provider**, choose **Pi-hole 6** and enable the DNS provider. Enter the host/IP (without a URL path), the actual web/API port (usually **80**, or **443** with HTTPS), and an **application password** from Pi-hole's Web interface/API settings. Leave the username empty. If switching from AdGuard, change its former port as well. TLS verification is enabled by default.
 
