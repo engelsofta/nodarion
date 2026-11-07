@@ -41,6 +41,6 @@ class AdGuardStatusCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if err.status in {401, 403} and not self._reauth_started:
                 self._reauth_started = True
                 self.entry.async_start_reauth(self.hass)
-            raise UpdateFailed(f"AdGuard Home status unavailable: {err}") from err
+            raise UpdateFailed(f"DNS provider status unavailable: {err}") from err
         except Exception as err:
-            raise UpdateFailed(f"AdGuard Home status unavailable: {err}") from err
+            raise UpdateFailed(f"DNS provider status unavailable: {err}") from err

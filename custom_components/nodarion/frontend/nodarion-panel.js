@@ -1,5 +1,5 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.29.33";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.29.33";
+import { internetStatusFor } from "./internet-status.mjs?v=1.30.0";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.0";
 
 const esc = (value) =>
   String(value ?? "")
@@ -40,6 +40,23 @@ const deviceWebControl = (entity) => {
 // intentionally falls back to English.
 let panelLocale = "en";
 const EN = new Map(Object.entries({
+  "DNS-Einstellungen": "DNS settings",
+  "Pi-hole DNS-Schutz": "Pi-hole DNS protection",
+  "DNS-Blockierung ein- oder ausschalten": "Enable or disable DNS blocking",
+  "Pi-hole · Domains": "Pi-hole \u00b7 Domains",
+  "Domain-Regeln werden geladen …": "Loading domain rules \u2026",
+  "Protokollierung und Datenschutzstufe werden in Pi-hole eingestellt.": "Logging and privacy level are configured in Pi-hole.",
+  "Exakte Domains für alle derzeit konfigurierten Pi-hole-Gruppen freigeben oder sperren. Regex-Regeln und Gruppenzuordnungen bleiben in Pi-hole verwaltbar.": "Allow or block exact domains for all currently configured Pi-hole groups. Manage regex rules and group assignments in Pi-hole.",
+  "Die Anfragen müssen in Pi-hole einzelnen Clients zugeordnet sein. Datenschutz oder deaktivierte Protokollierung können Details ausblenden. Nicht verfügbare AdGuard-Funktionen werden hier nicht angeboten.": "Pi-hole must identify individual clients. Privacy settings or disabled query logging may hide details. Unsupported AdGuard features are not offered here.",
+  "Domain-Regel entfernen": "Remove domain rule",
+  "Diese Pi-hole-Domain-Regel wirklich entfernen?": "Remove this Pi-hole domain rule?",
+  "Domain-Regel für alle derzeit konfigurierten Pi-hole-Gruppen speichern? Beim Sperren wird eine vorhandene exakte Freigabe dieser Domain entfernt.": "Save the domain rule for all currently configured Pi-hole groups? Blocking removes any existing exact allow rule for this domain.",
+  "für alle derzeit konfigurierten Pi-hole-Gruppen freigegeben werden?": "be allowed for all currently configured Pi-hole groups?",
+  "DNS-Anbieter ist in Nodarion nicht aktiviert oder nicht erreichbar": "DNS provider is not enabled in Nodarion or is unreachable",
+  "DNS-Log nicht verfügbar:": "DNS log unavailable:",
+  "Der Schalter aktiviert oder deaktiviert die DNS-Blockierung von Pi-hole. Protokollierung, Datenschutzstufe und Gruppen verwaltest du in Pi-hole.": "The switch enables or disables Pi-hole DNS blocking. Configure logging, privacy and groups in Pi-hole.",
+  "Domain-Regeln in Nodarion gelten für alle derzeit konfigurierten Pi-hole-Gruppen. Clientbezogene Freigaben, Regex-Regeln und weitere Pi-hole-Einstellungen bleiben in der Pi-hole-Oberfläche.": "Nodarion domain rules apply to all currently configured Pi-hole groups. Manage client-specific rules, regex rules and other Pi-hole settings in the Pi-hole interface.",
+
   "Internetzugang sperren": "Block internet access",
   "Sperre fehlgeschlagen": "Blocking failed",
   "Internetzugang konnte nicht gesperrt werden.": "Internet access could not be blocked.",
@@ -171,7 +188,7 @@ const EN = new Map(Object.entries({
   "Freigabe fehlgeschlagen": "Access approval failed", "KI-Analyse fehlgeschlagen": "AI analysis failed",
   "Keine Offline-Geräte gefunden.": "No offline devices found.", "AdGuard-Änderung fehlgeschlagen.": "AdGuard change failed.",
   "AdGuard Home ist nicht erreichbar.": "AdGuard Home is unreachable.",
-  "AdGuard Home ist in Nodarion nicht aktiviert oder nicht erreichbar": "AdGuard Home is not enabled in Nodarion or is unreachable",
+  "DNS-Anbieter ist in Nodarion nicht aktiviert oder nicht erreichbar": "AdGuard Home is not enabled in Nodarion or is unreachable",
   "Bereinigung konnte nicht ausgeführt werden.": "Cleanup could not be performed.",
   "DNS-Live nach": "Filter DNS Live by", "ausgewählt": "selected", "Keine Bewertung": "No rating",
   "Gast zur Ruhezeit": "Guest during quiet hours", "Aktivität zur Ruhezeit": "Activity during quiet hours",
@@ -238,7 +255,7 @@ const EN = new Map(Object.entries({
   "Benachrichtigungen erklären": "Explain notifications", "Hilfe zu Benachrichtigungen": "Notifications help",
   "KI-Analyse erklären": "Explain AI analysis", "Hilfe zur KI-Analyse": "AI analysis help",
   "Hilfe schließen": "Close help", "Hilfe": "Help", "Bereinigung": "Cleanup", "Löschen": "Delete",
-  "Kein AdGuard-DNS": "No AdGuard DNS", "Nicht verwaltet": "Not managed",
+  "Kein AdGuard-DNS": "No DNS", "Nicht verwaltet": "Not managed",
   "Vertrauenswürdig": "Trusted", "Noch nicht geprüft": "Not checked yet",
   "VPN · Nicht verwaltet": "VPN · Not managed",
   "Netzwerkinfrastruktur": "Network infrastructure",
@@ -1049,6 +1066,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
     if (this._hass?.user?.is_admin) this._loadAdguardConfig();
   }
 
+  _dnsProvider() {
+    return this._monitor?.dns_provider || { id:"adguard", name:"AdGuard Home", capabilities:["client_policy"] };
+  }
+
   async _loadAdguardConfig() {
     if (!this._hass?.user?.is_admin || this._adguardConfig.loading) return;
     this._adguardConfig.loading = true;
@@ -1057,6 +1078,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         "GET", "nodarion/monitor?view=adguard_config"
       );
       this._adguardConfig = {
+        provider: result.provider,
+        capabilities: result.capabilities || [],
         filters: result.filters || [],
         rules: result.rules || [],
         rewrites: result.rewrites || [],
@@ -1086,6 +1109,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         "POST", "nodarion/monitor", payload
       );
       this._adguardConfig = {
+        provider: result.provider,
+        capabilities: result.capabilities || [],
         filters: result.filters || [],
         rules: result.rules || [],
         rewrites: result.rewrites || [],
@@ -1509,6 +1534,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .log-clear { display:grid; place-items:center; width:23px; height:23px; padding:0; border:0; border-radius:50%; color:#dff8ef; background:rgba(255,255,255,.09); cursor:pointer; }
         .log-clear ha-icon { --mdc-icon-size:15px; }
         .log-list { overflow:auto; max-height:70vh; border:1px solid var(--ns-line); border-radius:13px; }
+        .pihole-domain-form{display:flex;flex-wrap:wrap;align-items:end;gap:10px}.pihole-domain-form label{display:grid;gap:6px;flex:1 1 130px}.pihole-domain-form input,.pihole-domain-form select{min-width:0;width:100%;min-height:42px;border:1px solid var(--ns-line);border-radius:10px;background:var(--ns-surface);color:var(--ns-text);padding:8px;font:inherit}.pihole-domain-settings p{font-size:12px;line-height:1.6;color:var(--ns-muted)}.pihole-domain-list{max-height:260px;overflow:auto;margin-top:10px}.pihole-domain-list>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--ns-line)}.pihole-domain-list span{overflow-wrap:anywhere}
         .log-table { width:100%; min-width:1020px; border-collapse:collapse; }
         .log-table thead { position:sticky; top:0; z-index:3; background:#292823; }
         :host([data-theme="light"]) .log-table thead { background:#f5f3ef; }
@@ -3642,7 +3668,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           };
           this._dnsRenderedSignature = "";
           this._renderDnsLive();
-          this.shadowRoot.querySelector('[data-dns-policy-scope="client"]')?.focus();
+          this.shadowRoot.querySelector(this._dnsProvider().id === 'pihole' ? '[data-dns-policy-scope="all"]' : '[data-dns-policy-scope="client"]')?.focus();
           return;
         }
         this._adguardAction(
@@ -3710,6 +3736,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this.shadowRoot.querySelector(".device-list").addEventListener("scroll", () => {
       this.shadowRoot.querySelectorAll(".device-gui-menu:popover-open").forEach(menu => menu.hidePopover());
     }, { passive:true });
+    this.shadowRoot.addEventListener("submit", event => {
+      if (!event.target.matches(".pihole-domain-form")) return;
+      event.preventDefault();
+      const form = new FormData(event.target);
+      this._adguardAction({ action:"adguard_set_domain_policy", domain:String(form.get("domain") || "").trim(), policy:form.get("policy") }, "Domain-Regel für alle derzeit konfigurierten Pi-hole-Gruppen speichern? Beim Sperren wird eine vorhandene exakte Freigabe dieser Domain entfernt.");
+    });
     this.shadowRoot.addEventListener("click", (event) => {
       const guiButton = event.target.closest(".device-gui-button");
       if (guiButton) {
@@ -3829,6 +3861,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
         this._navigateTo(this._settingsReturnTab || "participants");
         return;
       }
+      const removePiHoleRule = event.target.closest("[data-pihole-remove]");
+      if (removePiHoleRule) {
+        this._adguardAction({ action:"adguard_delete_rule", rule:removePiHoleRule.dataset.piholeRemove }, "Diese Pi-hole-Domain-Regel wirklich entfernen?");
+        return;
+      }
       const adguardSwitch = event.target.closest("[data-adguard-switch]");
       if (adguardSwitch) {
         this._toggleAdguardSwitch(adguardSwitch);
@@ -3855,7 +3892,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           checks:["Weitere Prüfungen", "Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln eine Warnung wegen instabiler Verbindung entsteht.", "Die Identitätsprüfung meldet, wenn an derselben IP-Adresse eine andere MAC-Adresse erscheint. Ein Wechsel wird erst nach wiederholter Bestätigung übernommen, damit einzelne fehlerhafte Scans keinen Alarm auslösen."],
           notifications:["Benachrichtigungen", "Die HA-Glocke zeigt neue Auffälligkeiten als dauerhafte Meldung direkt in Home Assistant. Warnungen und kritische Meldungen können unabhängig voneinander an die ausgewählten Ziele gesendet werden.", "Unabhängig von diesen Schaltern erzeugt jede neue Warnung das Home-Assistant-Ereignis nodarion_alert. Damit lassen sich eigene Automationen und weitere Eskalationswege bauen."],
           targets:["Benachrichtigungsziele", "Hier legst du fest, welche in Home Assistant eingerichteten Notify-Dienste Nodarion verwenden darf, beispielsweise die Companion App oder einen Telegram Bot.", "Alle und Keine ändern nur die aktuelle Auswahl. Wirksam wird sie zusammen mit den übrigen Änderungen erst nach dem Speichern. Ohne ausgewähltes Ziel bleiben HA-Glocke und nodarion_alert weiterhin verfügbar."],
-          adguard:["Schutzfunktionen", "Gesamtschutz ist der Hauptschalter von AdGuard Home. DNS-Filterung wendet Blocklisten und eigene Regeln an; Safe Browsing blockiert bekannte Phishing- und Malware-Ziele; Jugendschutz sperrt nicht jugendfreie Inhalte; Safe Search erzwingt den sicheren Modus unterstützter Suchmaschinen.", "Das Query-Log wird für DNS-Live, Gerätezuordnung und KI-Auswertungen benötigt. Wird es ausgeschaltet, arbeitet der DNS-Schutz weiter, Nodarion erhält jedoch keine aktuellen DNS-Anfragen mehr."],
+          adguard:[...(this._dnsProvider().id === "pihole" ? ["Pi-hole DNS-Schutz", "Der Schalter aktiviert oder deaktiviert die DNS-Blockierung von Pi-hole. Protokollierung, Datenschutzstufe und Gruppen verwaltest du in Pi-hole.", "Domain-Regeln in Nodarion gelten für alle derzeit konfigurierten Pi-hole-Gruppen. Clientbezogene Freigaben, Regex-Regeln und weitere Pi-hole-Einstellungen bleiben in der Pi-hole-Oberfläche."] : ["Schutzfunktionen", "Gesamtschutz ist der Hauptschalter von AdGuard Home. DNS-Filterung wendet Blocklisten und eigene Regeln an; Safe Browsing blockiert bekannte Phishing- und Malware-Ziele; Jugendschutz sperrt nicht jugendfreie Inhalte; Safe Search erzwingt den sicheren Modus unterstützter Suchmaschinen.", "Das Query-Log wird für DNS-Live, Gerätezuordnung und KI-Auswertungen benötigt. Wird es ausgeschaltet, arbeitet der DNS-Schutz weiter, Nodarion erhält jedoch keine aktuellen DNS-Anfragen mehr."])],
           ai:["KI-Analyse", "Die tägliche Auswertung fasst Netzwerkzustand, Änderungen und Auffälligkeiten nach dem gewählten Zeitpunkt zusammen. Eine manuelle Analyse bleibt im KI-Reiter jederzeit möglich.", "Mit anonymisiertem DNS-Datenschutz werden keine lesbaren Domainnamen an die KI übergeben. Domainnamen mitsenden ermöglicht detailliertere Bewertungen, gibt aber entsprechend mehr Informationen weiter."],
           cleanup:["Bereinigung", "Anzeige bereinigen entfernt alte Offline-Einträge, behält aber gespeicherte Gerätefreigaben. Vollständig vergessen entfernt zusätzlich Überwachungs- und Anwesenheitsmarkierungen.", "Vor beiden Aktionen zeigt Nodarion die Anzahl betroffener und geschützter Teilnehmer an und fragt nochmals nach."],
         }[helpButton.dataset.settingsHelp];
@@ -4127,9 +4164,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }
     const eventCount = (this._monitor.events || []).length;
     const adguardConnection = connections.adguard || {};
+    const protection = this._hass.states[this._dnsProvider().id === "pihole" ? "switch.nodarion_pihole_gesamtschutz" : "switch.nodarion_adguard_gesamtschutz"]?.state;
     const dnsStatus = !adguardConnection.configured
       ? "Nicht eingerichtet"
-      : adguardConnection.available ? "Schutz aktiv" : "Nicht erreichbar";
+      : adguardConnection.available ? protection === "on" ? "Schutz aktiv" : protection === "off" ? "Schutz aus" : "Verbunden" : "Nicht erreichbar";
     const dnsRatioEntity = this._hass.states["sensor.nodarion_dns_blockquote"];
     const dnsRatio = dnsRatioEntity && !["unknown", "unavailable"].includes(dnsRatioEntity.state)
       ? `${Number(dnsRatioEntity.state).toLocaleString(activeLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} % blockiert`
@@ -4761,7 +4799,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         `DNS-Protokoll: ${attr.dns_last_protocol || "Nicht verfügbar"}`,
         `Häufig abgefragt: ${topDomains(attr.dns_top_queried_domains) || "Nicht verfügbar"}`,
         `Häufig blockiert: ${topDomains(attr.dns_top_blocked_domains) || "Nicht verfügbar"}`,
-      ].join("\n") : "AdGuard Home ist in Nodarion nicht aktiviert oder nicht erreichbar";
+      ].join("\n") : "DNS-Anbieter ist in Nodarion nicht aktiviert oder nicht erreichbar";
       const dnsPrimary = attr.adguard_bypass_suspected
         ? "Kein AdGuard-DNS"
         : hasAdGuard ? `${attr.dns_queries || 0} Anfragen` : "–";
@@ -4794,7 +4832,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <td data-column="mesh" data-label="Mesh-Punkt"><div class="detail-stack"><strong>${esc(accessPoint)}</strong></div></td>
         <td data-column="rate" data-label="WLAN"><div class="detail-stack"><strong>${esc(rates || "Nicht verfügbar")}</strong>${signal ? `<span class="rating ${signalAssessment?.level || "okay"}" title="WLAN-Empfang: ${esc(signalAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(signal)} · ${esc(signalAssessment?.label || "")}</span></span>` : ""}</div></td>
         <td data-column="address" data-label="Adressvergabe"><div class="detail-stack"><strong>${esc(addressSource || "Nicht verfügbar")}</strong>${addressSource === "DHCP" && lease ? `<small>Noch ${esc(lease)}</small>` : ""}</div></td>
-        <td data-column="dns" data-label="AdGuard DNS" title="${esc(dnsTitle)}"><button class="dns-live-link" type="button" data-ip="${esc(attr.ip_address)}" data-name="${esc(name)}" title="DNS-Live-Log für ${esc(name)} öffnen"><span class="detail-stack"><strong class="${attr.adguard_bypass_suspected ? "dns-alert" : ""}">${esc(dnsPrimary)}</strong>${dnsSecondary ? `<span class="rating ${dnsAssessment?.level || "okay"}" title="Anteil blockierter DNS-Anfragen: ${esc(dnsAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(dnsSecondary)} · ${esc(dnsAssessment?.label || "")}</span></span>` : ""}</span></button></td>
+        <td data-column="dns" data-label="DNS" title="${esc(dnsTitle)}"><button class="dns-live-link" type="button" data-ip="${esc(attr.ip_address)}" data-name="${esc(name)}" title="DNS-Live-Log für ${esc(name)} öffnen"><span class="detail-stack"><strong class="${attr.adguard_bypass_suspected ? "dns-alert" : ""}">${esc(dnsPrimary)}</strong>${dnsSecondary ? `<span class="rating ${dnsAssessment?.level || "okay"}" title="Anteil blockierter DNS-Anfragen: ${esc(dnsAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(dnsSecondary)} · ${esc(dnsAssessment?.label || "")}</span></span>` : ""}</span></button></td>
         <td data-column="source" data-label="Erkannt durch">${esc(sources)}</td>
         <td data-column="internet" data-label="Internetzugang"><div class="internet-state"><span class="internet-label ${esc(internetClass)}">${esc(internetLabel)}</span>${internetHint ? `<small class="internet-hint">${esc(internetHint)}</small>` : ""}${(approvalRequired && attr.internet_control_available) ? `<button class="approve-internet" data-key="${esc(key)}" data-name="${esc(name)}" data-entity-id="${esc(entity.entity_id)}">Freigeben</button>` : attr.internet_control_available ? `<button class="block-internet" data-key="${esc(key)}" data-name="${esc(name)}" title="Internetzugang sperren"><ha-icon icon="mdi:lock-outline"></ha-icon>Sperren</button>` : ""}</div></td>
         <td data-column="watch" data-label="Überwachung">
@@ -4811,7 +4849,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ["vlan", "VLAN"],
       ["name", "Teilnehmer"], ["ip", "IP-Adresse"],
       ["mac", "MAC-Adresse"], ["connection", "Verbindung"], ["mesh", "Mesh-Zugangspunkt"],
-      ["rate", "WLAN-Daten"], ["address", "Adressvergabe"], ["dns", "AdGuard DNS"],
+      ["rate", "WLAN-Daten"], ["address", "Adressvergabe"], ["dns", "DNS"],
       ["source", "Erkannt durch"], ["internet", "Internetzugang"], ["watch", "Überwachung"],
     ];
     const heading = (label, key) => {
@@ -4918,7 +4956,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       .map(([name, count]) => `<button type="button" class="custom-filter-option ${this._columnFilters.mesh === name ? "active" : ""}" data-column-filter-key="mesh" data-column-filter-value="${esc(name)}"><ha-icon icon="${this._columnFilters.mesh === name ? "mdi:check" : "mdi:access-point"}"></ha-icon><span>${esc(name)}</span><span class="custom-filter-count">${count}</span></button>`)
       .join("");
     const selectedMesh = this._columnFilters.mesh || "Alle Mesh-Punkte";
-    const filterNames = { search:"Suche", state:"Status", onboarding:"IP-Bereich", vlan:"VLAN", name:"Teilnehmer", ip:"IP-Adresse", mac:"MAC-Adresse", connection:"Verbindung", mesh:"Mesh", rate:"WLAN", address:"Adressvergabe", dns:"AdGuard DNS", source:"Erkannt durch", internet:"Internetzugang", watch:"Überwachung" };
+    const filterNames = { search:"Suche", state:"Status", onboarding:"IP-Bereich", vlan:"VLAN", name:"Teilnehmer", ip:"IP-Adresse", mac:"MAC-Adresse", connection:"Verbindung", mesh:"Mesh", rate:"WLAN", address:"Adressvergabe", dns:"DNS", source:"Erkannt durch", internet:"Internetzugang", watch:"Überwachung" };
     const filterValueNames = { on:"Online", off:"Offline", guest:"Gastzugang", onboarding:"Einrichtungsbereich", assigned:"Regulärer Bereich", unknown:"Einrichtung deaktiviert", monitored:"Überwacht", notify:"Offline-Meldung", presence:"Anwesenheit", none:"Keine Funktion", denied:"Gesperrt", pending:"Freigabe ausstehend", error:"Freigabe fehlgeschlagen", unchecked:"Noch nicht geprüft", unmanaged:"Nicht verwaltet", infrastructure:"Netzwerkinfrastruktur", learning:"Lernphase", trusted:"Vertrauenswürdig", allowed:"Freigegeben", ...sourceLabels, ...Object.fromEntries([...segmentCounts.values()].map((segment) => [segment.id, segment.vlanId ? `${segment.name} · VLAN ${segment.vlanId}` : segment.name])) };
     const activeFilters = Object.entries(this._columnFilters).filter(([, value]) => value);
     const filterChips = activeFilters.length ? `<div class="filter-chips" role="status" aria-label="Aktive Filter">${activeFilters.map(([key, value]) => `<button class="filter-chip" type="button" data-clear-column-filter="${esc(key)}" aria-label="Filter ${esc(filterNames[key] || key)} entfernen"><span>${esc(filterNames[key] || key)}: ${esc(filterValueNames[value] || value)}</span><ha-icon icon="mdi:close"></ha-icon></button>`).join("")}<button class="filter-reset" type="button" data-clear-all-filters>Alle Filter zurücksetzen</button></div>` : "";
@@ -4934,7 +4972,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       </div></div>`;
     grid.innerHTML = `${mobileControls}${filterChips}<table aria-label="Netzwerkgeräte">
       <thead>
-        <tr>${heading("Status", "state")}${heading("IP-Bereich", "onboarding")}${heading("VLAN", "vlan")}${heading("Teilnehmer", "name")}${heading("IP-Adresse", "ip")}${heading("MAC-Adresse", "mac")}${heading("Verbindung", "connection")}${heading("Mesh-Zugangspunkt", "mesh")}${heading("WLAN-Daten", "rate")}${heading("Adressvergabe", "address")}${heading("AdGuard DNS", "dns")}${heading("Erkannt durch", "source")}<th data-column="internet" class="no-sort">Internetzugang</th><th data-column="watch" class="no-sort">Überwachung</th></tr>
+        <tr>${heading("Status", "state")}${heading("IP-Bereich", "onboarding")}${heading("VLAN", "vlan")}${heading("Teilnehmer", "name")}${heading("IP-Adresse", "ip")}${heading("MAC-Adresse", "mac")}${heading("Verbindung", "connection")}${heading("Mesh-Zugangspunkt", "mesh")}${heading("WLAN-Daten", "rate")}${heading("Adressvergabe", "address")}${heading("DNS", "dns")}${heading("Erkannt durch", "source")}<th data-column="internet" class="no-sort">Internetzugang</th><th data-column="watch" class="no-sort">Überwachung</th></tr>
         <tr class="column-filters">
           <th data-column="state">${stateFilter}</th>
           <th data-column="onboarding">${onboardingFilter}</th>
@@ -5111,6 +5149,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       hostnames: hostnameEntries,
       adguard_config: this._adguardConfig,
       policy_prompt: this._dnsPolicyPrompt,
+      dns_provider: this._dnsProvider(),
       is_admin: Boolean(this._hass?.user?.is_admin),
     });
     if (renderSignature === this._dnsRenderedSignature) return;
@@ -5142,7 +5181,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const reason = item.blocked
         ? blockReason(item.reason)
         : rawStatus.toUpperCase() === "NOERROR" ? "OK" : (rawStatus || "Verarbeitet");
-      const dnsServer = item.dns_server || (item.cached ? "Cache" : item.upstream) || "AdGuard Home";
+      const dnsServer = item.dns_server || (item.cached ? "Cache" : item.upstream) || this._dnsProvider().name;
       const answer = (item.answer || []).join(", ") || "–";
       const elapsed = Number(item.elapsed_ms);
       const elapsedFormatted = Number.isFinite(elapsed)
@@ -5198,7 +5237,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ["sensor.nodarion_dns_blockiert", "Blockiert"],
       ["sensor.nodarion_dns_blockquote", "Blockquote"],
       ["sensor.nodarion_dns_verarbeitungszeit", "Verarbeitungszeit"],
-    ].map(([entityId, label]) => {
+    ].filter(([entityId]) => this._dnsProvider().id !== "pihole" || entityId !== "sensor.nodarion_dns_verarbeitungszeit").map(([entityId, label]) => {
       const entity = this._hass.states[entityId];
       const value = entity && !["unknown", "unavailable"].includes(entity.state)
         ? `${entity.state}${entity.attributes.unit_of_measurement ? ` ${entity.attributes.unit_of_measurement}` : ""}`
@@ -5233,9 +5272,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
       <div class="dns-policy-modal-backdrop" role="presentation">
         <section class="dns-policy-modal" role="dialog" aria-modal="true" aria-labelledby="dns-policy-title">
           <h3 id="dns-policy-title"><ha-icon icon="mdi:shield-check-outline"></ha-icon>Domain freigeben</h3>
-          <p>Soll <strong>${esc(policyPrompt.domain)}</strong> nur für diesen Client oder für alle Geräte freigegeben werden?</p>
+          <p>Soll <strong>${esc(policyPrompt.domain)}</strong> ${this._dnsProvider().id === "pihole" ? "für alle derzeit konfigurierten Pi-hole-Gruppen freigegeben werden?" : "nur für diesen Client oder für alle Geräte freigegeben werden?"}</p>
           <div class="dns-policy-scope-actions">
-            <button class="dns-policy-scope" type="button" data-dns-policy-scope="client" ${policyPrompt.client ? "" : "disabled"}><ha-icon icon="mdi:laptop"></ha-icon>Nur dieser Client · ${esc(policyPrompt.client || "unbekannt")}</button>
+            <button class="dns-policy-scope" type="button" data-dns-policy-scope="client" ${this._dnsProvider().id === "pihole" ? "hidden" : ""} ${policyPrompt.client ? "" : "disabled"}><ha-icon icon="mdi:laptop"></ha-icon>Nur dieser Client · ${esc(policyPrompt.client || "unbekannt")}</button>
             <button class="dns-policy-scope" type="button" data-dns-policy-scope="all"><ha-icon icon="mdi:lan"></ha-icon>Für alle Clients</button>
             <button class="dns-policy-scope cancel" type="button" data-dns-policy-scope="cancel">Abbrechen</button>
           </div>
@@ -5243,7 +5282,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       </div>` : "";
     content.innerHTML = `
       <div class="dns-head">
-        <div><h2><ha-icon icon="mdi:dns-outline"></ha-icon>AdGuard DNS-Live</h2><p>Neueste DNS-Anfragen · zuletzt aktualisiert ${esc(updated)} · automatisch alle 3 Sekunden</p></div>
+        <div><h2><ha-icon icon="mdi:dns-outline"></ha-icon>${esc(this._dnsProvider().name)} DNS-Live</h2><p>Neueste DNS-Anfragen · zuletzt aktualisiert ${esc(updated)} · automatisch alle 3 Sekunden</p></div>
         <div class="dns-head-tools">
           <section class="dns-live-stats dns-quick-stats"><h3>Letzte 24 Stunden</h3><div class="adguard-stat-grid">${adguardStats}</div></section>
           <div class="dns-actions">
@@ -5253,7 +5292,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           </div>
         </div>
       </div>
-      ${this._dnsLive.error ? `<div class="dns-error"><strong>AdGuard-Log nicht verfügbar:</strong> ${esc(this._dnsLive.error)}</div>` : ""}
+      ${this._dnsLive.error ? `<div class="dns-error"><strong>DNS-Log nicht verfügbar:</strong> ${esc(this._dnsLive.error)}</div>` : ""}
       ${this._dnsChartVisible ? `<div class="dns-chart">
         <div class="dns-chart-head">
           <span class="dns-chart-title">DNS-Anfragen der letzten ${series.length || 24} Stunden${this._dnsLive.client ? ` · ${esc(clientLabel)}` : ""}</span>
@@ -5566,21 +5605,31 @@ class EngelsoftNodarionPanel extends HTMLElement {
       devices: ["Geräteeinstellungen", "Neue Geräte, Gastzugang und Bereinigung"],
       rules: ["Überwachungseinstellungen", "Regeln, Ruhezeiten und weitere Prüfungen"],
       notifications: ["Benachrichtigungen", "Home-Assistant-Meldungen und Benachrichtigungsziele"],
-      dns: ["DNS- und AdGuard-Einstellungen", "Schutzfunktionen, Statistiken und Filterverwaltung"],
+      dns: ["DNS-Einstellungen", "Schutzfunktionen, Statistiken und Filterverwaltung"],
       "ai-maintenance": ["KI-Einstellungen", "Tägliche Netzbewertung und DNS-Datenschutz"],
     };
     const settingsTitle = settingsTitles[this._settingsTab] || settingsTitles.general;
-    const adguardSwitches = [
+    const adguardSwitches = (this._dnsProvider().id === "pihole" ? [["switch.nodarion_pihole_gesamtschutz", "Pi-hole DNS-Schutz", "DNS-Blockierung ein- oder ausschalten"]] : [
       ["switch.nodarion_adguard_gesamtschutz", "Gesamtschutz", "Master-Schalter für sämtliche Schutzfunktionen"],
       ["switch.nodarion_adguard_dns_filterung", "DNS-Filterung", "Blocklisten und eigene Filterregeln anwenden"],
       ["switch.nodarion_adguard_safe_browsing", "Safe Browsing", "Phishing- und Malware-Domains blockieren"],
       ["switch.nodarion_adguard_jugendschutz", "Jugendschutz", "Nicht jugendfreie Inhalte blockieren"],
       ["switch.nodarion_adguard_safe_search", "Safe Search", "Sichere Suche bei Suchmaschinen erzwingen"],
       ["switch.nodarion_adguard_query_log", "Query-Log", "Für DNS-Live, Gerätezuordnung und KI erforderlich"],
-    ].map(([entityId, label, note]) => {
+    ]).map(([entityId, label, note]) => {
       const state = this._hass.states[entityId]?.state;
       return `<button class="adguard-feature ${state === "on" ? "active" : ""}" type="button" data-adguard-switch data-entity-id="${entityId}"><span><strong>${label}</strong><small>${note}</small></span><span class="adguard-feature-state">${state === "on" ? "An" : state === "off" ? "Aus" : "–"}</span></button>`;
     }).join("");
+    const piHoleRules = this._dnsProvider().id === "pihole" ? `
+      <section class="rule-group pihole-domain-settings">
+        <h3>Pi-hole · Domains</h3>
+        <p>Exakte Domains für alle derzeit konfigurierten Pi-hole-Gruppen freigeben oder sperren. Regex-Regeln und Gruppenzuordnungen bleiben in Pi-hole verwaltbar.</p>
+        <form class="pihole-domain-form"><label>Domain<input name="domain" type="text" required placeholder="example.com" autocomplete="off"></label><label>Aktion<select name="policy"><option value="allow">Freigeben</option><option value="block">Sperren</option></select></label><button type="submit" class="dns-action">Speichern</button></form>
+        ${this._adguardConfig.error ? `<p role="alert">${esc(this._adguardConfig.error)}</p>` : ""}
+        ${this._adguardConfig.loading ? `<p>Domain-Regeln werden geladen …</p>` : ""}
+        <div class="pihole-domain-list">${(this._adguardConfig.rules || []).map(rule => `<div><span>${rule.startsWith("@@") ? "Freigegeben" : "Gesperrt"} · ${esc(rule.replace(/^@@\|\||^\|\|/g, "").replace(/\^$/, ""))}</span><button type="button" class="dns-action" data-pihole-remove="${esc(rule)}" aria-label="Domain-Regel entfernen">×</button></div>`).join("")}</div>
+        <p>Die Anfragen müssen in Pi-hole einzelnen Clients zugeordnet sein. Datenschutz oder deaktivierte Protokollierung können Details ausblenden. Nicht verfügbare AdGuard-Funktionen werden hier nicht angeboten.</p>
+      </section>` : "";
     panel.innerHTML = `
       <div class="security-metrics">
         <article class="security-card"><span>Aktive Warnungen</span><strong>${Number(summary.active || 0)}</strong></article>
@@ -5676,7 +5725,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
             </section>
             </div>
             <div class="settings-tab-panel dns-settings-panel" role="tabpanel" data-settings-panel="dns" ${this._settingsTab === "dns" ? "" : "hidden"}>
-              <section class="rule-group adguard-control-settings"><h3>Schutzfunktionen<button class="settings-help-button" type="button" data-settings-help="adguard" title="Schutzfunktionen erklären" aria-label="Hilfe zu den AdGuard-Schutzfunktionen">?</button></h3><div class="adguard-feature-list">${adguardSwitches}</div><div class="query-log-warning"><ha-icon icon="mdi:alert-outline"></ha-icon>Das Ausschalten des Query-Logs unterbricht DNS-Live und reduziert die Auswertung.</div></section>
+              <section class="rule-group adguard-control-settings"><h3>Schutzfunktionen<button class="settings-help-button" type="button" data-settings-help="adguard" title="Schutzfunktionen erklären" aria-label="Hilfe zu den AdGuard-Schutzfunktionen">?</button></h3><div class="adguard-feature-list">${adguardSwitches}</div><div class="query-log-warning"><ha-icon icon="mdi:alert-outline"></ha-icon>${this._dnsProvider().id === "pihole" ? "Protokollierung und Datenschutzstufe werden in Pi-hole eingestellt." : "Das Ausschalten des Query-Logs unterbricht DNS-Live und reduziert die Auswertung."}</div></section>${piHoleRules}
             </div>
             <div class="settings-tab-panel ai-maintenance-panel" role="tabpanel" data-settings-panel="ai-maintenance" ${this._settingsTab === "ai-maintenance" ? "" : "hidden"}>
             <section class="rule-group ai-config-settings">

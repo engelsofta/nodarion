@@ -16,29 +16,18 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
-    CONF_ADGUARD_ENABLED,
-    CONF_ADGUARD_HOST,
-    CONF_ADGUARD_PASSWORD,
-    CONF_ADGUARD_PERIOD_HOURS,
-    CONF_ADGUARD_PORT,
-    CONF_ADGUARD_SSL,
-    CONF_ADGUARD_USER,
-    CONF_ADGUARD_VERIFY_SSL,
     CONF_CONCURRENCY,
     CONF_EXCLUDE,
     CONF_FRITZ_ENABLED,
     CONF_FRITZ_HOST,
     CONF_FRITZ_PASSWORD,
     CONF_FRITZ_USER,
-    CONF_NETWORK,
     CONF_OFFLINE_AFTER,
     CONF_REMOVE_AFTER_DAYS,
     CONF_PORTS,
     CONF_SCAN_INTERVAL,
     CONF_TIMEOUT,
     DEFAULT_CONCURRENCY,
-    DEFAULT_ADGUARD_PERIOD_HOURS,
-    DEFAULT_ADGUARD_PORT,
     DEFAULT_FRITZ_HOST,
     DEFAULT_OFFLINE_AFTER,
     DEFAULT_REMOVE_AFTER_DAYS,
@@ -50,7 +39,7 @@ from .const import (
     FRITZ_SCAN_INTERVAL_SECONDS,
     ADGUARD_SCAN_INTERVAL_SECONDS,
 )
-from .adguard import AdGuardScanner
+from .dns_provider import create_dns_scanner
 from .models import (
     NetworkHost,
     NetworkSegment,
@@ -142,25 +131,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
             if options.get(CONF_FRITZ_ENABLED)
             else None
         )
-        self.adguard_scanner = (
-            AdGuardScanner(
-                hass,
-                str(options.get(CONF_ADGUARD_HOST, "")),
-                int(options.get(CONF_ADGUARD_PORT, DEFAULT_ADGUARD_PORT)),
-                str(options.get(CONF_ADGUARD_USER, "")),
-                str(options.get(CONF_ADGUARD_PASSWORD, "")),
-                bool(options.get(CONF_ADGUARD_SSL, False)),
-                bool(options.get(CONF_ADGUARD_VERIFY_SSL, True)),
-                int(
-                    options.get(
-                        CONF_ADGUARD_PERIOD_HOURS,
-                        DEFAULT_ADGUARD_PERIOD_HOURS,
-                    )
-                ),
-            )
-            if options.get(CONF_ADGUARD_ENABLED)
-            else None
-        )
+        self.adguard_scanner = create_dns_scanner(hass, options)
         self.adguard_status_coordinator = None
         self.connection_status: dict[str, dict[str, Any]] = {
             "scanner": {
@@ -629,6 +600,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
                         ),
                         adguard_bypass_suspected=(
                             host.online
+                            and getattr(self.adguard_scanner, "supports_bypass_detection", True)
                             and queries == 0
                             and self.adguard_scanner.data_complete
                         ),

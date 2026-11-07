@@ -8,23 +8,14 @@ from typing import Any
 from aiohttp import ClientResponseError
 from homeassistant.core import HomeAssistant
 
-from .adguard import AdGuardScanner
+from .dns_provider import create_dns_scanner
 from .const import (
     CONF_ADGUARD_ENABLED,
-    CONF_ADGUARD_HOST,
-    CONF_ADGUARD_PASSWORD,
-    CONF_ADGUARD_PERIOD_HOURS,
-    CONF_ADGUARD_PORT,
-    CONF_ADGUARD_SSL,
-    CONF_ADGUARD_USER,
-    CONF_ADGUARD_VERIFY_SSL,
     CONF_FRITZ_ENABLED,
     CONF_FRITZ_HOST,
     CONF_FRITZ_PASSWORD,
     CONF_FRITZ_USER,
     CONF_NETWORK,
-    DEFAULT_ADGUARD_PERIOD_HOURS,
-    DEFAULT_ADGUARD_PORT,
     DEFAULT_FRITZ_HOST,
     DEFAULT_NETWORK,
 )
@@ -63,17 +54,12 @@ async def async_validate_connections(
             )
             await fritz.async_validate_connection()
         if values.get(CONF_ADGUARD_ENABLED):
-            adguard = AdGuardScanner(
-                hass,
-                str(values.get(CONF_ADGUARD_HOST, "")),
-                int(values.get(CONF_ADGUARD_PORT, DEFAULT_ADGUARD_PORT)),
-                str(values.get(CONF_ADGUARD_USER, "")),
-                str(values.get(CONF_ADGUARD_PASSWORD, "")),
-                bool(values.get(CONF_ADGUARD_SSL, False)),
-                bool(values.get(CONF_ADGUARD_VERIFY_SSL, True)),
-                int(values.get(CONF_ADGUARD_PERIOD_HOURS, DEFAULT_ADGUARD_PERIOD_HOURS)),
-            )
-            await adguard.async_validate_connection()
+            scanner = create_dns_scanner(hass, values)
+            try:
+                await scanner.async_validate_connection()
+            finally:
+                if hasattr(scanner, "async_close"):
+                    await scanner.async_close()
     except ClientResponseError as err:
         if err.status in {401, 403}:
             raise InvalidAuthError from err

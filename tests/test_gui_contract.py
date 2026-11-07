@@ -202,7 +202,7 @@ class GuiContractTests(unittest.TestCase):
         self.assertNotIn('class="adguard-modal-backdrop"', PANEL)
 
     def test_adguard_stats_live_above_dns_log_not_in_settings(self) -> None:
-        dns_live = PANEL.index('AdGuard DNS-Live</h2>')
+        dns_live = PANEL.index('DNS-Live</h2>')
         dns_stats = PANEL.index('<section class="dns-live-stats dns-quick-stats"')
         dns_toolbar = PANEL.index('<div class="dns-toolbar"')
         dns_settings = PANEL.index('data-settings-panel="dns"')

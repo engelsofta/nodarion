@@ -39,7 +39,7 @@ class NodarionView(HomeAssistantView):
             coordinator = self._coordinator(request)
             scanner = coordinator.adguard_scanner if coordinator else None
             if scanner is None:
-                return self.json_message("AdGuard Home ist nicht eingerichtet", 503)
+                return self.json_message("DNS-Anbieter ist nicht eingerichtet", 503)
             if view == "adguard_config":
                 if not self._is_admin(request):
                     return self.json_message(
@@ -60,7 +60,7 @@ class NodarionView(HomeAssistantView):
             try:
                 rows = await scanner.async_query_log(client or None)
             except Exception:
-                return self.json_message("AdGuard Home ist nicht erreichbar", 502)
+                return self.json_message("DNS-Anbieter ist nicht erreichbar", 502)
             return self.json(
                 {
                     "entries": rows,
@@ -244,7 +244,12 @@ class NodarionView(HomeAssistantView):
         coordinator = self._coordinator(request)
         scanner = coordinator.adguard_scanner if coordinator else None
         if scanner is None:
-            return self.json_message("AdGuard Home ist nicht eingerichtet", 503)
+            return self.json_message("DNS-Anbieter ist nicht eingerichtet", 503)
+
+        if scanner.provider == "pihole" and action not in {
+            "adguard_set_domain_policy", "adguard_add_rule", "adguard_delete_rule",
+        }:
+            return self.json_message("Diese Funktion wird von Pi-hole nicht unterstützt", 400)
 
         try:
             if action == "adguard_set_domain_policy":
@@ -281,7 +286,7 @@ class NodarionView(HomeAssistantView):
             return self.json_message("Ungültige AdGuard-Eingabe", 400)
         except Exception:
             _LOGGER.exception("AdGuard action %s failed", action)
-            return self.json_message("AdGuard-Änderung fehlgeschlagen", 502)
+            return self.json_message("DNS-Änderung fehlgeschlagen", 502)
         user = request.get("hass_user")
         _LOGGER.info(
             "AdGuard action %s completed by Home Assistant user %s",

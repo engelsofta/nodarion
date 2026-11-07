@@ -38,6 +38,8 @@ async def async_register_services(hass: HomeAssistant) -> None:
 
     async def execute(call: ServiceCall) -> None:
         scanner, status = scanner_for(call)
+        if scanner.provider == "pihole" and call.service not in {"add_dns_rule", "remove_dns_rule"}:
+            raise ServiceValidationError("This action is not supported by Pi-hole")
         handlers: dict[str, Callable[[], Awaitable[object]]] = {
             "add_filter_url": lambda: scanner.async_add_filter_url(call.data["name"], call.data["url"]),
             "remove_filter_url": lambda: scanner.async_remove_filter_url(call.data["url"]),
@@ -56,7 +58,7 @@ async def async_register_services(hass: HomeAssistant) -> None:
         except (TypeError, ValueError) as err:
             raise ServiceValidationError(str(err)) from err
         except Exception as err:
-            raise HomeAssistantError(f"AdGuard-Änderung fehlgeschlagen: {err}") from err
+            raise HomeAssistantError(f"DNS-Änderung fehlgeschlagen: {err}") from err
 
     for service, schema in SERVICE_SCHEMAS.items():
         hass.services.async_register(DOMAIN, service, execute, schema=schema)

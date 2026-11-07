@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.29.0-beta.1 — Two DNS bouncers. One guest list. 🕳️🛡️
+
+Pi-hole 6 joins AdGuard Home as an optional DNS provider. Same Nodarion dashboard, a second DNS bouncer at the door.
+
+- Choose AdGuard Home or Pi-hole 6 in setup, options, or reconfiguration. Existing AdGuard connection settings remain compatible.
+- Pi-hole supports application-password authentication, shared API sessions, automatic session recovery, and session cleanup on unload.
+- Show per-client DNS counts, blocked queries, block rates, top domains, query history, and the existing privacy-aware AI snapshots.
+- Read current queries from RAM and older queries from disk so recent DNS activity is not lost while waiting for database writes. Pagination, bounded scans and partial-data flags prevent unbounded log downloads.
+- Toggle Pi-hole DNS blocking through its native protection switch. Unsupported AdGuard-only controls are hidden and rejected by the backend.
+- Allow or block exact domains for all currently configured Pi-hole groups; remove rules from DNS settings. Client-specific rules, regex rules, lists and rewrites remain managed in Pi-hole.
+- Clearing an exact domain's allow rule is part of the explicit block action, so an exact allow cannot silently override the requested block. Other Pi-hole policy rules can still affect the outcome.
+- Pi-hole client details depend on query logging, privacy settings and direct client identification. No bypass alarm is inferred just from missing Pi-hole client queries.
+
+Validation: disposable official Pi-hole 2026.10.1 container, synthetic DNS queries, application-password login, session renewal, protection toggle, domain CRUD and per-client aggregation. This beta still needs feedback from real Home Assistant installations.
+
+Integration **1.29.0-beta.1** · Frontend **1.30.0**
+
+
 ## 1.28.0 — The radar got a glow-up. The filters got the broom. 🧹
 
 > The radar got a glow-up. The filters got the broom. 🧹

@@ -40,7 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry[NetworkCoord
     status = entry.runtime_data.adguard_status_coordinator
     if status is None:
         return
-    async_add_entities([NodarionAdGuardSensor(status, entry, item) for item in SENSORS])
+    async_add_entities([NodarionAdGuardSensor(status, entry, item) for item in SENSORS if status.scanner.provider != "pihole" or item.key in {"dns_queries", "dns_blocked", "dns_blocked_ratio", "rules_count"}])
 
 
 class NodarionAdGuardSensor(CoordinatorEntity[AdGuardStatusCoordinator], SensorEntity):
@@ -74,6 +74,9 @@ class NodarionAdGuardSensor(CoordinatorEntity[AdGuardStatusCoordinator], SensorE
 
 
 def _device_info(coordinator: AdGuardStatusCoordinator, entry_id: str) -> DeviceInfo:
+    if coordinator.scanner.provider == "pihole":
+        return DeviceInfo(identifiers={(DOMAIN, f"{entry_id}_pihole")}, name="Engelsoft Pi-hole",
+                          manufacturer="Pi-hole", model="Pi-hole 6 DNS", configuration_url=coordinator.scanner.base_url)
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_adguard")}, name="Engelsoft AdGuard",
         manufacturer="AdGuard", model="DNS-Schutz",

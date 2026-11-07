@@ -35,6 +35,14 @@ def serialize_frontend_state(
         if coordinator is not None and coordinator.fritz_scanner is not None
         else {"available": False, "enabled": False, "clients": 0}
     )
+    scanner = getattr(coordinator, "adguard_scanner", None) if coordinator else None
+    response["dns_provider"] = {
+        "id": scanner.provider if scanner else None,
+        "name": scanner.provider_name if scanner else "DNS",
+        "capabilities": sorted(scanner.capabilities) if scanner else [],
+        "features": sorted(scanner.supported_features) if scanner else [],
+        "data_complete": scanner.data_complete if scanner else False,
+    }
     participants = []
     if coordinator is not None and coordinator.data:
         for host in coordinator.data.values():

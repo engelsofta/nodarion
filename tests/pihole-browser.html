@@ -1,0 +1,26 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nodarion DNS provider preview</title>
+<style>body{margin:0;background:#171613;font:14px Arial,sans-serif;color:#eee}#fixture-controls{position:relative;z-index:20;padding:8px 20px}#fixture-controls button{padding:8px;margin-right:6px}ha-icon{display:inline-block;width:20px;height:20px}ha-icon::before{content:'◈';font-size:16px}</style>
+<div id="fixture-controls"><button id="pihole">Pi-hole preview</button><button id="adguard">AdGuard preview</button></div><engelsoft-nodarion-panel></engelsoft-nodarion-panel>
+<script type="module">
+import '../custom_components/nodarion/frontend/nodarion-panel.js';
+const panel=document.querySelector('engelsoft-nodarion-panel');
+const monitor={...panel._monitor,learning:{active:false},dns_provider:{id:'pihole',name:'Pi-hole',capabilities:['domain_policy','domain_rules'],features:['protection'],data_complete:true},connection_status:{adguard:{configured:true,available:true}},versions:{integration:'1.29.0-beta.1',frontend:'1.30.0'}};
+let rules=['||ads.example.org^','@@||example.org^'];
+const states={};
+for(const [id,value] of Object.entries({'sensor.nodarion_dns_anfragen':1240,'sensor.nodarion_dns_blockiert':320,'sensor.nodarion_dns_blockquote':25.8,'sensor.nodarion_dns_verarbeitungszeit':4,'switch.nodarion_pihole_gesamtschutz':'on','switch.nodarion_adguard_gesamtschutz':'on','switch.nodarion_adguard_dns_filterung':'on','switch.nodarion_adguard_safe_browsing':'on','switch.nodarion_adguard_jugendschutz':'off','switch.nodarion_adguard_safe_search':'off','switch.nodarion_adguard_query_log':'on'}))states[id]={entity_id:id,state:String(value),attributes:{}};
+const queries=[{time:new Date().toISOString(),client:'192.0.2.2',domain:'ads.example.org',query_type:'A',blocked:true,status:'GRAVITY',reason:'FilteredPiHole:GRAVITY',dns_server:'Pi-hole',elapsed_ms:0.2}];
+panel._hass={states,user:{is_admin:true},language:'de',locale:{language:'de'},themes:{darkMode:true},config:{time_zone:'Europe/Berlin'},
+  callApi:async(method,url,payload)=>{
+    if(url.includes('view=adguard_config'))return {rules,filters:[],rewrites:[],provider:monitor.dns_provider.id};
+    if(url.includes('view=adguard_live'))return {entries:queries,series:[],updated_at:new Date().toISOString()};
+    if(method==='POST'&&payload?.action==='adguard_delete_rule')rules=rules.filter(rule=>rule!==payload.rule);
+    if(method==='POST'&&payload?.action==='adguard_set_domain_policy')rules.push((payload.policy==='allow'?'@@':'')+'||'+payload.domain+'^');
+    if(method==='POST'&&payload?.action?.startsWith('adguard_'))return {rules,filters:[],rewrites:[],provider:monitor.dns_provider.id};
+    return monitor;
+  },callService:async(domain,action,data)=>{if(domain==='switch')states[data.entity_id].state=action==='turn_on'?'on':'off';panel._renderWatch();panel._renderSettings();}
+};
+panel._monitor=monitor;panel._settingsTab='dns';panel._activeTab='settings';panel.setAttribute('data-theme','dark');panel._build();panel._render();panel._openSettings('dns');
+document.querySelector('#pihole').onclick=()=>{monitor.dns_provider={id:'pihole',name:'Pi-hole',features:['protection']};panel._render();panel._openSettings('dns');};
+document.querySelector('#adguard').onclick=()=>{monitor.dns_provider={id:'adguard',name:'AdGuard Home',features:['protection','safe_browsing']};panel._render();panel._openSettings('dns');};
+document.body.dataset.ready='true';
+</script></html>

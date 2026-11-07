@@ -99,6 +99,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) ->
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         await entry.runtime_data.async_shutdown()
+        scanner = entry.runtime_data.adguard_scanner
+        if scanner is not None and hasattr(scanner, "async_close"):
+            await scanner.async_close()
         await entry.runtime_data.monitor.async_shutdown()
         await async_unregister_services(hass)
         frontend.async_remove_panel(hass, PANEL_URL)

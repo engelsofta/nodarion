@@ -56,6 +56,7 @@ SECTION_FIELDS = {
     "network": (CONF_NETWORK, CONF_SCAN_INTERVAL, CONF_EXCLUDE),
     "fritz": (CONF_FRITZ_ENABLED, CONF_FRITZ_HOST, CONF_FRITZ_USER, CONF_FRITZ_PASSWORD),
     "adguard": (
+        "dns_provider",
         CONF_ADGUARD_ENABLED, CONF_ADGUARD_HOST, CONF_ADGUARD_PORT,
         CONF_ADGUARD_USER, CONF_ADGUARD_PASSWORD, CONF_ADGUARD_SSL,
         CONF_ADGUARD_VERIFY_SSL, CONF_ADGUARD_PERIOD_HOURS,
@@ -155,6 +156,11 @@ def _schema(values: dict[str, Any], section: str | None = None) -> vol.Schema:
                     type=selector.TextSelectorType.PASSWORD
                 )
             ),
+            vol.Required("dns_provider", default=values.get("dns_provider", "adguard")):
+                selector.SelectSelector(selector.SelectSelectorConfig(options=[
+                    {"value": "adguard", "label": "AdGuard Home"},
+                    {"value": "pihole", "label": "Pi-hole 6"},
+                ])),
             vol.Required(
                 CONF_ADGUARD_ENABLED,
                 default=values.get(CONF_ADGUARD_ENABLED, False),
@@ -231,12 +237,14 @@ def _validate(data: dict[str, Any]) -> dict[str, str]:
             errors[CONF_FRITZ_USER] = "fritz_credentials_required"
         if not str(data.get(CONF_FRITZ_PASSWORD, "")).strip():
             errors[CONF_FRITZ_PASSWORD] = "fritz_credentials_required"
+    if data.get("dns_provider", "adguard") not in {"adguard", "pihole"}:
+        errors["dns_provider"] = "invalid_dns_provider"
     if data.get(CONF_ADGUARD_ENABLED):
         if not str(data.get(CONF_ADGUARD_HOST, "")).strip():
             errors[CONF_ADGUARD_HOST] = "adguard_host_required"
         user = str(data.get(CONF_ADGUARD_USER, "")).strip()
         password = str(data.get(CONF_ADGUARD_PASSWORD, "")).strip()
-        if bool(user) != bool(password):
+        if data.get("dns_provider", "adguard") == "adguard" and bool(user) != bool(password):
             missing = CONF_ADGUARD_PASSWORD if user else CONF_ADGUARD_USER
             errors[missing] = "adguard_credentials_incomplete"
     return errors

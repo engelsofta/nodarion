@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install test HTTP client
-        run: python -m pip install aiohttp
+        run: python -m pip install aiohttp voluptuous playwright
       - name: Start disposable Pi-hole (loopback only, no DHCP)
         run: |
           docker run -d --name nodarion-pihole-test \
@@ -35,6 +35,21 @@ jobs:
           exit 1
       - name: Exercise real REST API through Nodarion's Pi-hole client
         run: python tests/pihole_live_check.py
+      - name: Python regression tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Frontend regression tests
+        run: node --test tests/*.cjs tests/*.mjs
+      - name: Browser layout and interaction checks
+        run: |
+          python -m playwright install --with-deps chromium
+          python -m http.server 18765 --bind 127.0.0.1 >/tmp/nodarion-preview.log 2>&1 &
+          python tests/pihole_browser_check.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pihole-browser-previews
+          path: test-artifacts
+          if-no-files-found: ignore
       - name: Remove temporary Pi-hole
         if: always()
         run: docker rm -f nodarion-pihole-test || true

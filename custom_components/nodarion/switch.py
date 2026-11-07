@@ -35,7 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry[NetworkCoord
     status = entry.runtime_data.adguard_status_coordinator
     if status is None:
         return
-    async_add_entities([NodarionAdGuardSwitch(status, entry, item) for item in SWITCHES])
+    async_add_entities([NodarionAdGuardSwitch(status, entry, item) for item in SWITCHES if item.key in status.scanner.supported_features])
 
 
 class NodarionAdGuardSwitch(CoordinatorEntity[AdGuardStatusCoordinator], SwitchEntity):
@@ -45,8 +45,8 @@ class NodarionAdGuardSwitch(CoordinatorEntity[AdGuardStatusCoordinator], SwitchE
     def __init__(self, coordinator: AdGuardStatusCoordinator, entry: ConfigEntry[NetworkCoordinator], description: NodarionAdGuardSwitchDescription) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = f"{entry.entry_id}_adguard_{description.key}"
-        self.entity_id = f"switch.nodarion_{description.entity_id_suffix}"
+        self._attr_unique_id = f"{entry.entry_id}_{coordinator.scanner.provider}_{description.key}"
+        self.entity_id = f"switch.nodarion_{description.entity_id_suffix.replace('adguard_', coordinator.scanner.provider + '_', 1)}"
         self._attr_device_info = _device_info(coordinator, entry.entry_id)
 
     @property

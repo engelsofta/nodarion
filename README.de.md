@@ -346,3 +346,13 @@ Es werden keine Anmeldedaten geschickt, Weiterleitungen nicht automatisch
 verfolgt und keine Seiteninhalte heruntergeladen. Die TLS-Erkennung akzeptiert
 lokale selbstsignierte Zertifikate; beim Öffnen prüft der Browser selbst.
 Der Browser muss das Gerätenetz erreichen können, etwa im Heimnetz oder per VPN.
+
+### Pi-hole 6 (Beta)
+
+Unter **Einstellungen → Geräte & Dienste → Nodarion → Konfigurieren → DNS-Anbieter** **Pi-hole 6** auswählen und aktivieren. Host/IP ohne URL-Pfad, den tatsächlichen Web/API-Port (meist **80**, bei HTTPS **443**) und ein **Anwendungspasswort** aus Pi-holes Weboberflächen/API-Einstellungen eintragen. Benutzername leer lassen. Beim Wechsel von AdGuard dessen bisherigen Port ebenfalls anpassen. Die TLS-Prüfung ist standardmäßig aktiv.
+
+DNS-Live, Geräteauswertung und die vorhandenen DNS-Sensoren werden weiterverwendet. Pi-hole bietet den eigenen Schalter **Pi-hole DNS-Schutz**. Exakte Domains lassen sich in den DNS-Einstellungen für **alle derzeit konfigurierten Pi-hole-Gruppen** freigeben oder sperren. Beim ausdrücklichen Sperren wird eine vorhandene exakte Freigabe der Domain entfernt. Clientbezogene Ausnahmen, Regex-Regeln, Listen, DNS-Umschreibungen, Protokollierung und Datenschutz werden in Pi-hole verwaltet. Weitere Regeln können die tatsächliche DNS-Antwort beeinflussen.
+
+Pi-hole muss die einzelnen Geräte als Clients erkennen; zeigt es nur den Router, fehlen entsprechende Gerätezuordnungen. Verborgene oder nicht protokollierte Anfragen können nicht rekonstruiert werden. Fehlende Pi-hole-Anfragen allein lösen deshalb keinen DNS-Umgehungsverdacht aus. Die Auswertung ist durch Pi-holes Aufbewahrung und den begrenzten Protokollabruf beschränkt.
+
+Es ist ein DNS-Anbieter gleichzeitig aktiv. Bestehende AdGuard-Einrichtungen bleiben ohne Umstellung erhalten. Getestet wird gegen den offiziellen Container **Pi-hole 2026.10.1** (Pi-hole-6-API); Pi-hole 5 wird nicht unterstützt. Testinstanzen verändern weder DNS noch DHCP deines Heimnetzes.

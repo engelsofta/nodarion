@@ -270,3 +270,15 @@ and starts fresh checks. Discovery sends no
 credentials, follows no redirects, and reads no response body. Local self-signed
 TLS certificates are accepted for detection; browsers validate them when opening
 the link. The browser needs access to the device network, locally or through VPN.
+
+### Pi-hole 6 (beta)
+
+In **Settings → Devices & services → Nodarion → Configure → DNS provider**, choose **Pi-hole 6** and enable the DNS provider. Enter the host/IP (without a URL path), the actual web/API port (usually **80**, or **443** with HTTPS), and an **application password** from Pi-hole's Web interface/API settings. Leave the username empty. If switching from AdGuard, change its former port as well. TLS verification is enabled by default.
+
+Pi-hole uses the existing DNS dashboard and per-device statistics. The supported native switch is **Pi-hole DNS protection**. Exact domains can be allowed/blocked in Nodarion's DNS settings for **all currently configured Pi-hole groups**. These are global actions, not per-client exceptions; an explicit block removes an existing exact allow rule for that domain. Manage client-specific assignments, regex rules, lists, DNS rewrites, query logging and privacy in Pi-hole. Existing regex or other policies can influence the effective DNS response.
+
+For per-device activity, Pi-hole must see the actual client IPs rather than only a forwarding router. Hidden/private or unlogged queries cannot be reconstructed. Nodarion never interprets missing Pi-hole queries alone as proof of DNS bypass. Historical data is limited by Pi-hole's retention and Nodarion's bounded log scan. Empty/private logs are not a connection failure.
+
+Only one DNS provider is active per Nodarion installation. Switching providers keeps existing generic DNS sensor IDs; AdGuard-only switches are not exposed by the Pi-hole provider. Existing AdGuard setups default to AdGuard and need no migration. The native `add_dns_rule` / `remove_dns_rule` actions accept exact domains or `||example.org^` / `@@||example.org^` for Pi-hole; other AdGuard-specific actions are rejected.
+
+Tested against the official **Pi-hole 2026.10.1** container (Pi-hole 6 API). Pi-hole 5 is not supported. The tests use loopback-only ports and synthetic queries; they do not change your network's DNS or DHCP configuration.

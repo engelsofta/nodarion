@@ -8,7 +8,7 @@
         "menu_options": {
           "network": "Networks & scanning",
           "fritz": "FRITZ!Box & Mesh",
-          "adguard": "AdGuard Home",
+          "adguard": "DNS provider (AdGuard / Pi-hole)",
           "ai": "AI analysis",
           "advanced": "Advanced settings",
           "finish": "Save and start scanning"
@@ -20,7 +20,7 @@
         "menu_options": {
           "network": "Networks & scanning",
           "fritz": "FRITZ!Box & Mesh",
-          "adguard": "AdGuard Home",
+          "adguard": "DNS provider (AdGuard / Pi-hole)",
           "ai": "AI analysis",
           "advanced": "Advanced settings",
           "finish": "Save & finish"
@@ -32,7 +32,7 @@
         "menu_options": {
           "network": "Networks & scanning",
           "fritz": "FRITZ!Box & Mesh",
-          "adguard": "AdGuard Home",
+          "adguard": "DNS provider (AdGuard / Pi-hole)",
           "ai": "AI analysis",
           "advanced": "Advanced settings",
           "finish": "Save & finish"
@@ -62,17 +62,18 @@
         }
       },
       "adguard": {
-        "title": "AdGuard Home",
-        "description": "Optional: Add DNS activity and filtering data. The connection is tested when analysis is enabled.",
+        "title": "DNS provider",
+        "description": "Select AdGuard Home or Pi-hole 6. Pi-hole: use an application password, leave username empty, set the web/API port (usually 80; HTTPS usually 443). Existing AdGuard settings stay unchanged.",
         "data": {
-          "adguard_enabled": "Use AdGuard Home analysis",
-          "adguard_host": "AdGuard Home address",
-          "adguard_port": "AdGuard Home port",
-          "adguard_user": "AdGuard Home user",
-          "adguard_password": "AdGuard Home password",
+          "adguard_enabled": "Enable DNS provider",
+          "adguard_host": "Host / IP",
+          "adguard_port": "Web/API port",
+          "adguard_user": "Username (AdGuard only)",
+          "adguard_password": "Password / application password",
           "adguard_ssl": "Use HTTPS",
           "adguard_verify_ssl": "Verify SSL certificate",
-          "adguard_period_hours": "DNS analysis period (hours)"
+          "adguard_period_hours": "DNS analysis period (hours)",
+          "dns_provider": "Provider"
         }
       },
       "advanced": {
@@ -110,7 +111,8 @@
       "adguard_credentials_incomplete": "Enter both username and password, or leave both blank",
       "cannot_connect": "Could not connect to an enabled local service",
       "invalid_auth": "The supplied credentials were rejected",
-      "invalid_time": "Enter a valid time in HH:MM format."
+      "invalid_time": "Enter a valid time in HH:MM format.",
+      "invalid_dns_provider": "Select a supported DNS provider"
     },
     "abort": {
       "already_configured": "The network scanner is already configured",
@@ -126,7 +128,7 @@
         "menu_options": {
           "network": "Networks & scanning",
           "fritz": "FRITZ!Box & Mesh",
-          "adguard": "AdGuard Home",
+          "adguard": "DNS provider (AdGuard / Pi-hole)",
           "ai": "AI analysis",
           "advanced": "Advanced settings",
           "finish": "Save & finish"
@@ -152,17 +154,18 @@
         }
       },
       "adguard": {
-        "title": "AdGuard Home",
-        "description": "Optional: Add DNS activity and filtering data. The connection is tested when analysis is enabled.",
+        "title": "DNS provider",
+        "description": "Select AdGuard Home or Pi-hole 6. Pi-hole: use an application password, leave username empty, set the web/API port (usually 80; HTTPS usually 443). Existing AdGuard settings stay unchanged.",
         "data": {
-          "adguard_enabled": "Use AdGuard Home analysis",
-          "adguard_host": "AdGuard Home address",
-          "adguard_port": "AdGuard Home port",
-          "adguard_user": "AdGuard Home user",
-          "adguard_password": "AdGuard Home password",
+          "adguard_enabled": "Enable DNS provider",
+          "adguard_host": "Host / IP",
+          "adguard_port": "Web/API port",
+          "adguard_user": "Username (AdGuard only)",
+          "adguard_password": "Password / application password",
           "adguard_ssl": "Use HTTPS",
           "adguard_verify_ssl": "Verify SSL certificate",
-          "adguard_period_hours": "DNS analysis period (hours)"
+          "adguard_period_hours": "DNS analysis period (hours)",
+          "dns_provider": "Provider"
         }
       },
       "advanced": {
@@ -200,7 +203,8 @@
       "adguard_credentials_incomplete": "Enter both username and password, or leave both blank",
       "cannot_connect": "Could not connect to an enabled local service",
       "invalid_auth": "The supplied credentials were rejected",
-      "invalid_time": "Enter a valid time in HH:MM format."
+      "invalid_time": "Enter a valid time in HH:MM format.",
+      "invalid_dns_provider": "Select a supported DNS provider"
     }
   },
   "entity": {
