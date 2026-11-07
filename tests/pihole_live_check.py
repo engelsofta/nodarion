@@ -27,7 +27,11 @@ def query(domain):
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        scanner = PiHoleScanner(SimpleNamespace(session=session), "127.0.0.1", 18080, "", os.environ["PIHOLE_TEST_PASSWORD"], False, True, 24)
+        root = PiHoleScanner(SimpleNamespace(session=session), "127.0.0.1", 18080, "", os.environ["PIHOLE_TEST_PASSWORD"], False, True, 24)
+        app = (await root._async_request("GET", "auth/app"))["app"]
+        await root._async_request("PATCH", "config/webserver/api/app_pwhash", {"config": {"webserver": {"api": {"app_pwhash": app["hash"]}}}})
+        await root.async_close()
+        scanner = PiHoleScanner(SimpleNamespace(session=session), "127.0.0.1", 18080, "", app["password"], False, True, 24)
         try:
             await scanner.async_validate_connection()
             initial_sid = scanner._sid
@@ -38,9 +42,14 @@ async def main():
             await scanner.async_set_feature("protection", True)
             assert (await scanner.async_status())["protection"]
             await scanner.async_set_domain_policy("example.org", "block")
-            await asyncio.to_thread(query, "example.org")
-            await asyncio.sleep(2)
-            rows = await scanner.async_query_log()
+            # FTL applies gravity/group changes asynchronously. Wait for the
+            # actual blocking outcome, not merely the successful API write.
+            for attempt in range(10):
+                await asyncio.sleep(1)
+                await asyncio.to_thread(query, "example.org")
+                rows = await scanner.async_query_log()
+                if any(row["domain"] == "example.org" and row["blocked"] for row in rows):
+                    break
             assert any(row["domain"] == "example.org" and row["blocked"] for row in rows), rows
             client = next(row["client"] for row in rows if row["domain"] == "example.org")
             rows = await scanner.async_query_log(client)

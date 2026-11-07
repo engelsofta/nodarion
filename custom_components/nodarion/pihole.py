@@ -165,7 +165,7 @@ class PiHoleScanner(AdGuardScanner):
                 async with asyncio.timeout(120):
                     # Disk may lag behind RAM by a minute. Always collect RAM
                     # first, then fill the older part of the window from disk.
-                    until = end.timestamp()
+                    disk_until = end.timestamp()
                     disk_needed = False
                     for disk in (False, True):
                         if disk and not disk_needed:
@@ -176,7 +176,7 @@ class PiHoleScanner(AdGuardScanner):
                         while len(entries) < self.max_entries:
                             params = {
                                 "from": cutoff.timestamp(),
-                                "until": until,
+                                "until": disk_until if disk else end.timestamp(),
                                 "length": min(1000, self.max_entries - len(entries)),
                                 "disk": "true" if disk else "false",
                             }
@@ -194,7 +194,7 @@ class PiHoleScanner(AdGuardScanner):
                                     not earliest or earliest > cutoff.timestamp()
                                 )
                                 if earliest:
-                                    until = min(until, earliest)
+                                    disk_until = min(disk_until, earliest)
                             page = data.get("queries", [])
                             fetched += len(page)
                             for raw in page:
