@@ -19,7 +19,7 @@ panel._hass={states,user:{is_admin:true},language:'de',locale:{language:'de'},th
     return monitor;
   },callService:async(domain,action,data)=>{if(domain==='switch')states[data.entity_id].state=action==='turn_on'?'on':'off';panel._renderWatch();panel._renderSettings();}
 };
-panel._monitor=monitor;panel._settingsTab='dns';panel._activeTab='settings';panel.setAttribute('data-theme','dark');panel._build();panel._render();panel._openSettings('dns');
+panel._monitor=monitor;panel._settingsTab='dns';panel._activeTab='settings';panel.hass=panel._hass;panel._openSettings('dns');
 document.querySelector('#pihole').onclick=()=>{monitor.dns_provider={id:'pihole',name:'Pi-hole',features:['protection']};panel._render();panel._openSettings('dns');};
 document.querySelector('#adguard').onclick=()=>{monitor.dns_provider={id:'adguard',name:'AdGuard Home',features:['protection','safe_browsing']};panel._render();panel._openSettings('dns');};
 document.body.dataset.ready='true';

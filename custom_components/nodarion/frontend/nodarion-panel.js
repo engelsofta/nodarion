@@ -40,6 +40,8 @@ const deviceWebControl = (entity) => {
 // intentionally falls back to English.
 let panelLocale = "en";
 const EN = new Map(Object.entries({
+  "DNS-Änderungen werden direkt gespeichert.": "DNS changes are saved immediately.",
+  "Speichern": "Save", "Schutzfunktionen": "Protection features",
   "DNS-Einstellungen": "DNS settings",
   "Pi-hole DNS-Schutz": "Pi-hole DNS protection",
   "DNS-Blockierung ein- oder ausschalten": "Enable or disable DNS blocking",
@@ -1535,6 +1537,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         .log-clear ha-icon { --mdc-icon-size:15px; }
         .log-list { overflow:auto; max-height:70vh; border:1px solid var(--ns-line); border-radius:13px; }
         .pihole-domain-form{display:flex;flex-wrap:wrap;align-items:end;gap:10px}.pihole-domain-form label{display:grid;gap:6px;flex:1 1 130px}.pihole-domain-form input,.pihole-domain-form select{min-width:0;width:100%;min-height:42px;border:1px solid var(--ns-line);border-radius:10px;background:var(--ns-surface);color:var(--ns-text);padding:8px;font:inherit}.pihole-domain-settings p{font-size:12px;line-height:1.6;color:var(--ns-muted)}.pihole-domain-list{max-height:260px;overflow:auto;margin-top:10px}.pihole-domain-list>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--ns-line)}.pihole-domain-list span{overflow-wrap:anywhere}
+        @media(max-width:800px){.settings-view .settings-context-title{flex-basis:auto}}
         .log-table { width:100%; min-width:1020px; border-collapse:collapse; }
         .log-table thead { position:sticky; top:0; z-index:3; background:#292823; }
         :host([data-theme="light"]) .log-table thead { background:#f5f3ef; }
@@ -5649,7 +5652,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <div class="alert-list">${alertHtml}</div>
         </section>
         <section class="watch-panel watch-settings-panel">
-          <div class="watch-heading"><div class="settings-context-title"><button class="settings-back" type="button" title="Zurück" aria-label="Zurück zur vorherigen Ansicht"><ha-icon icon="mdi:arrow-left"></ha-icon></button><div><h2>${esc(settingsTitle[0])}</h2><p>${esc(settingsTitle[1])} · Änderungen gelten ab dem nächsten Netzwerkscan.</p></div></div><div class="settings-save-area"><div class="settings-dirty" role="status" aria-live="polite" ${this._dirtyRules.size ? "" : "hidden"}><span>${this._dirtyRules.size} ungespeicherte ${this._dirtyRules.size === 1 ? "Änderung" : "Änderungen"}</span><button class="discard-settings" type="button">Verwerfen</button></div><button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>Alle Einstellungen speichern</button></div></div>
+          <div class="watch-heading"><div class="settings-context-title"><button class="settings-back" type="button" title="Zurück" aria-label="Zurück zur vorherigen Ansicht"><ha-icon icon="mdi:arrow-left"></ha-icon></button><div><h2>${esc(settingsTitle[0])}</h2><p>${esc(settingsTitle[1])} · ${this._settingsTab === "dns" ? "DNS-Änderungen werden direkt gespeichert." : "Änderungen gelten ab dem nächsten Netzwerkscan."}</p></div></div><div class="settings-save-area" ${this._settingsTab === "dns" ? 'style="display:none"' : ""}><div class="settings-dirty" role="status" aria-live="polite" ${this._dirtyRules.size ? "" : "hidden"}><span>${this._dirtyRules.size} ungespeicherte ${this._dirtyRules.size === 1 ? "Änderung" : "Änderungen"}</span><button class="discard-settings" type="button">Verwerfen</button></div><button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>Alle Einstellungen speichern</button></div></div>
           <div class="rule-list">
             <div class="settings-tab-panel general-panel" role="tabpanel" data-settings-panel="general" ${this._settingsTab === "general" ? "" : "hidden"}>
             <section class="rule-group basics">

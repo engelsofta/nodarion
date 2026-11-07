@@ -26,7 +26,7 @@ async def main():
         await form.locator('[name="domain"]').fill('new.example.org')
         await form.locator('[type="submit"]').click()
         # The production confirmation dialog remains part of the tested flow.
-        await page.locator('.confirm-primary').click()
+        await page.locator('.confirm-accept').click()
         await settings.locator('[data-pihole-remove="@@||new.example.org^"]').wait_for()
         await page.locator('#adguard').click()
         assert await settings.locator('[data-adguard-switch]').count()==6
