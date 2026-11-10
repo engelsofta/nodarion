@@ -1,5 +1,5 @@
-import { esc, blockReason } from "./panel-formatters.mjs?v=1.30.4";
-import { activeLocale, t } from "./panel-i18n.mjs?v=1.30.4";
+import { esc, blockReason } from "./panel-formatters.mjs?v=1.30.5";
+import { activeLocale, t } from "./panel-i18n.mjs?v=1.30.5";
 
 export function renderLog(resetVerticalScroll = false) {
   const list = this.shadowRoot.querySelector(".log-list");
@@ -323,39 +323,45 @@ export function renderAi() {
         dateStyle: "medium", timeStyle: "short",
       }).format(new Date(latestReport.timestamp))
     : "–";
-  const history = reports.slice(0, 14).reverse().map((report) => {
+  const history = reports.slice(0, 14).reverse().map((report, index, points) => {
     const stamp = new Intl.DateTimeFormat(activeLocale(), {
       dateStyle: "short",
     }).format(new Date(report.timestamp));
-    return `<i class="ai-history-bar" style="--score:${Number(report.score || 1)}" title="${esc(stamp)} · ${Number(report.score || 0)}/10"></i>`;
+    const value = Math.max(0, Math.min(10, Number(report.score) || 0));
+    return `<span class="ai-history-bar${index === points.length - 1 ? " latest" : ""}" style="--score:${value}" title="${esc(stamp)} · ${value}/10"></span>`;
   }).join("");
   const aiReportHtml = latestReport ? `
     <div class="ai-report">
-      <div class="ai-score ${scoreClass}">
-        <strong>${score}</strong><span>${t("von 10")}</span>
-        <small>${scoreDelta === null ? t("Erste Bewertung") : scoreDelta > 0 ? t("▲ {0} zum Vortag", scoreDelta) : scoreDelta < 0 ? t("▼ {0} zum Vortag", Math.abs(scoreDelta)) : t("● unverändert")}</small>
+      <div class="ai-overview">
+        <div class="ai-score ${scoreClass}">
+          <div class="ai-score-value"><strong>${score}</strong> <span>${t("von 10")}</span></div>
+          <small>${scoreDelta === null ? t("Erste Bewertung") : scoreDelta > 0 ? t("▲ {0} zum Vortag", scoreDelta) : scoreDelta < 0 ? t("▼ {0} zum Vortag", Math.abs(scoreDelta)) : t("● unverändert")}</small>
+        </div>
+        <div class="ai-summary"><h3>${t("Zusammenfassung")}</h3><p>${esc(latestReport.summary)}</p></div>
+        <figure class="ai-history">
+          <figcaption>${t("Bewertungsverlauf")}</figcaption>
+          <div class="ai-history-bars">${history}</div>
+        </figure>
       </div>
       <div class="ai-copy">
-        <article class="summary"><h3>${t("Zusammenfassung")}</h3><p>${esc(latestReport.summary)}</p></article>
         <article><h3>${t("Auffälligkeiten")}</h3><p>${esc(latestReport.risks)}</p></article>
         <article><h3>${t("Änderungen")}</h3><p>${esc(latestReport.changes)}</p></article>
         <article><h3>${t("Empfehlungen")}</h3><p>${esc(latestReport.recommendations)}</p></article>
         <article><h3>${t("Vertrauen und Datenlage")}</h3><p>${esc(latestReport.confidence)}</p></article>
       </div>
-    </div>
-    ${history ? `<div class="ai-history" aria-label="Bewertungsverlauf">${history}</div>` : ""}`
+    </div>`
     : `<div class="ai-empty">${t("Noch keine KI-Auswertung vorhanden. Aktiviere den täglichen Bericht oder starte die erste Analyse manuell.")}</div>`;
   panel.innerHTML = `
     <section class="ai-panel">
       <div class="ai-head">
         <div><h2><ha-icon icon="mdi:creation-outline"></ha-icon>${t("KI-Netzwerkanalyse")}</h2><p>${t("24-Stunden-Bewertung mit Tagesvergleich · letzter Bericht {0}", esc(reportTime))}</p></div>
         <div class="ai-actions">
-          <button class="ai-prompt-toggle" type="button" ${latestReport?.prompt ? "" : "disabled"}><ha-icon icon="mdi:code-json"></ha-icon>${t("Prompt anzeigen")}</button>
+          ${latestReport?.prompt ? `<button class="ai-prompt-toggle" type="button" aria-expanded="false" aria-controls="ai-report-prompt"><ha-icon icon="mdi:code-json"></ha-icon>${t("Prompt anzeigen")}</button>` : ""}
           <button class="ai-run ${ai.running ? "busy" : ""}" type="button" ${ai.running ? "disabled" : ""}><ha-icon icon="mdi:creation-outline"></ha-icon>${ai.running ? t("Analyse läuft …") : t("Jetzt analysieren")}</button>
         </div>
       </div>
       ${ai.last_error ? `<div class="ai-error"><strong>${t("Letzte Analyse fehlgeschlagen:")}</strong> ${esc(ai.last_error)}</div>` : ""}
-      ${latestReport?.prompt ? `<pre class="ai-prompt" hidden>${esc(latestReport.prompt)}</pre>` : ""}
+      ${latestReport?.prompt ? `<pre class="ai-prompt" id="ai-report-prompt" hidden>${esc(latestReport.prompt)}</pre>` : ""}
       ${aiReportHtml}
     </section>`;
 }

@@ -61,6 +61,36 @@ async function main() {
     await general.click();
     assert.equal(await general.getAttribute("aria-current"), "page");
     assert.equal(await settings.locator('[data-settings-panel="general"]').isVisible(), true);
+    await page.setViewportSize({ width: 1440, height: 1080 });
+    assert.ok((await panel.boundingBox()).height >= 1080);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const settingsMenu = settings.locator(".settings-menu");
+    assert.equal(await settingsMenu.getByRole("button").count(), 6);
+    const saveSettings = settings.locator(".settings-toolbar .save-watch-rules");
+    assert.equal(await saveSettings.isEnabled(), false);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const menuBox = await settingsMenu.boundingBox();
+    const saveBox = await saveSettings.boundingBox();
+    assert.ok(saveBox.x >= menuBox.x + menuBox.width && Math.abs(saveBox.y - menuBox.y) < 2);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const learningDays = settings.locator('[data-rule="learning_days"]');
+    await learningDays.fill("12");
+    assert.equal(await saveSettings.isEnabled(), true);
+    for (const section of ["devices", "rules", "notifications", "dns", "ai-maintenance", "general"]) {
+      const entry = settingsMenu.locator(`[data-settings-section="${section}"]`);
+      await entry.click();
+      assert.equal(await entry.getAttribute("aria-current"), "true");
+      assert.equal(await settings.locator(`[data-settings-panel="${section}"]`).isVisible(), true);
+      assert.equal(await settings.locator("[data-settings-panel]:visible").count(), 1);
+      assert.equal(await saveSettings.isVisible(), true);
+      assert.equal(await saveSettings.isEnabled(), true);
+      if (section === "ai-maintenance") {
+        assert.equal(await settings.locator('[data-settings-panel="ai-maintenance"] .settings-select summary').isVisible(), true);
+      }
+    }
+    assert.equal(await learningDays.inputValue(), "12");
+    assert.equal(await settings.locator(".settings-context-title, .settings-back").count(), 0);
+    assert.equal(await panel.locator(".metrics .metric-settings").count(), 0);
     assert.equal(await panel.locator("header .header-settings").count(), 0);
     assert.equal(await panel.locator("header .scan, header .version-info").count(), 0);
     await nav.getByRole("button", { name: "Geräte", exact: true }).click();
@@ -101,6 +131,44 @@ async function main() {
       await page.keyboard.press("Enter");
       assert.equal(await button.getAttribute("aria-current"), "page");
       assert.equal(await panel.locator(`[data-view="${view}"]`).isVisible(), true);
+    }
+    await nav.locator('[data-nav-tab="ai"]').click();
+    const report = panel.locator(".ai-panel");
+    assert.equal(await report.locator(".ai-empty").isVisible(), true);
+    await panel.evaluate(element => {
+      element._monitor.ai_analysis = {
+        reports: Array.from({ length: 14 }, (_, index) => ({
+          timestamp: new Date(Date.UTC(2026, 10, 14 - index)).toISOString(),
+          score: index === 0 ? 8 : 7,
+          summary: "Das Netzwerk zeigt ein unauffälliges Verhalten mit stabiler Konnektivität und effektiver Filterung.",
+          risks: "Mehrere Geräte wurden umbenannt. Der Anteil blockierter DNS-Anfragen ist erhöht.",
+          changes: "Leichte Rückgänge bei DNS-Abfragen und aktiven Clients im Vergleich zum Vortag.",
+          recommendations: "Gründe für die Umbenennungen und die Filterlisten überprüfen.",
+          confidence: "Hohe Zuverlässigkeit bei vollständiger Datenlage.",
+          prompt: "Example prompt",
+        })),
+      };
+      element._renderAi();
+    });
+    assert.equal(await report.locator(".ai-history-bar").count(), 14);
+    assert.equal(await report.locator(".ai-history-bar.latest").count(), 1);
+    assert.equal(await report.locator(".ai-copy article").count(), 4);
+    assert.equal(await report.locator(".ai-copy").evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length), 1);
+    const promptToggle = report.locator(".ai-prompt-toggle");
+    await promptToggle.click();
+    assert.equal(await promptToggle.getAttribute("aria-expanded"), "true");
+    assert.equal(await report.locator(".ai-prompt").isVisible(), true);
+    await promptToggle.click();
+    assert.equal(await report.locator(".ai-prompt").isVisible(), false);
+    await page.setViewportSize({ width: 1800, height: 900 });
+    assert.equal(await report.locator(".ai-copy").evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length), 4);
+    assert.ok((await report.boundingBox()).height < 290);
+    if (process.env.NODARION_PREVIEW_DIR) {
+      await report.screenshot({ path: path.join(process.env.NODARION_PREVIEW_DIR, "panel-ai-desktop.png") });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    if (process.env.NODARION_PREVIEW_DIR) {
+      await report.screenshot({ path: path.join(process.env.NODARION_PREVIEW_DIR, "panel-ai-mobile.png") });
     }
     await nav.getByRole("button", { name: "Geräte", exact: true }).click();
     await panel.evaluate(element => { element.hass = { ...element._hass, language: "en" }; });

@@ -1,5 +1,5 @@
-import { esc, formatRemainingDuration } from "./panel-formatters.mjs?v=1.30.4";
-import { activeLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.4";
+import { esc, formatRemainingDuration } from "./panel-formatters.mjs?v=1.30.5";
+import { activeLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.5";
 
 export function renderWatch() {
   const panel = this.shadowRoot.querySelector(".watch-view");
@@ -223,15 +223,14 @@ export function renderWatch() {
       <button class="vlan-remove" type="button" data-segment-index="${index}" title="${t("VLAN entfernen")}" aria-label="VLAN ${esc(segment.name || String(segment.vlan_id))} entfernen" ${networkSegments.length <= 1 ? "disabled" : ""}><ha-icon icon="mdi:delete-outline"></ha-icon></button>
     </div>`;
   }).join("");
-  const settingsTitles = {
-    general: ["Allgemeine Einstellungen", "Grundlagen, Lernphase und VLANs"],
-    devices: ["Geräteeinstellungen", t("Neue Geräte, Gastzugang und Bereinigung")],
-    rules: ["Überwachungseinstellungen", t("Regeln, Ruhezeiten und weitere Prüfungen")],
-    notifications: [t("Benachrichtigungen"), "Home-Assistant-Meldungen und Benachrichtigungsziele"],
-    dns: [t("DNS-Einstellungen"), "Schutzfunktionen, Statistiken und Filterverwaltung"],
-    "ai-maintenance": ["KI-Einstellungen", t("Tägliche Netzbewertung und DNS-Datenschutz")],
-  };
-  const settingsTitle = settingsTitles[this._settingsTab] || settingsTitles.general;
+  const settingsSections = [
+    ["general", t("Allgemein")],
+    ["devices", t("Geräte")],
+    ["rules", t("Überwachung")],
+    ["notifications", t("Benachrichtigungen")],
+    ["dns", "DNS"],
+    ["ai-maintenance", t("KI-Analyse")],
+  ];
   const adguardSwitches = (this._dnsProvider().id === "pihole" ? [["switch.nodarion_pihole_gesamtschutz", t("Pi-hole DNS-Schutz"), t("DNS-Blockierung ein- oder ausschalten")]] : [
     ["switch.nodarion_adguard_gesamtschutz", "Gesamtschutz", t("Master-Schalter für sämtliche Schutzfunktionen")],
     ["switch.nodarion_adguard_dns_filterung", "DNS-Filterung", "Blocklisten und eigene Filterregeln anwenden"],
@@ -272,9 +271,20 @@ export function renderWatch() {
         <div class="alert-list">${alertHtml}</div>
       </section>
       <section class="watch-panel watch-settings-panel">
-        <div class="watch-heading"><div class="settings-context-title"><button class="settings-back" type="button" title="${t("Zurück")}" aria-label="${t("Zurück zur vorherigen Ansicht")}"><ha-icon icon="mdi:arrow-left"></ha-icon></button><div><h2>${esc(settingsTitle[0])}</h2><p>${esc(settingsTitle[1])} · ${this._settingsTab === "dns" ? t("DNS-Änderungen werden direkt gespeichert.") : t("Änderungen gelten ab dem nächsten Netzwerkscan.")}</p></div></div><div class="settings-save-area" ${this._settingsTab === "dns" ? 'style="display:none"' : ""}><div class="settings-dirty" role="status" aria-live="polite" ${this._dirtyRules.size ? "" : "hidden"}><span>${unsavedChanges(this._dirtyRules.size)}</span><button class="discard-settings" type="button">${t("Verwerfen")}</button></div><button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>${t("Alle Einstellungen speichern")}</button></div></div>
+        <div class="settings-toolbar">
+          <nav class="settings-menu" aria-label="${t("Einstellungsbereiche")}">
+            ${settingsSections.map(([key, label]) => `<button type="button" id="settings-menu-${key}" data-settings-section="${key}" aria-controls="settings-panel-${key}" aria-current="${this._settingsTab === key}">${esc(label)}</button>`).join("")}
+          </nav>
+          <div class="settings-save-area">
+            <button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>${t("Alle Einstellungen speichern")}</button>
+          </div>
+        </div>
+        <div class="settings-dirty" role="status" aria-live="polite" ${this._dirtyRules.size ? "" : "hidden"}>
+          <span>${unsavedChanges(this._dirtyRules.size)}</span>
+          <button class="discard-settings" type="button">${t("Verwerfen")}</button>
+        </div>
         <div class="rule-list">
-          <div class="settings-tab-panel general-panel" role="tabpanel" data-settings-panel="general" ${this._settingsTab === "general" ? "" : "hidden"}>
+          <div class="settings-tab-panel general-panel" id="settings-panel-general" role="region" aria-labelledby="settings-menu-general" data-settings-panel="general" ${this._settingsTab === "general" ? "" : "hidden"}>
           <section class="rule-group basics">
             <h3>${t("Grundlagen")}<button class="settings-help-button" type="button" data-settings-help="basics" title="${t("Grundlagen erklären")}" aria-label="${t("Hilfe zu Grundlagen")}">?</button></h3>
             <div class="rule"><label>${t("Überwachung aktiv")}<small>${t("Alle Regeln gemeinsam ein- oder ausschalten")}</small></label><input type="checkbox" data-rule="enabled" ${checked(rules.enabled)}></div>
@@ -286,7 +296,7 @@ export function renderWatch() {
             <p class="vlan-empty-note">${t("Subnetze dürfen sich nicht überschneiden. Überwachung aktiviert den Ping/TCP-Scanner und VLAN-Wechselwarnungen für das Segment.")}</p>
           </section>
           </div>
-          <div class="settings-tab-panel devices-panel" role="tabpanel" data-settings-panel="devices" ${this._settingsTab === "devices" ? "" : "hidden"}>
+          <div class="settings-tab-panel devices-panel" id="settings-panel-devices" role="region" aria-labelledby="settings-menu-devices" data-settings-panel="devices" ${this._settingsTab === "devices" ? "" : "hidden"}>
           <section class="rule-group onboarding-settings">
             <h3>${t("Neue Geräte")}<button class="settings-help-button" type="button" data-settings-help="onboarding" title="${t("Erkennung neuer Geräte erklären")}" aria-label="${t("Hilfe zur Erkennung neuer Geräte")}">?</button></h3>
             <div class="rule"><label>${t("Neue Geräte automatisch erkennen")}<small>${t("Teilnehmer in einem festgelegten IP-Bereich als neu kennzeichnen")}</small></label><input type="checkbox" data-rule="onboarding_enabled" ${checked(rules.onboarding_enabled)}></div>
@@ -310,7 +320,7 @@ export function renderWatch() {
             <div class="cleanup-result" role="status"></div>
           </section>
           </div>
-          <div class="settings-tab-panel rules-panel" role="tabpanel" data-settings-panel="rules" ${this._settingsTab === "rules" ? "" : "hidden"}>
+          <div class="settings-tab-panel rules-panel" id="settings-panel-rules" role="region" aria-labelledby="settings-menu-rules" data-settings-panel="rules" ${this._settingsTab === "rules" ? "" : "hidden"}>
           <section class="rule-group device-settings">
             <h3>${t("Geräteüberwachung")}<button class="settings-help-button" type="button" data-settings-help="devices" title="${t("Geräteüberwachung erklären")}" aria-label="${t("Hilfe zu Geräteüberwachung")}">?</button></h3>
             <div class="rule"><label>${t("Neue Geräte bestätigen")}<small>${t("Erst nach dieser Online-Zeit warnen")}</small></label><span class="unit-input"><input type="number" min="1" max="1440" data-rule="new_device_minutes" value="${Number(rules.new_device_minutes)}"><span>${t("Minuten")}</span></span></div>
@@ -333,7 +343,7 @@ export function renderWatch() {
             <div class="rule"><label>${t("Identitätswechsel melden")}<small>${t("Andere MAC-Adresse am gleichen IP-Platz")}</small></label><input type="checkbox" data-rule="identity_changes" ${checked(rules.identity_changes)}></div>
           </section></details>
           </div>
-          <div class="settings-tab-panel notifications-panel" role="tabpanel" data-settings-panel="notifications" ${this._settingsTab === "notifications" ? "" : "hidden"}>
+          <div class="settings-tab-panel notifications-panel" id="settings-panel-notifications" role="region" aria-labelledby="settings-menu-notifications" data-settings-panel="notifications" ${this._settingsTab === "notifications" ? "" : "hidden"}>
           <section class="rule-group notification-settings">
             <h3>${t("Benachrichtigungen")}<button class="settings-help-button" type="button" data-settings-help="notifications" title="${t("Benachrichtigungen erklären")}" aria-label="${t("Hilfe zu Benachrichtigungen")}">?</button></h3>
             <div class="rule"><label>${t("HA-Glocke")}<small>${t("Neue Auffälligkeiten als dauerhafte Meldung in Home Assistant anzeigen")}</small></label><input type="checkbox" data-rule="notify_alerts" ${checked(rules.notify_alerts)}></div>
@@ -347,15 +357,16 @@ export function renderWatch() {
             <div class="notify-target-section"><div class="notify-target-toolbar"><span class="notify-search-wrap"><ha-icon icon="mdi:magnify"></ha-icon><input class="notify-target-search" type="search" value="${esc(this._notifyTargetQuery)}" placeholder="${t("Ziel durchsuchen …")}" aria-label="${t("Benachrichtigungsziel durchsuchen")}"></span><button class="notify-target-action" type="button" data-notify-target-action="all">${t("Alle")}</button><button class="notify-target-action" type="button" data-notify-target-action="none">${t("Keine")}</button></div><div class="notify-target-list">${notifyTargetHtml}</div></div>
           </section>
           </div>
-          <div class="settings-tab-panel dns-settings-panel" role="tabpanel" data-settings-panel="dns" ${this._settingsTab === "dns" ? "" : "hidden"}>
+          <div class="settings-tab-panel dns-settings-panel" id="settings-panel-dns" role="region" aria-labelledby="settings-menu-dns" data-settings-panel="dns" ${this._settingsTab === "dns" ? "" : "hidden"}>
             <section class="rule-group adguard-control-settings"><h3>${t("Schutzfunktionen")}<button class="settings-help-button" type="button" data-settings-help="adguard" title="${t("Schutzfunktionen erklären")}" aria-label="${t("Hilfe zu den DNS-Schutzfunktionen")}">?</button></h3><div class="adguard-feature-list">${adguardSwitches}</div><div class="query-log-warning"><ha-icon icon="mdi:alert-outline"></ha-icon>${this._dnsProvider().id === "pihole" ? t("Protokollierung und Datenschutzstufe werden in Pi-hole eingestellt.") : t("Das Ausschalten des Query-Logs unterbricht DNS-Live und reduziert die Auswertung.")}</div></section>${piHoleRules}
           </div>
-          <div class="settings-tab-panel ai-maintenance-panel" role="tabpanel" data-settings-panel="ai-maintenance" ${this._settingsTab === "ai-maintenance" ? "" : "hidden"}>
+          <div class="settings-tab-panel ai-maintenance-panel" id="settings-panel-ai-maintenance" role="region" aria-labelledby="settings-menu-ai-maintenance" data-settings-panel="ai-maintenance" ${this._settingsTab === "ai-maintenance" ? "" : "hidden"}>
           <section class="rule-group ai-config-settings">
             <h3>${t("KI-Analyse")}<button class="settings-help-button" type="button" data-settings-help="ai" title="${t("KI-Analyse erklären")}" aria-label="${t("Hilfe zur KI-Analyse")}">?</button></h3>
             <div class="rule"><label>${t("Tägliche KI-Auswertung")}<small>${t("Automatisch einmal täglich einen Bericht erstellen")}</small></label><input type="checkbox" data-rule="ai_analysis_enabled" ${checked(rules.ai_analysis_enabled)}></div><div class="dependent-settings" data-depends-on="ai_analysis_enabled" ${rules.ai_analysis_enabled ? "" : "hidden"}>
             <div class="rule"><label>${t("KI-Auswertung um")}<small>${t("Erster Netzwerkscan nach diesem Zeitpunkt")}</small></label><input type="time" data-rule="ai_analysis_time" value="${esc(rules.ai_analysis_time)}"></div>
-            <details class="advanced-settings"><summary>${t("Erweiterter Datenschutz")}</summary><div class="rule"><label>${t("DNS-Datenschutz")}<small>${t("Anonymisiert überträgt nur Zähler und stabile, neutrale Domain-IDs")}</small></label><input type="hidden" data-rule="ai_privacy" value="${esc(rules.ai_privacy)}"><details class="custom-column-filter settings-select"><summary>${rules.ai_privacy === "domains" ? t("Domainnamen mitsenden") : t("Domains anonymisieren")}</summary><div class="custom-filter-menu"><button type="button" class="custom-filter-option ${rules.ai_privacy === "anonymized" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="anonymized"><ha-icon icon="${rules.ai_privacy === "anonymized" ? "mdi:check" : "mdi:incognito"}"></ha-icon><span>${t("Domains anonymisieren")}</span></button><button type="button" class="custom-filter-option ${rules.ai_privacy === "domains" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="domains"><ha-icon icon="${rules.ai_privacy === "domains" ? "mdi:check" : "mdi:web"}"></ha-icon><span>${t("Domainnamen mitsenden")}</span></button></div></details></div></details></div>
+            </div>
+            <div class="rule"><label>${t("DNS-Datenschutz")}<small>${t("Anonymisiert überträgt nur Zähler und stabile, neutrale Domain-IDs")}</small></label><input type="hidden" data-rule="ai_privacy" value="${esc(rules.ai_privacy)}"><details class="custom-column-filter settings-select"><summary>${rules.ai_privacy === "domains" ? t("Domainnamen mitsenden") : t("Domains anonymisieren")}</summary><div class="custom-filter-menu"><button type="button" class="custom-filter-option ${rules.ai_privacy === "anonymized" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="anonymized"><ha-icon icon="${rules.ai_privacy === "anonymized" ? "mdi:check" : "mdi:incognito"}"></ha-icon><span>${t("Domains anonymisieren")}</span></button><button type="button" class="custom-filter-option ${rules.ai_privacy === "domains" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="domains"><ha-icon icon="${rules.ai_privacy === "domains" ? "mdi:check" : "mdi:web"}"></ha-icon><span>${t("Domainnamen mitsenden")}</span></button></div></details></div>
           </section>
           </div>
         </div>
@@ -369,12 +380,16 @@ export function renderWatch() {
 export function renderSettings() {
   const panel = this.shadowRoot.querySelector(".settings-view");
   if (!panel) return;
+  const focusedSection = this.shadowRoot.activeElement?.closest(".settings-menu button");
   const watchSettings = this.shadowRoot.querySelector(
     ".watch-view .watch-settings-panel"
   ) || this.shadowRoot.querySelector(
     ".settings-view .watch-settings-panel"
   );
   panel.replaceChildren(...[watchSettings].filter(Boolean));
+  if (focusedSection) {
+    panel.querySelector('[data-settings-section][aria-current="true"]')?.focus({ preventScroll: true });
+  }
   if (this._settingsHelp) {
     const modal = panel.querySelector(".settings-help-backdrop");
     if (modal) {

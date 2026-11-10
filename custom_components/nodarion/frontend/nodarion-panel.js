@@ -1,10 +1,10 @@
-import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.4";
-import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.4";
-import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.4";
-import { renderCards } from "./panel-devices.mjs?v=1.30.4";
-import { panelStyles } from "./panel-styles.mjs?v=1.30.4";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.4";
-import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.4";
+import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.5";
+import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.5";
+import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.5";
+import { renderCards } from "./panel-devices.mjs?v=1.30.5";
+import { panelStyles } from "./panel-styles.mjs?v=1.30.5";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.5";
+import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.5";
 
 class EngelsoftNodarionPanel extends HTMLElement {
   constructor() {
@@ -22,7 +22,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._logFilters = { time: "", device: "", type: "", service: "", details: "" };
     this._settingsHelp = null;
     this._settingsTab = this._loadSettingsTab();
-    this._settingsReturnTab = "participants";
     this._notifyTargetQuery = "";
     this._notifyTargetsDirty = false;
     this._settingsDraft = null;
@@ -387,14 +386,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
     if (tab === "settings") this._renderSettings();
   }
 
-  _openSettings(section = "general", returnTab = null) {
+  _openSettings(section = "general") {
     const allowed = ["general", "devices", "rules", "notifications", "dns", "ai-maintenance"];
     this._settingsTab = allowed.includes(section) ? section : "general";
-    if (returnTab) {
-      this._settingsReturnTab = returnTab;
-    } else if (this._activeTab !== "settings") {
-      this._settingsReturnTab = this._activeTab;
-    }
     this._saveSettingsTab();
     this._renderWatch();
     this._navigateTo("settings");
@@ -620,11 +614,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
         const metrics = this.shadowRoot.querySelector(".metrics");
         metrics.classList.toggle("overview-expanded", this._mobileOverviewExpanded);
         metrics.querySelector(".mobile-overview-toggle").setAttribute("aria-expanded", String(this._mobileOverviewExpanded));
-        return;
-      }
-      const settingsLink = event.target.closest(".metric-settings");
-      if (settingsLink) {
-        this._openSettings(settingsLink.dataset.settingsSection, settingsLink.dataset.returnTab);
         return;
       }
       const entityIdLink = event.target.closest(".metric-entity-link");
@@ -1118,6 +1107,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         prompt.toggleAttribute("hidden");
         const button = event.target.closest(".ai-prompt-toggle");
         const open = !prompt.hasAttribute("hidden");
+        button.setAttribute("aria-expanded", String(open));
         button.innerHTML = `<ha-icon icon="${open ? "mdi:eye-off-outline" : "mdi:code-json"}"></ha-icon>${open ? t("Prompt ausblenden") : t("Prompt anzeigen")}`;
         return;
       }
@@ -1129,8 +1119,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
     });
     const settingsView = this.shadowRoot.querySelector(".settings-view");
     settingsView.addEventListener("click", (event) => {
-      if (event.target.closest(".settings-back")) {
-        this._navigateTo(this._settingsReturnTab || "participants");
+      const sectionButton = event.target.closest("[data-settings-section]");
+      if (sectionButton) {
+        const section = sectionButton.dataset.settingsSection;
+        if (section !== this._settingsTab) {
+          this._openSettings(section);
+          settingsView.querySelector('[data-settings-section][aria-current="true"]')?.focus();
+        }
         return;
       }
       const removePiHoleRule = event.target.closest("[data-pihole-remove]");
@@ -1452,9 +1447,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
     metrics.classList.toggle("overview-expanded", this._mobileOverviewExpanded);
     metrics.innerHTML = `
       <article class="metric devices">
-        <div class="metric-label-row"><div class="metric-label">${t("Netzwerkgeräte")}</div><div class="metric-header-actions">
-            <button class="mobile-overview-toggle" type="button" aria-label="${t("Übersicht ein- oder ausklappen")}" title="${t("Übersicht ein- oder ausklappen")}" aria-expanded="${this._mobileOverviewExpanded}" aria-controls="mobile-metric-overview"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
-            <button class="metric-settings" type="button" data-settings-section="devices" data-return-tab="participants" title="${t("Geräteeinstellungen öffnen")}" aria-label="${t("Geräteeinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div></div>
+        <div class="metric-label-row"><div class="metric-label">${t("Netzwerkgeräte")}</div>
+          <button class="mobile-overview-toggle" type="button" aria-label="${t("Übersicht ein- oder ausklappen")}" title="${t("Übersicht ein- oder ausklappen")}" aria-expanded="${this._mobileOverviewExpanded}" aria-controls="mobile-metric-overview"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+        </div>
         <div class="device-counts">
           <button class="device-count online ${this._columnFilters.state === "on" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="on" title="${t("Nur Online-Geräte anzeigen")}"><strong>${online}</strong><span>Online</span></button>
           <button class="device-count offline ${this._columnFilters.state === "off" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="off" title="${t("Nur Offline-Geräte anzeigen")}"><strong>${entities.length - online}</strong><span>Offline</span></button>
@@ -1465,28 +1460,28 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ${alertCount ? `<div class="mobile-overview-actions"><button class="mobile-alert-summary" type="button" data-open-watch><ha-icon icon="mdi:alert-outline"></ha-icon>${t("{0} offene Warnungen", alertCount)}</button></div>` : ""}
       <div class="metric-overview" id="mobile-metric-overview">
       <article class="metric events-metric">
-        <div class="metric-label-row"><div class="metric-label">${t("Ereignisse")}</div><button class="metric-settings" type="button" data-settings-section="notifications" data-return-tab="log" title="${t("Benachrichtigungen öffnen")}" aria-label="${t("Benachrichtigungseinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+        <div class="metric-label-row"><div class="metric-label">${t("Ereignisse")}</div></div>
         <div class="metric-reading">
           <div class="metric-status-value">${eventCount}</div>
           <span class="metric-note">${alertCount ? `${alertCount} offene ${alertCount === 1 ? t("Warnung") : t("Warnungen")}` : t("Keine offenen Warnungen")}</span>
         </div>
       </article>
       <article class="metric dns-metric">
-        <div class="metric-label-row"><div class="metric-label">${t("DNS-Schutz")}</div><button class="metric-settings" type="button" data-settings-section="dns" data-return-tab="dns" title="${t("DNS-Einstellungen öffnen")}" aria-label="${t("DNS-Einstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+        <div class="metric-label-row"><div class="metric-label">${t("DNS-Schutz")}</div></div>
         <div class="metric-reading">
           <div class="metric-status-value" title="${esc(dnsStatus)}">${esc(dnsStatus)}</div>
           <button class="metric-note metric-entity-link" type="button" data-entity-id="sensor.nodarion_dns_blockquote" title="${t("Home-Assistant-Dialog öffnen")}">${esc(dnsRatio)}</button>
         </div>
       </article>
       <article class="metric ai-metric" title="${esc(aiNote)}">
-        <div class="metric-label-row"><div class="metric-label">${t("Netzbewertung")}</div><button class="metric-settings" type="button" data-settings-section="ai-maintenance" data-return-tab="ai" title="${t("KI-Einstellungen öffnen")}" aria-label="${t("KI-Einstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+        <div class="metric-label-row"><div class="metric-label">${t("Netzbewertung")}</div></div>
         <div class="metric-reading">
           <div class="metric-value">${esc(aiScore)}</div>
           <span class="metric-note">${esc(aiNote)}</span>
         </div>
       </article>
       <article class="metric watch-metric">
-        <div class="metric-label-row"><div class="metric-label">${t("Überwachung {0}", alertCount ? `<span class="metric-alert-badge">${alertCount}</span>` : "")}</div><button class="metric-settings" type="button" data-settings-section="rules" data-return-tab="watch" title="${t("Überwachungsregeln öffnen")}" aria-label="${t("Überwachungseinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+        <div class="metric-label-row"><div class="metric-label">${t("Überwachung {0}", alertCount ? `<span class="metric-alert-badge">${alertCount}</span>` : "")}</div></div>
         <div class="function-counts">
           <button class="function-count favorite ${this._columnFilters.watch === "monitored" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="monitored" title="${t("Favoriten: {0} gesamt, {1} online", important, importantOnline)}"><strong><ha-icon icon="mdi:star-outline"></ha-icon>${important}/${importantOnline}</strong><span>${t("Favoriten")}</span></button>
           <button class="function-count notify ${this._columnFilters.watch === "notify" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="notify" title="${t("Glocke: {0} gesamt, {1} online", notifications, notificationsOnline)}"><strong><ha-icon icon="mdi:bell-outline"></ha-icon>${notifications}/${notificationsOnline}</strong><span>${t("Glocke")}</span></button>

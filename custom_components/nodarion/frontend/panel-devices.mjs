@@ -1,6 +1,6 @@
-import { esc, deviceWebControl, onboardingStatus, formatLease, formatDateTime, isPrivateMac, formatStateChanged, isNetworkInfrastructure, deviceIcon, deviceIconTitle, blockReason, topDomains, signalRating, dnsRating } from "./panel-formatters.mjs?v=1.30.4";
-import { t } from "./panel-i18n.mjs?v=1.30.4";
-import { internetStatusFor } from "./internet-status.mjs?v=1.30.4";
+import { esc, deviceWebControl, onboardingStatus, formatLease, formatDateTime, isPrivateMac, formatStateChanged, isNetworkInfrastructure, deviceIcon, deviceIconTitle, blockReason, topDomains, signalRating, dnsRating } from "./panel-formatters.mjs?v=1.30.5";
+import { t } from "./panel-i18n.mjs?v=1.30.5";
+import { internetStatusFor } from "./internet-status.mjs?v=1.30.5";
 
 export function renderCards() {
   const focusedDevice = this.shadowRoot.activeElement?.closest(".mobile-details")?.dataset.device;

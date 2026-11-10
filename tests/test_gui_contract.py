@@ -74,7 +74,7 @@ class GuiContractTests(unittest.TestCase):
         self.assertNotIn("window.alert", PANEL)
         self.assertIn('role="alertdialog"', PANEL)
         self.assertIn('aria-live="polite"', PANEL)
-        self.assertIn('aria-label="${t("Zurück zur vorherigen Ansicht")}"', PANEL)
+        self.assertIn('class="settings-menu" aria-label=', PANEL)
 
     def test_every_settings_group_has_contextual_modal_help(self) -> None:
         for help_key in (
@@ -150,19 +150,16 @@ class GuiContractTests(unittest.TestCase):
         self.assertIn('.guest-inline strong { color:var(--ns-cyan); }', PANEL)
         self.assertIn(':host([data-theme="light"]) .rating.warn {', PANEL)
         self.assertIn('--rating-color:#8a6200', PANEL)
-        self.assertIn(':host([data-theme="light"]) .metric-settings {', PANEL)
+        self.assertIn('.settings-menu button[aria-current="true"] {', PANEL)
 
     def test_dns_metric_opens_the_native_sensor_dialog(self) -> None:
         self.assertIn('this._hass.states["sensor.nodarion_dns_blockquote"]', PANEL)
         self.assertIn('class="metric-note metric-entity-link"', PANEL)
         self.assertIn('detail: { entityId: entityIdLink.dataset.entityId }', PANEL)
 
-    def test_metric_gears_open_contextual_settings_without_secondary_tabs(self) -> None:
-        for section in ("devices", "rules", "notifications", "dns", "ai-maintenance"):
-            self.assertIn(f'data-settings-section="{section}"', PANEL)
-        self.assertIn('class="metric-settings"', PANEL)
-        self.assertNotIn('class="settings-tabs"', PANEL)
-        self.assertNotIn('data-settings-tab=', PANEL)
+    def test_settings_menu_replaces_metric_gears(self) -> None:
+        self.assertIn('class="settings-menu"', PANEL)
+        self.assertNotIn('class="metric-settings"', PANEL)
 
     def test_presence_settings_live_in_monitoring_settings(self) -> None:
         general_panel = PANEL.index('data-settings-panel="general"')

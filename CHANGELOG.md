@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.30.2 — Less menu hopping. More network watching. 🎛️
+
+- **AI analysis:** Score, summary and recent ratings share a compact overview. Report details adapt to the available width, and the prompt can still be opened when available.
+- **Settings:** All six sections are available from the sidebar gear. The top menu uses subtle gold dividers and keeps the Save button in place even while viewing DNS settings. DNS switches and domain rules still apply directly. The AI privacy selector is always visible, including when daily analysis is off.
+- **Dashboard:** Each overview card has a distinct corner tint that matches its inactive navigation icon. The logo and wordmark are hidden on mobile to make room for the controls.
+- **Background:** Short views fill the visible screen so the background image reaches the bottom.
+
+Integration **1.30.2** · Frontend **1.30.5**
+
 ## 1.30.1 — Going up! 🛗
 
 - On mobile, Nodarion’s navigation moves to the top and the hamburger button is removed. The Home Assistant menu still opens with a swipe from the left edge.
