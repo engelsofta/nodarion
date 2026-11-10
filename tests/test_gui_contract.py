@@ -104,8 +104,8 @@ class GuiContractTests(unittest.TestCase):
             self.assertNotIn(obsolete, PANEL)
         self.assertIn('data-column="mesh"', PANEL)
 
-    def test_mobile_panel_exposes_home_assistant_navigation(self) -> None:
-        self.assertIn('class="ha-menu"', PANEL)
+    def test_mobile_panel_keeps_edge_swipe_without_hamburger(self) -> None:
+        self.assertNotIn('class="ha-menu"', PANEL)
         self.assertIn('new CustomEvent("hass-toggle-menu"', PANEL)
         self.assertIn('this._onEdgeTouchStart', PANEL)
         self.assertIn('deltaX >= 72', PANEL)

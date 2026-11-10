@@ -25,14 +25,12 @@ export const panelStyles = `
 }
 * { box-sizing: border-box; }
 .shell { width:100%; max-width:none; margin:0; padding:28px clamp(14px,2vw,30px) 52px; position:relative; isolation:isolate; }
-.ha-menu { display:none; place-items:center; flex:0 0 44px; width:44px; height:44px; padding:0; border:1px solid var(--ns-line); border-radius:13px; color:var(--ns-text); background:var(--ns-surface); cursor:pointer; }
-.ha-menu ha-icon { --mdc-icon-size:24px; }
 .shell::before {
   content:""; position:fixed; z-index:-1; inset:0; pointer-events:none; opacity:.28;
   background-image:radial-gradient(rgba(255,255,255,.16) .45px, transparent .45px);
   background-size:4px 4px; mix-blend-mode:soft-light;
 }
-header { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:28px; }
+header { display:flex; align-items:center; justify-content:space-between; gap:24px; }
 .brand { display:flex; align-items:center; gap:16px; }
 
 .header-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; }
@@ -821,9 +819,8 @@ button:focus-visible, summary:focus-visible, input:focus-visible { outline:2px s
 
 /* Warm smoked-glass theme, inspired by the supplied dashboard reference. */
 header {
-  margin-bottom:24px; padding:4px 2px 0;
+  margin-bottom:14px; padding:4px 2px 12px;
   border-bottom:1px solid rgba(255,255,255,.035);
-  padding-bottom:20px;
 }
 .metric-note, .entity, .entity-id-link, .status-time,
 .log-date, .alert-time { color:#aaa49a; }
@@ -1374,7 +1371,6 @@ tbody tr:hover { background:rgba(231,185,101,.055); } .entity-link, .detail-stac
 @media (max-width:1200px) { .metrics { grid-template-columns:repeat(3,1fr); } }
 @media (max-width:800px) {
   .shell { padding-top:20px; } header { align-items:flex-start; flex-wrap:wrap; }
-  .ha-menu { display:grid; }
   .header-actions { margin-left:auto; }
   .metrics { grid-template-columns:1fr 1fr; }
   .connection-panel { grid-template-columns:1fr; }
@@ -1398,7 +1394,7 @@ tbody tr:hover { background:rgba(231,185,101,.055); } .entity-link, .detail-stac
 }
 @media (max-width:620px) {
   .shell { padding:14px 10px 34px; }
-  header { gap:12px; margin-bottom:18px; }
+  header { gap:12px; margin-bottom:12px; }
   .header-actions { width:100%; }
   .header-action { justify-content:center; min-width:0; max-width:100%; }
   .connection-status span { overflow:hidden; text-overflow:ellipsis; }
@@ -1516,7 +1512,6 @@ tbody tr:hover { background:rgba(231,185,101,.055); } .entity-link, .detail-stac
   .settings-help-backdrop { padding:8px; }
   .settings-help-dialog { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); padding:18px; }
 }
-:host([narrow]) .ha-menu { display:grid; }
 @media (max-width:460px) {
   .metrics { gap:9px; }
   .metric-value { font-size:27px; }
@@ -1871,8 +1866,12 @@ tbody tr:hover { background:rgba(231,185,101,.055); } .entity-link, .detail-stac
 
 .mobile-device-status { display:none; }
 @media (max-width:800px) {
-  .panel-navigation { gap:2px; padding:3px; }
-  .panel-navigation button { width:36px; height:40px; }
+  .shell { grid-template-columns:minmax(0,1fr); }
+  .panel-navigation {
+    top:6px; z-index:6; display:grid; grid-template-columns:repeat(6,minmax(0,1fr));
+    justify-items:center; gap:2px; padding:4px; background:var(--ns-metric-surface);
+  }
+  .panel-navigation button { width:44px; height:44px; max-width:100%; }
   .metric { min-height:0; border-radius:18px; }
   .device-list tbody tr { margin-bottom:7px; }
   .device-list td[data-column="name"] { padding:5px 9px; border-bottom:0; }
@@ -1881,9 +1880,15 @@ tbody tr:hover { background:rgba(231,185,101,.055); } .entity-link, .detail-stac
   .device-list tbody tr:not(.mobile-expanded) td[data-column="ip"],
   .device-list tbody tr:not(.mobile-expanded) td[data-column="watch"],
   .device-list tbody tr:not(.mobile-expanded) .entity-id-link { display:none; }
-  .device-name-line { display:flex; align-items:center; gap:8px; min-width:0; }
+  .device-name-line { display:grid; grid-template-columns:minmax(0,1fr) 64px; align-items:center; gap:8px; min-width:0; }
   .device-name-line .entity-link { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .device-list .mobile-device-status { display:inline-flex; gap:4px; flex:none; font-size:10px; }
+  .device-list .mobile-device-status {
+    display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:3px 4px;
+    border:1px solid color-mix(in srgb,var(--state) 28%,transparent); border-radius:999px;
+    background:color-mix(in srgb,var(--state) 7%,transparent); text-transform:none;
+    font-size:10px; font-weight:500; letter-spacing:0;
+  }
+  .device-list .mobile-device-status .dot { width:5px; height:5px; box-shadow:none; }
   .device-list .mobile-details { width:44px; height:44px; margin:0; }
   .device-list .mobile-expanded .mobile-details ha-icon { transform:rotate(180deg); }
 }

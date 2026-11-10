@@ -1,10 +1,10 @@
-import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.3";
-import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.3";
-import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.3";
-import { renderCards } from "./panel-devices.mjs?v=1.30.3";
-import { panelStyles } from "./panel-styles.mjs?v=1.30.3";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.3";
-import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.3";
+import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.4";
+import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.4";
+import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.4";
+import { renderCards } from "./panel-devices.mjs?v=1.30.4";
+import { panelStyles } from "./panel-styles.mjs?v=1.30.4";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.4";
+import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.4";
 
 class EngelsoftNodarionPanel extends HTMLElement {
   constructor() {
@@ -567,7 +567,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <div class="panel-content">
           <header>
             <div class="brand">
-              <button class="ha-menu" type="button" title="${t("Home-Assistant-Menü öffnen")}" aria-label="${t("Home-Assistant-Menü öffnen")}"><ha-icon icon="mdi:menu"></ha-icon></button>
               <span class="logo"><img src="/engelsoft_nodarion_icon.png" alt=""></span>
               <div>
                 <div class="eyebrow">Engelsoft</div>
@@ -611,9 +610,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
         </div>
       </div><div class="guest-modal-host"></div><div class="confirm-host"></div>`;
 
-    this.shadowRoot.querySelector(".ha-menu").addEventListener("click", () =>
-      this._toggleHomeAssistantMenu()
-    );
     this.shadowRoot.querySelector(".connection-status").addEventListener("click", () => {
       this._connectionsExpanded = !this._connectionsExpanded;
       this._renderConnections();

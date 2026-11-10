@@ -44,6 +44,10 @@ async function main() {
     await page.waitForSelector('body[data-ready="true"]', { state: "attached" });
     const panel = page.locator("engelsoft-nodarion-panel");
     const nav = panel.locator(".panel-navigation");
+    const mobileNav = await nav.boundingBox();
+    const mobileHeader = await panel.locator("header").boundingBox();
+    assert.ok(mobileNav.y + mobileNav.height < mobileHeader.y && mobileNav.width > mobileNav.height);
+    assert.equal(await panel.locator(".ha-menu").count(), 0);
     const settings = panel.locator(".settings-view");
     const policy = settings.locator(".pihole-domain-form");
     await policy.locator('[name="domain"]').fill("new.example.org");
@@ -77,6 +81,7 @@ async function main() {
     assert.ok((await row.boundingBox()).height <= 70);
     const offlineStatus = panel.locator(".device-list tbody tr").nth(1).locator(".mobile-device-status");
     assert.equal(await offlineStatus.textContent(), "Offline");
+    assert.ok(Math.abs((await status.boundingBox()).x - (await offlineStatus.boundingBox()).x) < 1);
     assert.ok((await offlineStatus.boundingBox()).x + (await offlineStatus.boundingBox()).width < 380);
     await disclosure.click();
     assert.equal(await disclosure.getAttribute("aria-expanded"), "true");

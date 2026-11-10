@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.30.1 — Going up! 🛗
+
+- On mobile, Nodarion’s navigation moves to the top and the hamburger button is removed. The Home Assistant menu still opens with a swipe from the left edge.
+- Online and Offline appear as aligned status badges beside the device details button.
+- Reduced the space between the header and overview cards.
+
+Integration **1.30.1** · Frontend **1.30.4**
+
 ## 1.30.0 — Less scroll. More patrol. 🧭
 
 *Even the tabs know their way around now.*
