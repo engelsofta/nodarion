@@ -2,8 +2,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
+const { esc, formatLease } = require("../custom_components/nodarion/frontend/panel-formatters.mjs");
 let Panel;
 vm.runInNewContext(fs.readFileSync("custom_components/nodarion/frontend/nodarion-panel.js", "utf8").replace(/^import .*;\r?\n/gm, ""), {
+  esc, formatLease, t: message => message,
   HTMLElement:class {}, customElements:{get:()=>false, define:(_name,value)=>{Panel=value;}}
 });
 function panel(enabled=false) {

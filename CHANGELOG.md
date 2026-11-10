@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.30.0-beta.1 — Less Scroll, More Control. 🧭
+
+*The cards went on a diet. The buttons got a map.*
+
+### Changed
+
+- **Mobile device list:** Online or Offline appears beside the device name. Tap the chevron to reveal the IP address, monitoring actions and other details. An expanded card stays open when live data refreshes.
+- **Dedicated navigation:** Devices, Events, DNS, Analysis and Monitoring each have a labeled button. Overview cards still show counts and offer quick filters, while the navigation shows which view is open.
+- **Cleaner header:** Removed the GitHub star and issue buttons. The Nodarion logo stays.
+
+### Removed and cleaned up
+
+- Removed the unused standalone mesh topology, the handover demo and the old navigation and toolbar styles. Mesh access points and connection details still appear in the device table.
+- Consolidated the overview card surfaces and split the frontend into modules for views, styles, formatting and translations. English interface labels are translated as they render, without scanning and rewriting the page afterward.
+
+Integration **1.30.0-beta.1** · Frontend **1.30.1**
+
 ## 1.29.0 — Pi-hole joins the party. Ads weren't invited. 🕳️🛡️
 
 Pi-hole 6 joins AdGuard Home as a supported DNS provider. Pick your DNS bouncer; Nodarion brings the guest list, device insights and controls together in Home Assistant.

@@ -1,586 +1,10 @@
-import { internetStatusFor } from "./internet-status.mjs?v=1.30.0";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.0";
-
-const esc = (value) =>
-  String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-
-// Only link anonymous HTTP endpoints on the exact discovered device address.
-const deviceWebLinks = (entity) => {
-  const attr = entity.attributes || {};
-  if (entity.state !== "on" || !Array.isArray(attr.web_urls)) return [];
-  return attr.web_urls.filter((value) => {
-    try {
-      const url = new URL(value);
-      return ["http:", "https:"].includes(url.protocol)
-        && url.hostname === attr.ip_address && !url.username && !url.password
-        && url.pathname === "/" && !url.search && !url.hash;
-    } catch { return false; }
-  });
-};
-
-const deviceWebControl = (entity) => {
-  const urls = [...new Set(deviceWebLinks(entity))];
-  if (!urls.length) return "";
-  const icon = '<ha-icon icon="mdi:open-in-new"></ha-icon>';
-  if (urls.length === 1) return `<a class="device-web-link" href="${esc(urls[0])}" target="_blank" rel="noopener noreferrer" title="${esc(urls[0])}">GUI ${icon}</a>`;
-  const id = `device-gui-${String(entity.attributes.ip_address).replaceAll(".", "-")}`;
-  return `<button type="button" class="device-web-link device-gui-button" popovertarget="${esc(id)}" aria-label="GUI auswählen">GUI ${icon}</button><div id="${esc(id)}" class="device-gui-menu" popover="auto">${urls.map(value => {
-    const url = new URL(value);
-    const label = url.protocol.replace(":", "").toUpperCase() + (url.port ? " · " + url.port : "");
-    return `<a href="${esc(value)}" target="_blank" rel="noopener noreferrer" title="${esc(value)}">${esc(label)} ${icon}</a>`;
-  }).join("")}</div>`;
-};
-
-// The panel is authored in German. Home Assistant's selected language decides
-// whether those labels are kept or translated; every unsupported language
-// intentionally falls back to English.
-let panelLocale = "en";
-const EN = new Map(Object.entries({
-  "DNS-Änderungen werden direkt gespeichert.": "DNS changes are saved immediately.",
-  "Speichern": "Save", "Schutzfunktionen": "Protection features",
-  "DNS-Einstellungen": "DNS settings",
-  "Pi-hole DNS-Schutz": "Pi-hole DNS protection",
-  "DNS-Blockierung ein- oder ausschalten": "Enable or disable DNS blocking",
-  "Pi-hole · Domains": "Pi-hole \u00b7 Domains",
-  "Domain-Regeln werden geladen …": "Loading domain rules \u2026",
-  "Protokollierung und Datenschutzstufe werden in Pi-hole eingestellt.": "Logging and privacy level are configured in Pi-hole.",
-  "Exakte Domains für alle derzeit konfigurierten Pi-hole-Gruppen freigeben oder sperren. Regex-Regeln und Gruppenzuordnungen bleiben in Pi-hole verwaltbar.": "Allow or block exact domains for all currently configured Pi-hole groups. Manage regex rules and group assignments in Pi-hole.",
-  "Die Anfragen müssen in Pi-hole einzelnen Clients zugeordnet sein. Datenschutz oder deaktivierte Protokollierung können Details ausblenden. Nicht verfügbare AdGuard-Funktionen werden hier nicht angeboten.": "Pi-hole must identify individual clients. Privacy settings or disabled query logging may hide details. Unsupported AdGuard features are not offered here.",
-  "Domain-Regel entfernen": "Remove domain rule",
-  "Diese Pi-hole-Domain-Regel wirklich entfernen?": "Remove this Pi-hole domain rule?",
-  "Domain-Regel für alle derzeit konfigurierten Pi-hole-Gruppen speichern? Beim Sperren wird eine vorhandene exakte Freigabe dieser Domain entfernt.": "Save the domain rule for all currently configured Pi-hole groups? Blocking removes any existing exact allow rule for this domain.",
-  "für alle derzeit konfigurierten Pi-hole-Gruppen freigegeben werden?": "be allowed for all currently configured Pi-hole groups?",
-  "DNS-Anbieter ist in Nodarion nicht aktiviert oder nicht erreichbar": "DNS provider is not enabled in Nodarion or is unreachable",
-  "DNS-Log nicht verfügbar:": "DNS log unavailable:",
-  "Der Schalter aktiviert oder deaktiviert die DNS-Blockierung von Pi-hole. Protokollierung, Datenschutzstufe und Gruppen verwaltest du in Pi-hole.": "The switch enables or disables Pi-hole DNS blocking. Configure logging, privacy and groups in Pi-hole.",
-  "Domain-Regeln in Nodarion gelten für alle derzeit konfigurierten Pi-hole-Gruppen. Clientbezogene Freigaben, Regex-Regeln und weitere Pi-hole-Einstellungen bleiben in der Pi-hole-Oberfläche.": "Nodarion domain rules apply to all currently configured Pi-hole groups. Manage client-specific rules, regex rules and other Pi-hole settings in the Pi-hole interface.",
-
-  "Internetzugang sperren": "Block internet access",
-  "Sperre fehlgeschlagen": "Blocking failed",
-  "Internetzugang konnte nicht gesperrt werden.": "Internet access could not be blocked.",
-  "Gast-WLAN direkt auf der FRITZ!Box ein- oder ausschalten.": "Enable or disable guest Wi-Fi directly on the FRITZ!Box.",
-  "Gast-WLAN": "Guest Wi-Fi",
-  "Wird umgeschaltet …": "Switching …",
-  "Ein": "On",
-  "Aus": "Off",
-  "Gast-WLAN konnte nicht umgeschaltet werden.": "Guest Wi-Fi could not be switched.",
-  "Weboberfläche öffnen": "Open web interface",
-  "Nodarion auf GitHub öffnen": "Open Nodarion on GitHub",
-  "Übersicht ein- oder ausklappen": "Expand or collapse overview",
-  "Nodarion gefällt dir?": "Enjoying Nodarion?",
-  "Ein Stern auf GitHub sagt Danke.": "A GitHub star says thanks.",
-  "Issue auf GitHub melden": "Report an issue on GitHub",
-  "Fehler gefunden oder eine Idee?": "Found a bug or have an idea?",
-  "Nodarion mit einem Stern auf GitHub unterstützen": "Support Nodarion with a star on GitHub",
-  "Warnungen und Auffälligkeiten": "Warnings and anomalies",
-  "Aktive Hinweise stehen oben, erledigte bleiben als Verlauf erhalten.": "Active notices are shown first; resolved ones remain in the history.",
-  "Änderungen werden direkt in AdGuard Home gespeichert. DNS-Live ist während der Bearbeitung pausiert.": "Changes are saved directly to AdGuard Home. DNS Live is paused while editing.",
-  "Nur lesende Anzeige – Nodarion verändert hier keine FRITZ!Box-Einstellungen.": "Read-only view – Nodarion does not change any FRITZ!Box settings here.",
-  "Die FRITZ!Box konnte den Internetzugang nicht freigeben. Bitte Benutzerrechte und TR-064-Unterstützung prüfen.": "The FRITZ!Box could not enable internet access. Check user permissions and TR-064 support.",
-  "Noch keine KI-Auswertung vorhanden. Aktiviere den täglichen Bericht oder starte die erste Analyse manuell.": "No AI analysis yet. Enable the daily report or start the first analysis manually.",
-  "Nach dem nächsten Scan erscheint hier deine Netzwerktopologie.": "Your network topology will appear here after the next scan.",
-  "Markiere Teilnehmer in der Tabelle mit dem Haus-Symbol.": "Mark devices in the table with the home icon.",
-  "Erkannte Auffälligkeiten erscheinen automatisch hier.": "Detected anomalies will appear here automatically.",
-  "Änderungen gelten ab dem nächsten Netzwerkscan.": "Changes take effect with the next network scan.",
-  "QR-Code mit der Handykamera scannen und direkt mit": "Scan the QR code with your phone camera and connect directly to",
-  "Der WLAN-QR-Code ist nur für Home-Assistant-Administratoren sichtbar.": "The Wi-Fi QR code is only visible to Home Assistant administrators.",
-  "Die FRITZ!Box konnte für dieses Gast-WLAN keinen QR-Code bereitstellen.": "The FRITZ!Box could not provide a QR code for this guest Wi-Fi.",
-  "Der QR-Code ist verfügbar, sobald der Gastzugang aktiv ist.": "The QR code is available once guest access is active.",
-  "Alle Regeln gemeinsam ein- oder ausschalten": "Enable or disable all rules together",
-  "Tage, in denen aktuelle Geräte als bekannt gelten": "Days during which current devices are considered known",
-  "Markierte Geräte gehen sofort online und erst nach dieser Zeit offline (Minuten)": "Marked devices go online immediately and offline after this time (minutes)",
-  "Geräte in diesem IP-Bereich als neu kennzeichnen": "Mark devices in this IP range as new",
-  "DHCP-Start und -Ende automatisch per TR-064 abfragen": "Retrieve DHCP start and end automatically via TR-064",
-  "Neue Geräte im Einrichtungsbereich direkt mit Stern markieren": "Automatically mark new devices in the setup range with a star",
-  "Neue Geräte im Einrichtungsbereich in Home Assistant melden": "Report new devices in the setup range to Home Assistant",
-  "Keine passenden DNS-Anfragen": "No matching DNS requests",
-  "DNS-Anfragen werden geladen": "Loading DNS requests",
-  "Filter ändern oder auf neue Anfragen warten.": "Change the filters or wait for new requests.",
-  "Keine passenden Geräte": "No matching devices",
-  "Keine Ereignisse gefunden": "No events found",
-  "Filter ändern oder leeren.": "Change or clear the filters.",
-  "Keine eigenen Regeln vorhanden": "No custom rules",
-  "Keine DNS-Rewrites vorhanden": "No DNS rewrites",
-  "Keine offenen Warnungen": "No open warnings",
-  "Alles ruhig im Netz": "Everything is quiet on the network",
-  "Noch keine Mesh-Daten": "No mesh data yet",
-  "Noch keine Anwesenheitsgeräte": "No presence devices yet",
-  "Niemand zuhause": "Nobody home",
-  "Mit dem Gast-WLAN verbinden": "Connect to guest Wi-Fi",
-  "Gastnetz an": "Guest network on",
-  "Gastnetz aus": "Guest network off",
-  "Keine Gäste online": "No guests online",
-  "Der Gastzugang ist gerade angenehm übersichtlich.": "Guest access is pleasantly quiet right now.",
-  "Gäste in Tabelle anzeigen": "Show guests in table",
-  "In den Optionen deaktiviert": "Disabled in options",
-  "Alle Einstellungen speichern": "Save all settings",
-  "Von FRITZ!Box übernehmen": "Import from FRITZ!Box",
-  "Automatisch von der FRITZ!Box erkannt": "Detected automatically by the FRITZ!Box",
-  "Erste DHCP-Adresse für neue Geräte": "First DHCP address for new devices",
-  "Letzte DHCP-Adresse für neue Geräte": "Last DHCP address for new devices",
-  "Anwesenheitssensor ist aktiviert.": "Presence sensor is enabled.",
-  "Aktueller Zustand und Verlauf der letzten 24 Stunden.": "Current state and history for the last 24 hours.",
-  "24-Stunden-Bewertung mit Tagesvergleich": "24-hour rating with day-to-day comparison",
-  "Neueste DNS-Anfragen": "Latest DNS requests",
-  "automatisch alle 3 Sekunden": "automatically every 3 seconds",
-  "Übersicht": "Overview", "Geräte suchen …": "Search devices …", "Geräte suchen": "Search devices", "Geräte filtern": "Filter devices", "Suche": "Search",
-  "Netzwerkgeräte": "Network devices", "Alle IP-Bereiche": "All IP ranges",
-  "Teilnehmer": "Devices", "IP-Adresse": "IP address", "MAC-Adresse": "MAC address",
-  "Verbindung": "Connection", "Verbindungen werden geladen": "Loading connections",
-  "Mesh-Zugangspunkt": "Mesh access point", "Alle Mesh-Punkte": "All mesh points",
-  "WLAN-Daten": "Wi-Fi data", "Adressvergabe": "Address assignment",
-  "Erkannt durch": "Detected by", "Internetzugang": "Internet access",
-  "Überwachung": "Monitoring", "Überwachung aktiv": "Monitoring enabled",
-  "Automatisch überwachen": "Monitor automatically", "Einstellungen": "Settings",
-  "Jetzt scannen": "Scan now", "Live-Log": "Live log", "Ereignisse": "Events",
-  "Warnungen": "Warnings", "Warnung": "Warning", "offene": "open",
-  "DNS-Schutz": "DNS protection", "Netzbewertung": "Network rating",
-  "Schutz aktiv": "Protection enabled", "Schutz nicht erreichbar": "Protection unavailable",
-  "Favoriten": "Favorites", "Glocke": "Notifications", "Anwesenheit": "Presence",
-  "FRITZ!Box-Gastzugang": "FRITZ!Box guest access", "Gastzugang": "Guest access",
-  "Spalten auswählen": "Choose columns", "Zeit": "Time", "Gerät": "Device",
-  "Ereignis": "Event", "Dienst": "Service", "Details": "Details",
-  "Datum / Uhrzeit": "Date / time", "Name / IP": "Name / IP", "Meldung": "Message",
-  "Freigeben": "Allow", "Freigegeben": "Allowed", "Blockieren": "Block",
-  "Ergebnis": "Result", "Domain / Antwort": "Domain / answer", "Client-IP": "Client IP",
-  "DNS-Server": "DNS server", "Grund": "Reason", "Dauer": "Duration", "Aktion": "Action",
-  "AdGuard-Konfiguration": "AdGuard configuration", "Eigene Filterregeln": "Custom filter rules",
-  "Hinzufügen": "Add", "Domain freigeben": "Allow domain", "Nur dieser Client": "This client only",
-  "Für alle Clients": "For all clients", "Abbrechen": "Cancel", "Konfiguration": "Configuration",
-  "Aktualisieren": "Refresh", "Alle Ergebnisse": "All results", "Nur erlaubt": "Allowed only",
-  "Diagramm aus": "Hide chart", "Diagramm an": "Show chart",
-  "Stundendiagramm ausblenden": "Hide hourly chart", "Stundendiagramm einblenden": "Show hourly chart",
-  "Nur blockiert": "Blocked only", "Alle Clients": "All clients", "erlaubt": "allowed",
-  "blockiert": "blocked", "Zusammenfassung": "Summary", "Auffälligkeiten": "Anomalies",
-  "Änderungen": "Changes", "Empfehlungen": "Recommendations",
-  "Vertrauen und Datenlage": "Confidence and data quality", "KI-Netzwerkanalyse": "AI network analysis",
-  "Erste Bewertung": "First rating", "zum Vortag": "from previous day",
-  "unverändert": "unchanged", "letzter Bericht": "latest report",
-  "Prompt anzeigen": "Show prompt", "Prompt ausblenden": "Hide prompt",
-  "Jetzt analysieren": "Analyze now", "Analyse läuft": "Analysis running",
-  "Letzte Analyse fehlgeschlagen": "Last analysis failed", "Netzwerkhinweis": "Network notice",
-  "Bestätigen": "Acknowledge", "Zuhause": "Home", "Abwesend": "Away", "Anwesend": "Present",
-  "Aktive Warnungen": "Active warnings", "Kritisch": "Critical",
-  "Unbekannte Geräte": "Unknown devices", "Instabile Geräte": "Unstable devices",
-  "Lernphase beendet": "Learning phase complete", "Neu starten": "Restart",
-  "Allgemein": "General", "Geräte": "Devices", "Regeln & Alarme": "Rules & alerts",
-  "Benachrichtigungen": "Notifications", "KI-Analyse": "AI analysis", "Grundlagen": "Basics",
-  "Lernphase": "Learning phase", "Anwesenheits-Timeout": "Presence timeout",
-  "Anwesenheitssensor": "Presence sensor", "Geräte-Einrichtung": "Device setup",
-  "Einrichtungsbereich aktiv": "Setup range enabled", "Bereich beginnt": "Range starts",
-  "Bereich endet": "Range ends", "Benachrichtigung": "Notification",
-  "Online": "Online", "Offline": "Offline", "Neu": "New", "Unbekannt": "Unknown", "unbekannt": "unknown",
-  "Privat / randomisiert": "Private / randomized", "Noch": "Remaining", "Tage": "days",
-  "Tag": "day", "Stunden": "hours", "Minuten": "minutes", "Sek.": "sec.",
-  "Std.": "hrs.", "Gast": "guest", "Gäste": "guests", "aktiv": "enabled",
-  "deaktiviert": "disabled", "Erledigt": "Resolved", "vor": "ago", "jetzt": "now",
-  "Sehr gut": "Excellent", "Gut": "Good", "Schwach": "Weak", "Sehr schwach": "Very weak",
-  "Unauffällig": "Normal", "Moderat": "Moderate", "Erhöht": "Elevated", "Auffällig hoch": "Unusually high",
-  "Blockliste": "Blocklist", "Jugendschutz": "Parental control", "Gesperrter Dienst": "Blocked service",
-  "Ungültige Anfrage": "Invalid request", "Nicht protokolliert": "Not logged",
-  "Speichern fehlgeschlagen": "Save failed", "Speichert": "Saving", "Gespeichert": "Saved",
-  "Keine Funktion": "No function", "Alle Funktionen": "All functions",
-  "Zeit unbekannt": "Time unknown", "Noch nicht geprüft": "Not checked yet", "Wird freigegeben": "Enabling access",
-  "Gastzugang anzeigen": "Show guest access", "Nur Geräte im Gastzugang anzeigen": "Show guest access devices only",
-  "Noch keine Bewertung": "No rating yet", "Einen kleinen Moment": "Just a moment",
-  "Freigabe fehlgeschlagen": "Access approval failed", "KI-Analyse fehlgeschlagen": "AI analysis failed",
-  "Keine Offline-Geräte gefunden.": "No offline devices found.", "DNS-Änderung fehlgeschlagen.": "DNS change failed.",
-  "DNS-Anbieter ist nicht erreichbar.": "DNS provider is unreachable.",
-  "DNS-Anbieter ist in Nodarion nicht aktiviert oder nicht erreichbar": "DNS provider is not enabled in Nodarion or is unreachable",
-  "Bereinigung konnte nicht ausgeführt werden.": "Cleanup could not be performed.",
-  "DNS-Live nach": "Filter DNS Live by", "ausgewählt": "selected", "Keine Bewertung": "No rating",
-  "Gast zur Ruhezeit": "Guest during quiet hours", "Aktivität zur Ruhezeit": "Activity during quiet hours",
-  "Simulation abgeschlossen": "Simulation complete", "ist jetzt mit": "is now connected to",
-  "Für diesen MAC-Präfix wurde in der lokalen Datei kein Hersteller gefunden.": "No manufacturer was found for this MAC prefix in the local file.",
-  "Lokale bzw. randomisierte MAC-Adresse – eine Herstellerzuordnung ist nicht zuverlässig möglich.": "Local or randomized MAC address – reliable manufacturer identification is not possible.",
-  "Internetzugang für": "Enable internet access for", "freigeben und das Gerät dauerhaft bestätigen?": "and permanently approve this device?",
-  "Noch kein": "No", "-Ziel in Home Assistant vorhanden.": "target exists in Home Assistant.",
-  "Diese Aktion ist bewusst nicht Teil des normalen Speicherns und wird erst nach einer zusätzlichen Bestätigung ausgeführt.": "This action is intentionally separate from normal saving and runs only after an additional confirmation.",
-  "Für Geräte mit Stern gilt die Offline-Frist. Nach deren Ablauf erscheint eine Warnung, sofern das Gerät weiterhin nicht erreichbar ist.": "The offline grace period applies to starred devices. A warning appears when it expires if the device is still unreachable.",
-  "Neue Geräte werden erst nach der Bestätigungszeit gemeldet. Kurze oder fehlerhafte Erkennungen lösen dadurch nicht sofort eine Warnung aus.": "New devices are reported only after the confirmation period, preventing brief or faulty detections from immediately triggering a warning.",
-  "Haus-markierte Geräte melden sich sofort als anwesend. Erst wenn ein Gerät länger als das Anwesenheits-Timeout nicht erreichbar ist, gilt es als abwesend.": "Home-marked devices become present immediately and are considered away only after being unreachable for longer than the presence timeout.",
-  "Der Einrichtungsbereich kennzeichnet Geräte im angegebenen DHCP-Adressbereich als neu. Adressen außerhalb dieses Bereichs erscheinen als regulärer Bereich.": "The setup range marks devices in the specified DHCP address range as new. Addresses outside this range are shown as the regular range.",
-  "Bei automatischer Übernahme liest Nodarion Start und Ende direkt aus der FRITZ!Box. Optional können neue Geräte sofort überwacht oder zusätzlich in Home Assistant gemeldet werden.": "With automatic import, Nodarion reads the start and end directly from the FRITZ!Box. New devices can optionally be monitored immediately or also reported in Home Assistant.",
-  "Gastnetz anzeigen und überwachen": "Show and monitor guest network",
-  "Gastgeräte in Nodarion erfassen, anzeigen und protokollieren": "Detect, display, and log guest devices in Nodarion",
-  "Neue Gäste melden": "Report new guests",
-  "Beim erstmaligen Verbinden mit dem FRITZ!Box-Gastzugang warnen": "Warn when a device first connects to FRITZ!Box guest access",
-  "Gäste zur Ruhezeit melden": "Report guests during quiet hours",
-  "Verbindungen im eingestellten Ruhezeitraum hervorheben": "Highlight connections during the configured quiet hours",
-  "Maximale Gastdauer": "Maximum guest duration",
-  "Nach dieser Anzahl Stunden eine Warnung anzeigen": "Show a warning after this number of hours",
-  "Offline-Teilnehmer löschen": "Delete offline devices",
-  "Entfernt alle aktuell offline geführten Geräte einschließlich ihrer gespeicherten Einstellungen.": "Removes all devices currently marked offline, including their saved settings.",
-  "Alle derzeit offline geführten Geräte sofort entfernen": "Immediately remove all devices currently marked offline",
-  "Geräteüberwachung": "Device monitoring",
-  "Neue Geräte bestätigen": "Confirm new devices",
-  "Erst nach dieser Online-Zeit warnen (Minuten)": "Warn only after this online time (minutes)",
-  "Wichtiges Gerät offline": "Important device offline",
-  "Warnung nach Minuten": "Warn after minutes",
-  "Weitere Prüfungen": "Additional checks",
-  "Statuswechsel pro Stunde": "State changes per hour",
-  "Ab dieser Anzahl als instabil melden": "Report as unstable from this number onward",
-  "Identitätswechsel melden": "Report identity changes",
-  "Andere MAC-Adresse am gleichen IP-Platz": "Different MAC address at the same IP address",
-  "Ruhezeiten": "Quiet hours", "Ruhezeit überwachen": "Monitor quiet hours",
-  "Aktivierungen in diesem Zeitraum melden": "Report activity during this period",
-  "Ruhezeit beginnt": "Quiet hours start", "Ruhezeit endet": "Quiet hours end",
-  "HA-Glocke": "HA notifications",
-  "Neue Auffälligkeiten als dauerhafte Meldung in Home Assistant anzeigen": "Show new anomalies as persistent notifications in Home Assistant",
-  "Warnungen senden": "Send warnings",
-  "Normale Warnungen an die ausgewählten Ziele senden": "Send regular warnings to the selected targets",
-  "Kritische Meldungen senden": "Send critical notifications",
-  "Kritische Ausfälle an die ausgewählten Ziele senden": "Send critical outages to the selected targets",
-  "Für eigene Automationen wird immer das Ereignis": "The event",
-  "ausgelöst.": "is always fired for custom automations.",
-  "Benachrichtigungsziele": "Notification targets",
-  "Companion App, Telegram und andere in Home Assistant eingerichtete Ziele": "Companion App, Telegram, and other targets configured in Home Assistant",
-  "Ziel durchsuchen": "Search targets", "Benachrichtigungsziel durchsuchen": "Search notification targets",
-  "Tägliche KI-Auswertung": "Daily AI analysis",
-  "Automatisch einmal täglich einen Bericht erstellen": "Automatically create a report once a day",
-  "KI-Auswertung um": "AI analysis at",
-  "Erster Netzwerkscan nach diesem Zeitpunkt": "First network scan after this time",
-  "DNS-Datenschutz": "DNS privacy",
-  "Anonymisiert überträgt nur Zähler und stabile, neutrale Domain-IDs": "Anonymized mode transmits only counters and stable, neutral domain IDs",
-  "Domains anonymisieren": "Anonymize domains", "Domainnamen mitsenden": "Include domain names",
-  "Grundlagen erklären": "Explain basics", "Hilfe zu Grundlagen": "Help with basics",
-  "Anwesenheit erklären": "Explain presence", "Hilfe zu Anwesenheit": "Help with presence",
-  "Geräte-Einrichtung erklären": "Explain device setup", "Hilfe zu Geräte-Einrichtung": "Help with device setup",
-  "Bereinigung erklären": "Explain cleanup", "Hilfe zur Bereinigung": "Cleanup help",
-  "Geräteüberwachung erklären": "Explain device monitoring", "Hilfe zu Geräteüberwachung": "Device monitoring help",
-  "Ruhezeiten erklären": "Explain quiet hours", "Hilfe zu Ruhezeiten": "Quiet-hours help",
-  "Prüfungen erklären": "Explain checks", "Hilfe zu weiteren Prüfungen": "Additional-checks help",
-  "Benachrichtigungen erklären": "Explain notifications", "Hilfe zu Benachrichtigungen": "Notifications help",
-  "KI-Analyse erklären": "Explain AI analysis", "Hilfe zur KI-Analyse": "AI analysis help",
-  "Hilfe schließen": "Close help", "Hilfe": "Help", "Bereinigung": "Cleanup", "Löschen": "Delete",
-  "Kein AdGuard-DNS": "No DNS", "Nicht verwaltet": "Not managed",
-  "Vertrauenswürdig": "Trusted", "Noch nicht geprüft": "Not checked yet",
-  "VPN · Nicht verwaltet": "VPN · Not managed",
-  "Netzwerkinfrastruktur": "Network infrastructure",
-  "Router und Mesh-Komponenten werden nicht durch den FRITZ!Box-Hostfilter gesteuert.": "Routers and mesh components are not controlled by the FRITZ!Box host filter.",
-  "Einrichtungsbereich": "Setup range", "Regulärer Bereich": "Regular range",
-  "Einrichtung deaktiviert": "Setup disabled", "IP-Bereich": "IP range",
-  "Keine Angabe": "No information", "Nicht erkannt": "Not detected", "Keine Quelle": "No source",
-  "Freigabe gespeichert": "Approval saved", "Freigabe entzogen": "Approval revoked",
-  "Internetzugang gesperrt": "Internet access blocked", "Archiv bereinigt": "Inventory cleaned",
-  "Gerät vergessen": "Device forgotten", "Nodarion-Internetschutz": "Nodarion internet protection",
-  "Nodarion-Datenpflege": "Nodarion data maintenance",
-  "Internetfreigabe gespeichert.": "Internet approval saved.",
-  "Während der Lernphase automatisch freigegeben.": "Automatically approved during the learning phase.",
-  "Internetfreigabe automatisch entzogen: MAC-Adresse geändert": "Internet approval automatically revoked: MAC address changed",
-  "Internetzugang für ein noch nicht freigegebenes Gerät gesperrt.": "Internet access blocked for a device that has not yet been approved.",
-  "Veralteten Offline-Eintrag entfernt; Freigabe bleibt erhalten.": "Removed stale offline entry; approval was retained.",
-  "Gerät vollständig gelöscht; Freigabe entfernt.": "Device completely deleted; approval removed.",
-  "Gespeicherte Freigabe konnte nicht wiederhergestellt werden": "Saved approval could not be restored",
-  "Neue Geräte automatisch erkennen": "Detect new devices automatically",
-  "IP-Bereich aus FRITZ!Box übernehmen": "Import IP range from FRITZ!Box",
-  "Erste IP-Adresse": "First IP address", "Letzte IP-Adresse": "Last IP address",
-  "Erkennung neuer Geräte erklären": "Explain new-device detection", "Hilfe zur Erkennung neuer Geräte": "New-device detection help",
-  "Lernphase läuft bis": "Learning phase runs until", "Lernphase ist beendet": "Learning phase has ended",
-  "Aktuell erkannte Geräte werden automatisch übernommen. Danach müssen neue Geräte wieder geprüft werden.": "Currently detected devices are accepted automatically. New devices will require review afterwards.",
-  "Neue Geräte werden geprüft und bei aktiviertem Internetschutz zunächst gesperrt.": "New devices are reviewed and initially blocked when internet protection is enabled.",
-  "Neu beginnen": "Start again", "7 Tage verlängern": "Extend by 7 days", "Jetzt beenden": "End now",
-  "Dauer bei Neustart": "Duration after restart", "Maximal 30 Tage": "Maximum 30 days",
-  "Offline-Teilnehmer bereinigen": "Clean up offline devices", "Anzeige bereinigen": "Clean up display",
-  "Vollständig vergessen": "Forget completely", "mit Freigabe oder Überwachung": "with approval or monitoring",
-  "Freigaben oder Überwachungseinstellungen entfernt": "approvals or monitoring settings will be removed",
-  "Gespeicherte Gerätefreigaben bleiben erhalten": "Saved device approvals will be retained",
-  "VPN-Verbindungen werden nicht durch den FRITZ!Box-Hostfilter gesteuert.": "VPN connections are not controlled by the FRITZ!Box host filter.",
-  "Der Gastzugang wird durch die FRITZ!Box verwaltet.": "Guest access is managed by the FRITZ!Box.",
-  "Die FRITZ!Box konnte die gewünschte Änderung nicht ausführen.": "The FRITZ!Box could not perform the requested change.",
-  "Freigabe durch einen Administrator erforderlich.": "Approval by an administrator is required.",
-  "Nicht verfügbar": "Not available",
-  "Überwachen": "Monitor", "Erledigen": "Resolve", "Details": "Details",
-  "Weitere Gerätedetails anzeigen": "Show more device details",
-  "Wechsel/Std.": "changes/hour", "Aktuell": "Currently", "offline, davon": "offline, of which",
-  "Lernphase jetzt beenden? Neue Geräte werden danach wieder geprüft.": "End the learning phase now? New devices will be reviewed afterwards.",
-  "Offline-Anzeigen bereinigen?": "Clean up offline entries?",
-  "behält Freigaben": "retains approvals", "entfernt zusätzlich Freigaben und Markierungen": "also removes approvals and markers",
-  "Neue Geräte": "New devices",
-  "Teilnehmer in einem festgelegten IP-Bereich als neu kennzeichnen": "Mark devices in a defined IP range as new",
-  "DHCP-Start und -Ende automatisch abfragen": "Read DHCP start and end automatically",
-  "Neue Geräte direkt mit Stern markieren": "Mark new devices with a star automatically",
-  "Neue Geräte in Home Assistant melden": "Report new devices in Home Assistant",
-  "Markierte Geräte gehen sofort online und erst danach offline": "Marked devices go online immediately and offline only after the timeout",
-  "Danach eine Warnung anzeigen": "Show a warning afterwards",
-  "Der Bereich für neue Geräte kennzeichnet Teilnehmer im angegebenen DHCP-Adressbereich als neu. Adressen außerhalb dieses Bereichs erscheinen als regulärer Bereich.": "The new-device range marks devices in the specified DHCP address range as new. Addresses outside this range are shown as the regular range.",
-  "Anzeige bereinigen entfernt alte Offline-Einträge, behält aber gespeicherte Gerätefreigaben. Vollständig vergessen entfernt zusätzlich Überwachungs- und Anwesenheitsmarkierungen.": "Clean up display removes old offline entries but retains saved device approvals. Forget completely also removes monitoring and presence markers.",
-  "Vor beiden Aktionen zeigt Nodarion die Anzahl betroffener und geschützter Teilnehmer an und fragt nochmals nach.": "Before either action, Nodarion shows the number of affected and protected devices and asks for confirmation.",
-  "Nicht bewertet": "Not rated", "Anfragen": "queries", "blockiert": "blocked",
-  "Gesperrt / frei": "Blocked / allowed", "Gesperrt": "Blocked",
-  "Alle Internetstatus": "All internet statuses",
-  "Alle Verbindungen": "All connections", "Alle Adressvergaben": "All address assignments",
-  "Alle Erkennungsquellen": "All detection sources", "Aktive Filter": "Active filters",
-  "Alle Filter zurücksetzen": "Reset all filters", "Filter entfernen": "Remove filter",
-  "ungespeicherte Änderung": "unsaved change", "ungespeicherte Änderungen": "unsaved changes",
-  "Verwerfen": "Discard", "IP-Bereich manuell festlegen": "Set IP range manually",
-  "Erweiterte Prüfungen": "Advanced checks", "Erweiterter Datenschutz": "Advanced privacy",
-  "Änderung bestätigen": "Confirm change", "Änderung fehlgeschlagen": "Change failed",
-  "Lernphase beenden": "End learning phase", "Offline-Geräte bereinigen": "Clean up offline devices",
-  "Gerät freigeben": "Approve device", "Ausführen": "Proceed", "Schließen": "Close",
-  "Gesperrt · Freigabe ausstehend": "Blocked · approval pending", "Freigabe ausstehend": "Approval pending", "Lernphase · automatisch freigegeben": "Learning phase · automatically allowed",
-  "Anteil blockierter DNS-Anfragen": "Share of blocked DNS queries",
-  "Nur Offline-Geräte anzeigen": "Show offline devices only",
-  "DNS-Live-Log für": "Open DNS Live log for", "öffnen": "open",
-  "Statisch": "Static", "Signal": "signal", "Normal": "Normal",
-  "von": "of", "Keine": "None", "Alle": "All",
-  "Offline-Meldung": "Offline notification", "Nicht erreichbar": "Unreachable", "Nicht eingerichtet": "Not configured",
-  "Hersteller": "Manufacturer", "Quelle: lokale MAC-Vendor-Datei": "Source: local MAC vendor file",
-  "Registrierter Präfix": "Registered prefix", "Zuteilung": "Allocation", "Registerstand": "Registry date",
-  "Zeitraum": "Period", "Daten vollständig": "Data complete", "Nein (Abfragelimit erreicht)": "No (query limit reached)",
-  "Ja": "Yes", "Letzte Aktivität": "Last activity", "Letzte Domain": "Last domain",
-  "Zuletzt blockiert": "Last blocked", "Treffergrund": "Match reason", "DNS-Protokoll": "DNS protocol",
-  "Häufig abgefragt": "Frequently queried", "Häufig blockiert": "Frequently blocked",
-  "Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus": "Locally administered or randomized MAC address; changes do not trigger an identity warning",
-  "Überwachung beenden": "Stop monitoring", "Als wichtig überwachen": "Monitor as important",
-  "Gerät im DHCP-Einrichtungsbereich": "Device in DHCP setup range",
-  "Netzwerkteilnehmer · Symbol anhand verfügbarer Gerätedaten": "Network device · icon based on available device data",
-  "VPN-Verbindung · nicht durch den FRITZ!Box-Hostfilter verwaltet": "VPN connection · not managed by the FRITZ!Box host filter",
-  "Gastgerät · durch den FRITZ!Box-Gastzugang verwaltet": "Guest device · managed by FRITZ!Box guest access",
-  "Router · geschützte Netzwerkinfrastruktur": "Router · protected network infrastructure",
-  "Mesh-Komponente · aus FRITZ!Box-Topologie erkannt": "Mesh component · detected from FRITZ!Box topology",
-  "Mesh-Komponente · anhand verfügbarer Gerätedaten erkannt": "Mesh component · detected from available device data",
-  "Live-Log dieses Geräts anzeigen": "Show this device's live log", "Home-Assistant-Dialog öffnen": "Open Home Assistant dialog",
-  "WLAN-Empfang": "Wi-Fi reception", "Mesh-Punkt": "Mesh point",
-  "Mit Überwachung aktiv werden sämtliche Warn- und Prüfregeln gemeinsam geschaltet. Die Erkennung und Anzeige der Geräte läuft unabhängig davon weiter.": "Enabling monitoring turns all warning and checking rules on or off together. Device detection and display continue independently.",
-  "Der optionale Home-Assistant-Binary-Sensor ist aktiv, sobald mindestens eines dieser Geräte zuhause ist. Er eignet sich beispielsweise für Licht-, Heizungs- oder Alarm-Automationen.": "The optional Home Assistant binary sensor is active whenever at least one of these devices is home. It can be used for lighting, heating, or alarm automations.",
-  "Während der Ruhezeit kann das Aktivwerden eines Geräts als Auffälligkeit gemeldet werden. Zeiträume über Mitternacht, beispielsweise 23:00 bis 06:00 Uhr, werden automatisch korrekt behandelt.": "Device activity during quiet hours can be reported as an anomaly. Periods spanning midnight, such as 23:00 to 06:00, are handled automatically.",
-  "Ist die Prüfung deaktiviert, beeinflusst die Ruhezeit weder Erkennung noch Anwesenheitssteuerung.": "When this check is disabled, quiet hours affect neither detection nor presence tracking.",
-  "Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln gewarnt wird.": "Frequent online/offline changes within one hour indicate an unstable connection. The threshold determines how many changes trigger a warning.",
-  "Die HA-Glocke zeigt Meldungen direkt in Home Assistant. Ausgewählte Benachrichtigungsziele senden Warnungen zusätzlich etwa an die Companion App oder einen eingerichteten Telegram Bot.": "HA notifications appear directly in Home Assistant. Selected notification targets can additionally send warnings to the Companion App or a configured Telegram bot.",
-  "Unabhängig von diesen Schaltern erzeugt jede neue Warnung das Home-Assistant-Ereignis nodarion_alert. Damit lassen sich eigene Automationen und weitere Eskalationswege bauen.": "Regardless of these switches, every new warning fires the Home Assistant event nodarion_alert. It can be used for custom automations and additional escalation paths.",
-  "Die tägliche Auswertung fasst Netzwerkzustand, Änderungen und Auffälligkeiten nach dem gewählten Zeitpunkt zusammen. Eine manuelle Analyse bleibt im KI-Reiter jederzeit möglich.": "The daily analysis summarizes network status, changes, and anomalies after the selected time. A manual analysis remains available in the AI tab at any time.",
-  "Mit anonymisiertem DNS-Datenschutz werden keine lesbaren Domainnamen an die KI übergeben. Domainnamen mitsenden ermöglicht detailliertere Bewertungen, gibt aber entsprechend mehr Informationen weiter.": "With anonymized DNS privacy, no readable domain names are sent to the AI. Including domain names enables more detailed assessments but shares correspondingly more information.",
-  "Offline-Teilnehmer löschen entfernt alle derzeit offline geführten Geräte samt gespeicherter Markierungen und Überwachungseinstellungen.": "Deleting offline devices removes every device currently marked offline, including saved labels and monitoring settings.",
-  "Wirklich ALLE derzeit offline angezeigten Geräte sofort entfernen? Offline überwachte Geräte und deren Überwachungseinstellungen werden ebenfalls gelöscht.": "Really remove ALL devices currently shown as offline? Monitored offline devices and their monitoring settings will also be deleted.",
-  "wird von": "is being moved from", "übergeben": "to", "Änderungen lösen keine Identitätswarnung aus": "Changes do not trigger an identity warning",
-  "Verbunden": "Connected", "Geprüft": "Checked", "Mesh-Wechsel": "Mesh change",
-  "Erlaubt": "Allowed", "Blockiert": "Blocked", "Verarbeitet": "Processed",
-  "Umbenannt": "Renamed", "Neu erkannt": "Newly detected",
-  "Gast verbunden": "Guest connected", "Gast getrennt": "Guest disconnected",
-  "Unbekanntes Gerät": "Unknown device", "Instabile Verbindung": "Unstable connection",
-  "Identität geändert": "Identity changed", "Neuer Gast": "New guest",
-  "Gast lange verbunden": "Guest connected for a long time",
-  "ist wieder online": "is back online", "ist offline": "is offline",
-  "ist seit mindestens": "has been online for at least",
-  "Statuswechsel innerhalb einer Stunde erkannt.": "state changes detected within one hour.",
-  "Gerät wurde während der eingestellten Ruhezeit aktiv.": "Device became active during the configured quiet hours.",
-  "Gastgerät wurde während der Ruhezeit aktiv.": "Guest device became active during quiet hours.",
-  "Gastgerät ist seit mindestens": "Guest device has been connected for at least",
-  "Wichtiges Gerät ist seit mindestens": "Important device has been offline for at least",
-  "hat das Gastnetz verlassen": "left the guest network",
-  "Name geändert": "Name changed", "Mesh-Wechsel von": "Mesh handover from",
-  "seit": "since", "Uhr": "", "basiert auf den markierten Home-Geräten": "based on the marked Home devices",
-  "alle ": "every ", "Min.": "min.",
-  "VLANs und Netzwerksegmente": "VLANs and network segments",
-  "VLANs und Rollen erklären": "Explain VLANs and roles",
-  "Hilfe zu VLANs und Netzwerksegmenten": "VLAN and network-segment help",
-  "VLAN hinzufügen": "Add VLAN", "VLAN entfernen": "Remove VLAN",
-  "Subnetze dürfen sich nicht überschneiden. Überwachung aktiviert den Ping/TCP-Scanner und VLAN-Wechselwarnungen für das Segment.": "Subnets must not overlap. Monitoring enables the ping/TCP scanner and VLAN-change alerts for the segment.",
-  "Jeder Eintrag ordnet ein IPv4-Subnetz einem Namen, einer VLAN-ID und einer Farbe zu. Die VLAN-Farbe erscheint am rechten Rand der Gerätetabelle; interne Kennzeichnungen wie Gastnetz oder Einrichtungsbereich bleiben links.": "Each entry assigns an IPv4 subnet a name, VLAN ID, and color. The VLAN color appears at the right edge of the device table; internal markers such as guest network or setup range remain on the left.",
-  "Vertrauenswürdig steht für normale interne Geräte. Eingeschränkt ist für IoT- oder begrenzte Netze gedacht. Gast nimmt Teilnehmer von der regulären Internet-Freigabeprüfung aus. Isoliert stuft einen Wechsel in dieses Segment als kritisch ein. Infrastruktur schützt Router, Switches und Access Points vor der normalen Gerätesperre.": "Trusted is intended for regular internal devices. Restricted is intended for IoT or limited networks. Guest exempts devices from regular internet approval. Isolated rates a move into the segment as critical. Infrastructure protects routers, switches, and access points from regular device blocking.",
-  "Überwachung aktiviert den Ping-/TCP-Scanner und VLAN-Wechselwarnungen für dieses Subnetz. Deaktivierte Segmente bleiben zugeordnet und sichtbar, werden aber nicht aktiv durch den Segmentscanner geprüft. Subnetze dürfen sich nicht überschneiden.": "Monitoring enables the ping/TCP scanner and VLAN-change alerts for this subnet. Disabled segments remain assigned and visible but are not actively checked by the segment scanner. Subnets must not overlap.",
-  "Ist die Gastnetzüberwachung aktiv, übernimmt Nodarion Teilnehmer aus dem FRITZ!Box-Gastzugang, zeigt sie in der Tabelle an und protokolliert ihre Aktivität. Gastgeräte sind von der normalen Internet-Freigabeprüfung ausgenommen.": "When guest monitoring is enabled, Nodarion imports devices from the FRITZ!Box guest access, shows them in the table, and records their activity. Guest devices are exempt from regular internet approval.",
-  "Neue Gäste können beim ersten Verbinden gemeldet werden. Die Ruhezeitprüfung hebt Gastaktivität im festgelegten Zeitraum hervor; die maximale Gastdauer erzeugt nach Ablauf der gewählten Stunden eine Warnung.": "New guests can be reported when they first connect. Quiet-hours monitoring highlights guest activity during the configured period; maximum guest duration creates an alert after the selected number of hours.",
-  "Hier legst du fest, welche in Home Assistant eingerichteten Notify-Dienste Nodarion verwenden darf, beispielsweise die Companion App oder einen Telegram Bot.": "Choose which Home Assistant notification services Nodarion may use, such as the Companion App or a Telegram bot.",
-  "Alle und Keine ändern nur die aktuelle Auswahl. Wirksam wird sie zusammen mit den übrigen Änderungen erst nach dem Speichern. Ohne ausgewähltes Ziel bleiben HA-Glocke und nodarion_alert weiterhin verfügbar.": "All and None only change the current selection. It becomes active with the other changes after saving. HA notifications and nodarion_alert remain available without a selected target.",
-  "Gesamtschutz ist der Hauptschalter von AdGuard Home. DNS-Filterung wendet Blocklisten und eigene Regeln an; Safe Browsing blockiert bekannte Phishing- und Malware-Ziele; Jugendschutz sperrt nicht jugendfreie Inhalte; Safe Search erzwingt den sicheren Modus unterstützter Suchmaschinen.": "Overall protection is the AdGuard Home master switch. DNS filtering applies blocklists and custom rules; Safe Browsing blocks known phishing and malware targets; parental control blocks adult content; Safe Search enforces safe mode for supported search engines.",
-  "Das Query-Log wird für DNS-Live, Gerätezuordnung und KI-Auswertungen benötigt. Wird es ausgeschaltet, arbeitet der DNS-Schutz weiter, Nodarion erhält jedoch keine aktuellen DNS-Anfragen mehr.": "The query log is required for DNS Live, device assignment, and AI analysis. If disabled, DNS protection continues to work, but Nodarion no longer receives current DNS queries.",
-}));
-const EN_REPLACEMENTS = [...EN].sort((a, b) => b[0].length - a[0].length);
-const translateText = (value) => {
-  if (panelLocale === "de" || !value) return value;
-  let result = String(value);
-  for (const [source, target] of EN_REPLACEMENTS) {
-    // "Moderat" is a prefix of its English translation "Moderate". A plain
-    // replaceAll would therefore append another "e" whenever localization is
-    // re-run by the mutation observer.
-    result = source === "Moderat"
-      ? result.replace(/\bModerat\b/g, target)
-      : result.replaceAll(source, target);
-  }
-  return result;
-};
-const activeLocale = () => panelLocale === "de" ? "de-DE" : "en-GB";
-
-const ipv4Number = (value) => {
-  const parts = String(value || "").split(".");
-  if (parts.length !== 4 || parts.some((part) =>
-    !/^\d+$/.test(part) || Number(part) > 255
-  )) return null;
-  return parts.reduce((result, part) => result * 256 + Number(part), 0);
-};
-
-const onboardingStatus = (ip, rules = {}) => {
-  if (!rules.onboarding_enabled) return "unknown";
-  const value = ipv4Number(ip);
-  const start = ipv4Number(rules.onboarding_start);
-  const end = ipv4Number(rules.onboarding_end);
-  if (value === null || start === null || end === null) return "unknown";
-  return value >= Math.min(start, end) && value <= Math.max(start, end)
-    ? "onboarding"
-    : "assigned";
-};
-
-const formatLease = (seconds) => {
-  if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return null;
-  const value = Math.max(0, Number(seconds));
-  // Some FRITZ!OS versions report 0 when no remaining lease duration is
-  // exposed. Treat that as unavailable instead of showing a misleading timer.
-  if (value <= 0) return null;
-  if (value < 60) return `${Math.round(value)} Sek.`;
-  if (value < 3600) return `${Math.round(value / 60)} Min.`;
-  if (value < 86400) return `${Math.round(value / 3600)} Std.`;
-  return `${Math.round(value / 86400)} Tage`;
-};
-
-const formatRemainingDuration = (milliseconds) => {
-  const value = Math.max(0, Number(milliseconds) || 0);
-  if (value < 3600000) {
-    return `${Math.max(1, Math.ceil(value / 60000))} Minuten`;
-  }
-  if (value < 86400000) {
-    return `${Math.ceil(value / 3600000)} Stunden`;
-  }
-  const totalHours = Math.round(value / 3600000);
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-  const dayLabel = `${days} ${days === 1 ? "Tag" : "Tage"}`;
-  return hours ? `${dayLabel} ${hours} Stunden` : dayLabel;
-};
-
-const formatDateTime = (value) => {
-  if (!value) return "–";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "–"
-    : new Intl.DateTimeFormat(activeLocale(), {
-        day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-      }).format(date);
-};
-
-const isPrivateMac = (value) => {
-  const firstOctet = Number.parseInt(String(value || "").replaceAll("-", ":").split(":")[0], 16);
-  return Number.isFinite(firstOctet) && Boolean(firstOctet & 0x02);
-};
-
-const formatStateChanged = (value) => {
-  if (!value) return "Zeit unbekannt";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Zeit unbekannt";
-  const day = new Intl.DateTimeFormat(activeLocale(), {
-    day: "2-digit", month: "2-digit", year: "numeric",
-  }).format(date);
-  const time = new Intl.DateTimeFormat(activeLocale(), {
-    hour: "2-digit", minute: "2-digit",
-  }).format(date);
-  return `${day}\n${time} Uhr`;
-};
-
-const isRootRouter = (entity) => ["fritz.box", "fritz!box", "fritzbox"].includes(
-  String(entity.attributes?.hostname || entity.attributes?.friendly_name || "")
-    .trim().replace(/\.$/, "").toLocaleLowerCase("de-DE")
-);
-
-const isNetworkInfrastructure = (entity) => {
-  const attr = entity.attributes || {};
-  const hostname = String(attr.fritz_hostname || attr.hostname || attr.friendly_name || "")
-    .trim().replace(/\.$/, "").toLocaleLowerCase("de-DE");
-  if (typeof attr.network_infrastructure === "boolean") return attr.network_infrastructure;
-  if (["fritz.box", "fritz!box", "fritzbox"].includes(hostname)) return true;
-  const tokens = new Set(hostname.split(/[^a-z0-9!]+/).filter(Boolean));
-  return ["router", "repeater", "powerline", "accesspoint"].some((marker) => tokens.has(marker));
-};
-
-const deviceIcon = (entity) => {
-  const attr = entity.attributes || {};
-  if (attr.vpn_connection || /^(vpn|wireguard)/i.test(String(attr.hostname || attr.friendly_name || ""))) return "mdi:vpn";
-  const name = [
-    attr.hostname,
-    attr.friendly_name,
-    attr.model,
-    attr.manufacturer,
-    attr.mac_vendor,
-  ].filter(Boolean).join(" ").toLocaleLowerCase("de-DE");
-  const matches = (...terms) => terms.some((term) => name.includes(term));
-
-  if (isNetworkInfrastructure(entity) && !isRootRouter(entity)) return "mdi:access-point-network";
-
-  if (matches("iphone", "android", "smartphone", "telefon", "phone", "pixel")) return "mdi:cellphone";
-  if (matches("ipad", "tablet", "galaxy tab", "surface")) return "mdi:tablet";
-  if (matches("macbook", "notebook", "laptop", "thinkpad", "chromebook")) return "mdi:laptop";
-  if (matches("desktop", "computer", "workstation", "imac", "mac mini", "pc-")) return "mdi:desktop-tower-monitor";
-  if (matches("printer", "drucker", "epson", "brother", "laserjet", "officejet")) return "mdi:printer";
-  if (matches("apple tv", "fire tv", "chromecast", "smarttv", "smart-tv", "television", "fernseher")) return "mdi:television";
-  if (matches("playstation", "xbox", "nintendo", "switch", "steam deck")) return "mdi:gamepad-variant";
-  if (matches("camera", "kamera", "doorbell", "ring ", "reolink", "tapo c")) return "mdi:cctv";
-  if (matches("speaker", "lautsprecher", "sonos", "homepod", "echo", "alexa")) return "mdi:speaker";
-  if (matches("nas", "synology", "qnap", "server", "proxmox", "raspberry")) return "mdi:server";
-  if (matches("repeater", "powerline", "access point", "access-point", "fritz!repeater")) return "mdi:access-point-network";
-  if (matches("router", "fritz!box", "gateway")) return "mdi:router-wireless";
-  if (matches("thermostat", "sensor", "steckdose", "plug", "shelly", "tuya", "esp", "zigbee", "iot")) return "mdi:chip";
-  if (String(attr.connection_type || "").toUpperCase() === "WLAN") return "mdi:wifi";
-  return "mdi:lan";
-};
-
-const deviceIconTitle = (entity) => {
-  const attr = entity.attributes || {};
-  if (attr.vpn_connection || /^(vpn|wireguard)/i.test(String(attr.hostname || attr.friendly_name || ""))) {
-    return "VPN-Verbindung · nicht durch den FRITZ!Box-Hostfilter verwaltet";
-  }
-  if (attr.guest_network) return "Gastgerät · durch den FRITZ!Box-Gastzugang verwaltet";
-  if (isRootRouter(entity)) return "Router · geschützte Netzwerkinfrastruktur";
-  if (isNetworkInfrastructure(entity)) {
-    return attr.infrastructure_source === "mesh_topology"
-      ? "Mesh-Komponente · aus FRITZ!Box-Topologie erkannt"
-      : "Mesh-Komponente · anhand verfügbarer Gerätedaten erkannt";
-  }
-  return "Netzwerkteilnehmer · Symbol anhand verfügbarer Gerätedaten";
-};
-
-const blockReason = (value) => ({
-  FilteredBlackList: "Blockliste",
-  FilteredSafeBrowsing: "Safe Browsing",
-  FilteredParental: "Jugendschutz",
-  FilteredSafeSearch: "Safe Search",
-  FilteredBlockedService: "Gesperrter Dienst",
-  FilteredInvalid: "Ungültige Anfrage",
-}[value] || value || "–");
-
-const topDomains = (items) => (items || [])
-  .map(([domain, count]) => `${domain} (${count})`)
-  .join(", ");
-
-const signalRating = (attr) => {
-  const hasDbm = attr.signal_strength_dbm !== null && attr.signal_strength_dbm !== undefined;
-  const dbm = Number(attr.signal_strength_dbm);
-  if (hasDbm && Number.isFinite(dbm)) {
-    if (dbm >= -55) return { level: "good", label: "Sehr gut" };
-    if (dbm >= -67) return { level: "okay", label: "Gut" };
-    if (dbm >= -75) return { level: "warn", label: "Schwach" };
-    return { level: "bad", label: "Sehr schwach" };
-  }
-  const hasPercent = attr.signal_strength_percent !== null && attr.signal_strength_percent !== undefined;
-  const percent = Number(attr.signal_strength_percent);
-  if (!hasPercent || !Number.isFinite(percent)) return null;
-  if (percent >= 75) return { level: "good", label: "Sehr gut" };
-  if (percent >= 50) return { level: "okay", label: "Gut" };
-  if (percent >= 25) return { level: "warn", label: "Schwach" };
-  return { level: "bad", label: "Sehr schwach" };
-};
-
-const dnsRating = (ratio) => {
-  const value = Number(ratio);
-  if (!Number.isFinite(value)) return null;
-  if (value < 5) return { level: "good", label: "Unauffällig" };
-  if (value < 15) return { level: "okay", label: "Moderat" };
-  if (value < 30) return { level: "warn", label: "Erhöht" };
-  return { level: "bad", label: "Auffällig hoch" };
-};
+import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.1";
+import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.1";
+import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.1";
+import { renderCards } from "./panel-devices.mjs?v=1.30.1";
+import { panelStyles } from "./panel-styles.mjs?v=1.30.1";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.1";
+import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.1";
 
 class EngelsoftNodarionPanel extends HTMLElement {
   constructor() {
@@ -590,6 +14,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._columnFilters = {};
     this._mobileOverviewExpanded = false;
     this._mobileFiltersExpanded = false;
+    this._expandedDevices = new Set();
     this._columnVisibility = this._loadColumnVisibility();
     this._sort = "ip";
     this._sortDirection = "asc";
@@ -633,8 +58,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._monitorLoading = false;
     this._stateClient = null;
     this._stateConnection = null;
-    this._translationFrame = null;
-    this._translationObserver = new MutationObserver(() => this._scheduleLocalization());
     this._edgeSwipe = null;
     this._onEdgeTouchStart = (event) => {
       const touch = event.touches?.[0];
@@ -655,11 +78,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
       }
     };
     this._onEdgeTouchEnd = () => { this._edgeSwipe = null; };
-    this._observeTranslations();
   }
 
   connectedCallback() {
-    this._observeTranslations();
     this.addEventListener("touchstart", this._onEdgeTouchStart, { passive: true });
     this.addEventListener("touchmove", this._onEdgeTouchMove, { passive: true });
     this.addEventListener("touchend", this._onEdgeTouchEnd, { passive: true });
@@ -671,11 +92,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._stateClient = null;
     this._stateConnection = null;
     window.clearTimeout(this._dnsLiveTimer);
-    if (this._translationFrame !== null) {
-      window.cancelAnimationFrame(this._translationFrame);
-      this._translationFrame = null;
-    }
-    this._translationObserver.disconnect();
     this.removeEventListener("touchstart", this._onEdgeTouchStart);
     this.removeEventListener("touchmove", this._onEdgeTouchMove);
     this.removeEventListener("touchend", this._onEdgeTouchEnd);
@@ -687,44 +103,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
       bubbles: true,
       composed: true,
     }));
-  }
-
-  _observeTranslations() {
-    this._translationObserver.observe(this.shadowRoot, {
-      childList: true, subtree: true, characterData: true, attributes: true,
-      attributeFilter: ["title", "placeholder", "aria-label"],
-    });
-  }
-
-  _scheduleLocalization() {
-    if (panelLocale === "de" || this._translationFrame !== null) return;
-    this._translationFrame = window.requestAnimationFrame(() => {
-      this._translationFrame = null;
-      this._localizeDom();
-    });
-  }
-
-  _localizeDom() {
-    if (panelLocale === "de") return;
-    // Translation itself changes text nodes. Temporarily disconnecting avoids
-    // feeding those changes back into the observer and locking up the UI.
-    this._translationObserver.disconnect();
-    const walker = document.createTreeWalker(this.shadowRoot, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      if (node.parentElement?.closest("style, script")) continue;
-      const translated = translateText(node.nodeValue);
-      if (translated !== node.nodeValue) node.nodeValue = translated;
-    }
-    for (const element of this.shadowRoot.querySelectorAll("[title], [placeholder], [aria-label]")) {
-      for (const attribute of ["title", "placeholder", "aria-label"]) {
-        if (!element.hasAttribute(attribute)) continue;
-        const value = element.getAttribute(attribute);
-        const translated = translateText(value);
-        if (translated !== value) element.setAttribute(attribute, translated);
-      }
-    }
-    this._observeTranslations();
   }
 
   _loadColumnVisibility() {
@@ -774,12 +152,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._stateClient.start();
     }
     const nextLocale = String(value?.language || "en").toLowerCase().startsWith("de") ? "de" : "en";
-    if (nextLocale !== panelLocale) {
-      panelLocale = nextLocale;
-      if (this._built) {
-        this._built = false;
-        this._build();
-      }
+    const languageChanged = nextLocale !== panelLocale;
+    if (languageChanged) {
+      setPanelLocale(nextLocale);
+      this._dnsRenderedSignature = null;
+      this._built = false;
     }
     if (!this._built) this._build();
     const darkMode = value?.themes?.darkMode;
@@ -792,11 +169,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const signature = this._entities()
       .map((entity) => `${entity.entity_id}:${entity.state}:${entity.last_changed}`)
       .join("|");
-    if (signature !== this._lastSignature) {
+    if (languageChanged || signature !== this._lastSignature) {
       this._lastSignature = signature;
-      this._render(new Set(["participants"]));
+      this._render(languageChanged ? null : new Set(["participants"]));
     }
-    this._scheduleLocalization();
   }
 
   set narrow(value) {
@@ -891,12 +267,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
     if (dirty) {
       dirty.hidden = this._dirtyRules.size === 0;
       const label = dirty.querySelector("span");
-      if (label) label.textContent = `${this._dirtyRules.size} ungespeicherte ${this._dirtyRules.size === 1 ? "Änderung" : "Änderungen"}`;
+      if (label) label.textContent = unsavedChanges(this._dirtyRules.size);
     }
     if (save) save.disabled = this._dirtyRules.size === 0;
   }
 
-  _confirm({ title, message, confirmLabel = "Bestätigen", danger = false, showCancel = true }) {
+  _confirm({ title, message, confirmLabel = t("Bestätigen"), danger = false, showCancel = true }) {
     const host = this.shadowRoot.querySelector(".confirm-host");
     if (!host) return Promise.resolve(false);
     return new Promise((resolve) => {
@@ -906,7 +282,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         previousFocus?.focus?.();
         resolve(accepted);
       };
-      host.innerHTML = `<div class="confirm-backdrop"><section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message"><div class="confirm-icon ${danger ? "danger" : ""}"><ha-icon icon="${danger ? "mdi:alert-outline" : "mdi:help-circle-outline"}"></ha-icon></div><h2 id="confirm-title">${esc(title)}</h2><p id="confirm-message">${esc(message)}</p><div class="confirm-actions">${showCancel ? '<button class="confirm-cancel" type="button">Abbrechen</button>' : ""}<button class="confirm-accept ${danger ? "danger" : ""}" type="button">${esc(confirmLabel)}</button></div></section></div>`;
+      host.innerHTML = `<div class="confirm-backdrop"><section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message"><div class="confirm-icon ${danger ? "danger" : ""}"><ha-icon icon="${danger ? "mdi:alert-outline" : "mdi:help-circle-outline"}"></ha-icon></div><h2 id="confirm-title">${esc(title)}</h2><p id="confirm-message">${esc(message)}</p><div class="confirm-actions">${showCancel ? `<button class="confirm-cancel" type="button">${t("Abbrechen")}</button>` : ""}<button class="confirm-accept ${danger ? "danger" : ""}" type="button">${esc(confirmLabel)}</button></div></section></div>`;
       const backdrop = host.querySelector(".confirm-backdrop");
       const keyHandler = (event) => {
         if (event.key === "Escape") close(false);
@@ -928,12 +304,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   async _saveRuleSettings(button, rules, kind) {
     const selector = ".save-watch-rules";
-    const defaultLabel = "Alle Einstellungen speichern";
+    const defaultLabel = t("Alle Einstellungen speichern");
     const defaultContent = `<ha-icon icon="mdi:content-save-outline"></ha-icon>${defaultLabel}`;
     button.disabled = true;
     button.classList.remove("saved", "failed");
     button.classList.add("busy");
-    button.innerHTML = '<ha-icon icon="mdi:loading"></ha-icon>Speichert …';
+    button.innerHTML = `<ha-icon icon="mdi:loading"></ha-icon>${t("Speichert …")}`;
     try {
       await this._stateClient.mutate({ action: "set_rules", rules });
       this._notifyTargetsDirty = false;
@@ -943,7 +319,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       if (!savedButton) return;
       savedButton.disabled = true;
       savedButton.classList.add("saved");
-      savedButton.innerHTML = '<ha-icon icon="mdi:check"></ha-icon>Gespeichert';
+      savedButton.innerHTML = `<ha-icon icon="mdi:check"></ha-icon>${t("Gespeichert")}`;
       window.setTimeout(() => {
         const currentButton = this.shadowRoot.querySelector(selector);
         if (!currentButton?.classList.contains("saved")) return;
@@ -955,7 +331,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       button.disabled = false;
       button.classList.remove("busy");
       button.classList.add("failed");
-      button.innerHTML = '<ha-icon icon="mdi:alert-circle-outline"></ha-icon>Speichern fehlgeschlagen';
+      button.innerHTML = `<ha-icon icon="mdi:alert-circle-outline"></ha-icon>${t("Speichern fehlgeschlagen")}`;
       window.setTimeout(() => {
         if (!button.isConnected || !button.classList.contains("failed")) return;
         button.classList.remove("failed");
@@ -976,7 +352,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     } catch (error) {
       this._monitor.ai_analysis = {
         ...(this._monitor.ai_analysis || {}),
-        last_error: error?.message || "KI-Analyse fehlgeschlagen",
+        last_error: error?.message || t("KI-Analyse fehlgeschlagen"),
       };
     } finally {
       button?.classList.remove("busy");
@@ -1104,7 +480,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
   }
 
   async _adguardAction(payload, confirmation = null) {
-    if (confirmation && !await this._confirm({ title:"Änderung bestätigen", message:confirmation, confirmLabel:"Ausführen", danger:true })) return;
+    if (confirmation && !await this._confirm({ title:t("Änderung bestätigen"), message:confirmation, confirmLabel:t("Ausführen"), danger:true })) return;
     if (this._activeTab === "dns") this._dnsLivePaused = true;
     try {
       const result = await this._hass.callApi(
@@ -1126,7 +502,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         this._renderSettings();
       }
     } catch (error) {
-      await this._confirm({ title:"Änderung fehlgeschlagen", message:error?.message || "DNS-Änderung fehlgeschlagen.", confirmLabel:"Schließen", danger:true, showCancel:false });
+      await this._confirm({ title:t("Änderung fehlgeschlagen"), message:error?.message || t("DNS-Änderung fehlgeschlagen."), confirmLabel:t("Schließen"), danger:true, showCancel:false });
     }
   }
 
@@ -1159,7 +535,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         needsRender = true;
       }
     } catch (error) {
-      const message = error?.message || "DNS-Anbieter ist nicht erreichbar.";
+      const message = error?.message || t("DNS-Anbieter ist nicht erreichbar.");
       needsRender = this._dnsLive.error !== message;
       this._dnsLive.error = message;
     } finally {
@@ -1175,2124 +551,32 @@ class EngelsoftNodarionPanel extends HTMLElement {
   _build() {
     this._built = true;
     this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          --ns-bg: #111315;
-          --ns-panel: rgba(29, 32, 35, .80);
-          --ns-line: rgba(255, 246, 229, .10);
-          --ns-text: #fffaf1;
-          --ns-muted: #a9b6b1;
-          --ns-subtle: #87958f;
-          --ns-surface: rgba(255,255,255,.035);
-          --ns-surface-raised: rgba(255,255,255,.055);
-          --ns-field: rgba(16,15,14,.46);
-          --ns-green: #ccb57b;
-          --ns-cyan: #f5d7a3;
-          --ns-red: #ff786f;
-          display: block;
-          min-height: 100%;
-          color-scheme: dark;
-          color: var(--ns-text);
-          background:
-            radial-gradient(ellipse at 12% 0%, rgba(210, 157, 68, .10), transparent 42rem),
-            radial-gradient(ellipse at 95% 28%, rgba(77, 136, 151, .06), transparent 38rem),
-            linear-gradient(135deg, rgba(255,255,255,.025), transparent 48%),
-            var(--ns-bg);
-          font-family: "Manrope", "Avenir Next", "Segoe UI Variable", "Segoe UI", sans-serif;
-        }
-        * { box-sizing: border-box; }
-        .shell { width:100%; max-width:none; margin:0; padding:28px clamp(14px,2vw,30px) 52px; position:relative; isolation:isolate; }
-        .ha-menu { display:none; place-items:center; flex:0 0 44px; width:44px; height:44px; padding:0; border:1px solid var(--ns-line); border-radius:13px; color:var(--ns-text); background:var(--ns-surface); cursor:pointer; }
-        .ha-menu ha-icon { --mdc-icon-size:24px; }
-        .shell::before {
-          content:""; position:fixed; z-index:-1; inset:0; pointer-events:none; opacity:.28;
-          background-image:radial-gradient(rgba(255,255,255,.16) .45px, transparent .45px);
-          background-size:4px 4px; mix-blend-mode:soft-light;
-        }
-        header { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:28px; }
-        .brand { display:flex; align-items:center; gap:16px; }
-        .github-thanks { display:flex; align-items:center; justify-content:center; gap:10px; flex:1; min-width:0; padding:9px 12px; border:1px solid var(--ns-line); border-radius:13px; color:var(--ns-text); background:rgba(204,181,123,.045); text-decoration:none; transition:background .18s ease,border-color .18s ease; }
-        .github-thanks > ha-icon { --mdc-icon-size:24px; flex-shrink:0; color:var(--ns-yellow,#d9c58e); }
-        .github-thanks-copy { display:grid; gap:3px; }
-        .github-thanks strong { font-size:12px; font-weight:750; }
-        .github-thanks small { font-size:11px; line-height:1.4; color:var(--ns-muted); }
-        .github-thanks:hover { background:rgba(204,181,123,.11); border-color:var(--ns-yellow,#d9c58e); }
-        .github-thanks:focus-visible { outline:2px solid var(--ns-yellow,#d9c58e); outline-offset:3px; }
-        @media (max-width:800px) { .github-thanks { display:none; } }
-        .header-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; }
-        .header-action { min-height:43px; display:flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid var(--ns-line); border-radius:13px; color:#cce5dc; background:rgba(255,255,255,.04); font:inherit; font-size:11px; font-weight:750; white-space:nowrap; cursor:pointer; transition:.18s ease; }
-        .header-action:hover, .header-action.active { color:#fff7e9; border-color:rgba(204,181,123,.38); background:rgba(204,181,123,.1); }
-        .header-action ha-icon { --mdc-icon-size:18px; }
-        .connection-status { color:#bcecff; }
-        .connection-status ha-icon { color:var(--ns-cyan); }
-        .connection-status ha-icon:last-child { --mdc-icon-size:16px; transition:transform .18s ease; }
-        .connection-status.open ha-icon:last-child { transform:rotate(180deg); }
-        .version-info { color:#73958a; font-size:11px; margin-top:4px; min-height:14px; }
-        .logo {
-          width:58px; height:58px; flex:none; display:block; border-radius:18px;
-          transition:transform .18s ease;
-        }
-        .logo:hover { transform:translateY(-2px); }
-        .logo:focus-visible { outline:3px solid color-mix(in srgb,var(--ns-green) 55%,transparent); outline-offset:3px; }
-        .logo img { display:block; width:100%; height:100%; }
-        h1 { margin:0; font-size:clamp(26px,3vw,38px); letter-spacing:-1.5px; font-weight:720; }
-        .eyebrow { color:var(--ns-cyan); font-size:10px; letter-spacing:2.8px; font-weight:750; text-transform:uppercase; margin-bottom:5px; }
-        .scan {
-          border:1px solid rgba(85,242,162,.3); color:#eafff3; background:rgba(85,242,162,.09);
-          border-radius:13px; padding:12px 17px; display:flex; gap:9px; align-items:center;
-          font:inherit; font-weight:700; cursor:pointer; transition:.18s ease;
-        }
-        .scan:hover { transform:translateY(-2px); background:rgba(85,242,162,.16); }
-        .scan.busy ha-icon { animation:spin .8s linear infinite; }
-        @keyframes spin { to { transform:rotate(360deg); } }
-        .metrics { display:grid; grid-template-columns:1.25fr .9fr .9fr 1.15fr 1.35fr; gap:14px; margin-bottom:18px; }
-        .metric, .toolbar, .table-panel, .log-panel, .mesh-panel, .watch-panel {
-          background:var(--ns-panel); border:1px solid var(--ns-line);
-          backdrop-filter:blur(22px) saturate(110%); box-shadow:0 22px 55px rgba(10,8,5,.22), inset 0 1px rgba(255,255,255,.035);
-        }
-        .metric { min-height:132px; padding:18px 20px; border-radius:17px; position:relative; overflow:hidden; }
-        .metric:is(button) { color:inherit; text-align:left; font:inherit; cursor:pointer; transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
-        .metric:is(button):hover { transform:translateY(-2px); border-color:rgba(204,181,123,.4); background:rgba(204,181,123,.09); box-shadow:0 24px 58px rgba(10,8,5,.25), inset 0 1px rgba(255,255,255,.055); }
-        .nav-metric { width:100%; min-width:0; color:inherit; text-align:left; font:inherit; cursor:pointer; transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
-        .nav-metric:hover { transform:translateY(-2px); border-color:rgba(204,181,123,.4); background:rgba(204,181,123,.09); }
-        .nav-metric.active { border-color:rgba(204,181,123,.72); box-shadow:0 0 0 1px rgba(204,181,123,.24), 0 22px 55px rgba(10,8,5,.22); }
-        .metric-status-value { display:flex; align-items:center; gap:8px; margin-top:12px; color:#effff8; font-size:20px; font-weight:780; }
-        .metric-status-value ha-icon { color:var(--ns-cyan); --mdc-icon-size:23px; }
-        .metric.events-metric { --glow:#ffd766; }
-        .metric.dns-metric { --glow:var(--ns-cyan); }
-        .metric.watch-metric { --glow:var(--ns-green); }
-        .metric-alert-badge { display:inline-flex; align-items:center; justify-content:center; min-width:21px; height:21px; padding:0 6px; border-radius:999px; color:#2c160f; background:#ff8c72; font-size:10px; font-weight:850; }
-        .guest-inline { position:relative; z-index:3; display:inline-flex; align-items:center; gap:5px; margin-top:7px; padding:4px 7px; border:0; border-radius:7px; color:#bcecff; background:rgba(80,215,255,.08); font:inherit; font-size:9px; font-weight:750; cursor:pointer; }
-        .guest-inline ha-icon { --mdc-icon-size:14px; }
-        .metric::after { content:""; position:absolute; inset:auto -20px -35px auto; width:90px; height:90px; border-radius:50%; background:var(--glow); filter:blur(32px); opacity:.24; }
-        .metric-label-row { position:relative; z-index:4; display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:25px; }
-        .metric-label { color:#9bb8af; font-size:13px; text-transform:uppercase; letter-spacing:1.2px; font-weight:700; }
-        .metric-settings { display:grid; place-items:center; flex:0 0 auto; width:26px; height:26px; padding:0; border:1px solid rgba(255,255,255,.1); border-radius:8px; color:#8eaea4; background:rgba(255,255,255,.035); cursor:pointer; transition:.18s ease; }
-        .metric-settings:hover { color:#fff7e9; border-color:rgba(204,181,123,.42); background:rgba(204,181,123,.14); transform:rotate(20deg); }
-        .metric-settings ha-icon { --mdc-icon-size:15px; }
-        .metric-value { font-size:31px; font-weight:780; margin-top:7px; letter-spacing:-1px; }
-        .metric.devices { --glow:var(--ns-green); }
-        .device-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:7px; }
-        .device-count { appearance:none; min-width:0; border:0; outline:0; padding:5px 7px; color:inherit; background:transparent; text-align:left; font:inherit; cursor:pointer; border-radius:8px; transition:color .18s ease, background .18s ease, transform .18s ease; }
-        .device-count:hover, .function-count:hover { color:#fffaf1; background:rgba(204,181,123,.13); transform:translateY(-1px); }
-        .device-count.active, .function-count.active { background:rgba(204,181,123,.18); box-shadow:inset 0 0 0 1px rgba(204,181,123,.28); }
-        .device-count:focus, .device-count:focus-visible { border:0; outline:0; box-shadow:none; }
-        .device-count + .device-count { padding-left:12px; border-left:1px solid var(--ns-line); }
-        .device-count strong { display:block; font-size:31px; line-height:1; letter-spacing:-1px; }
-        .device-count.online strong { color:var(--ns-green); }
-        .device-count.offline strong { color:#91a29c; }
-        .device-count.new strong { color:var(--ns-cyan); }
-        .device-count span { display:block; margin-top:6px; color:#8eaea4; font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.8px; }
-        .function-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:9px; }
-        .function-count { appearance:none; min-width:0; border:0; outline:0; padding:5px 8px; color:inherit; background:transparent; text-align:left; font:inherit; cursor:pointer; border-radius:8px; transition:color .18s ease, background .18s ease, transform .18s ease; }
-        .function-count + .function-count { border-left:1px solid var(--ns-line); }
-        .function-count:focus, .function-count:focus-visible { outline:0; box-shadow:none; }
-        .function-count strong { display:flex; align-items:center; gap:6px; color:#f4dfbd; font-size:24px; line-height:1; }
-        .function-count ha-icon { color:var(--ns-green); --mdc-icon-size:17px; }
-        .function-count.notify ha-icon { color:var(--ns-cyan); }
-        .function-count.presence ha-icon { color:#8fffc2; }
-        .function-count span { display:block; margin-top:7px; overflow:hidden; color:#8eaea4; font-size:9px; font-weight:750; text-overflow:ellipsis; text-transform:uppercase; letter-spacing:.65px; white-space:nowrap; }
-        .metric.network { --glow:var(--ns-cyan); } .metric.network .metric-value { color:var(--ns-cyan); font-size:20px; margin-top:13px; }
-        .metric.quick-filter { width:100%; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-        .metric.quick-filter:hover { border-color:rgba(204,181,123,.4); background:rgba(204,181,123,.09); }
-        .metric.quick-filter.active { border-color:rgba(204,181,123,.62); box-shadow:0 0 0 1px rgba(204,181,123,.2), 0 22px 55px rgba(10,8,5,.22); }
-        .metric.connections { --glow:var(--ns-cyan); width:100%; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-        .metric.connections .metric-value { display:flex; align-items:center; justify-content:space-between; color:var(--ns-cyan); font-size:20px; margin-top:13px; }
-        .metric.connections ha-icon { --mdc-icon-size:21px; transition:transform .18s ease; }
-        .metric.connections.open ha-icon { transform:rotate(180deg); }
-        .metric.ai-metric { --glow:#b68cff; width:100%; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-        .metric.ai-metric .metric-value { color:#b68cff; }
-        .metric-note { display:block; margin-top:5px; color:#8eaea4; font-size:10px; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .metric-entity-link { max-width:100%; padding:0; border:0; background:transparent; font-family:inherit; text-align:left; cursor:pointer; }
-        .metric-entity-link:hover { color:var(--ns-cyan); text-decoration:underline; text-underline-offset:2px; }
-        .connection-panel { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:-4px 0 18px; padding:16px; border-radius:17px; background:var(--ns-panel); border:1px solid var(--ns-line); }
-        .connection-panel[hidden] { display:none; }
-        .connection-card { --connection-color:var(--ns-green); display:grid; grid-template-columns:11px minmax(0,1fr) auto; align-items:center; gap:11px; padding:13px 14px; border-radius:12px; background:rgba(2,10,8,.38); border:1px solid color-mix(in srgb,var(--connection-color) 22%,transparent); }
-        .connection-card.offline { --connection-color:var(--ns-red); }
-        .connection-card.disabled { --connection-color:#66857c; }
-        .connection-dot { width:9px; height:9px; border-radius:50%; background:var(--connection-color); box-shadow:0 0 10px color-mix(in srgb,var(--connection-color) 70%,transparent); }
-        .connection-name { color:#effff8; font-size:14px; font-weight:750; }
-        .connection-device-info { display:block; margin-top:3px; color:#aaa49a; font-size:10px; font-weight:550; }
-        .connection-state { color:var(--connection-color); font-size:11px; font-weight:750; margin-top:3px; }
-        .connection-time { color:#a9c9be; font:700 13px ui-monospace,SFMono-Regular,Consolas,monospace; text-align:right; }
-        .connection-checked { display:block; color:#58776e; font:500 10px Inter,Roboto,sans-serif; margin-top:3px; }
-        .toolbar { padding:12px; border-radius:17px; display:flex; gap:12px; margin-bottom:18px; }
-        .tabs { display:flex; gap:7px; margin:2px 0 18px; padding:6px; width:max-content; max-width:100%; overflow:auto; border-radius:15px; background:rgba(13,30,27,.62); border:1px solid var(--ns-line); }
-        .tab { display:flex; align-items:center; gap:8px; padding:11px 17px; border:0; border-radius:10px; color:#9ab8ae; background:transparent; font:inherit; font-size:14px; font-weight:750; cursor:pointer; white-space:nowrap; }
-        .tab ha-icon { --mdc-icon-size:19px; }
-        .tab-badge { min-width:18px; height:18px; display:none; place-items:center; padding:0 5px; border-radius:999px; color:#27080c; background:var(--ns-red); font-size:9px; }
-        .tab-badge.visible { display:grid; }
-        .tab.active { color:#092018; background:var(--ns-green); box-shadow:0 6px 18px rgba(85,242,162,.14); }
-        .tab-view[hidden] { display:none !important; }
-        .search { flex:1; position:relative; min-width:180px; }
-        .search ha-icon { position:absolute; left:13px; top:12px; color:#66857c; --mdc-icon-size:21px; }
-        input, select {
-          width:100%; color:#ecfff6; background:rgba(2,10,8,.46); border:1px solid var(--ns-line);
-          outline:none; border-radius:11px; padding:13px 14px; font:inherit; font-size:14px;
-        }
-        input { padding-left:43px; } input:focus, select:focus { border-color:rgba(85,242,162,.55); box-shadow:0 0 0 3px rgba(85,242,162,.08); }
-        select { width:auto; min-width:145px; }
-        .filters { display:flex; gap:7px; }
-        .filter { border:0; padding:11px 15px; border-radius:10px; color:#9ab8ae; background:transparent; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
-        .filter.active { color:#092018; background:var(--ns-green); }
-        .cleanup { display:flex; align-items:center; gap:8px; padding:11px 14px; border-radius:10px; color:#ffd5d9; background:rgba(255,107,120,.07); border:1px solid rgba(255,107,120,.22); font:inherit; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
-        .cleanup:hover { color:#fff; background:rgba(255,107,120,.14); }
-        .cleanup ha-icon { --mdc-icon-size:18px; }
-        .cleanup.busy ha-icon { animation:spin .8s linear infinite; }
-        .cleanup-result { display:none; margin:-7px 0 18px; padding:11px 14px; border-radius:11px; color:#cce5dc; background:rgba(80,215,255,.07); border:1px solid rgba(80,215,255,.18); font-size:13px; }
-        .cleanup-result.visible { display:block; }
-        .cleanup-summary { margin:5px 0 9px; color:#9dbbb1; font-size:11px; line-height:1.45; }
-        .cleanup-actions { display:grid; gap:7px; width:100%; }
-        .cleanup.preserve { color:#bcecff; background:rgba(80,215,255,.07); border-color:rgba(80,215,255,.22); }
-        .tab-view[data-view="participants"] { position:relative; }
-        .column-config-head { width:48px; min-width:48px; padding:6px !important; text-align:center; }
-        .column-picker-button { width:35px; height:35px; display:grid; place-items:center; padding:0; border-radius:9px; color:#dff7ed; background:rgba(80,215,255,.08); border:1px solid rgba(80,215,255,.25); font:inherit; cursor:pointer; }
-        .column-picker-button:hover { color:#fff5e4; background:rgba(204,181,123,.14); border-color:rgba(204,181,123,.38); }
-        .column-picker-button ha-icon { --mdc-icon-size:19px; }
-        .column-picker { position:absolute; z-index:20; right:8px; top:48px; display:grid; grid-template-columns:repeat(2,minmax(150px,1fr)); gap:7px; width:min(390px,calc(100vw - 36px)); padding:12px; border-radius:13px; background:#0b211b; border:1px solid rgba(80,215,255,.25); box-shadow:0 18px 45px rgba(0,0,0,.42); }
-        .column-picker[hidden] { display:none; }
-        .column-picker label { display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:8px; color:var(--ns-text); font-size:13px; font-weight:600; cursor:pointer; }
-        .column-picker label:hover { color:#fff7e9; background:rgba(204,181,123,.11); }
-        .column-picker input { width:17px; height:17px; padding:0; accent-color:var(--ns-green); }
-        .column-picker-head {
-          grid-column:1/-1; display:flex; align-items:center;
-          justify-content:space-between; gap:12px; padding:2px 4px 8px;
-          color:var(--ns-text); font-size:12px; font-weight:800;
-          border-bottom:1px solid var(--ns-line);
-        }
-        .column-picker-close {
-          width:30px; height:30px; display:grid; place-items:center; padding:0;
-          border-radius:8px; color:#d8d0c5; background:rgba(255,255,255,.05);
-          border:1px solid var(--ns-line); cursor:pointer;
-        }
-        .column-picker-close:hover { color:#fff; background:rgba(204,181,123,.14); }
-        .column-picker-close ha-icon { --mdc-icon-size:18px; }
-        .table-column-picker {
-          position:absolute; z-index:12; top:8px; right:18px;
-          background:#3b3733; box-shadow:0 7px 20px rgba(0,0,0,.34);
-        }
-        .table-panel { border-radius:18px; overflow:auto; max-height:72vh; scrollbar-color:rgba(85,242,162,.3) rgba(2,10,8,.25); scrollbar-gutter:stable; }
-        [data-column][hidden] { display:none; }
-        table { width:max-content; min-width:100%; border-collapse:collapse; }
-        th { position:sticky; top:0; z-index:2; color:#8eaea4; background:rgba(9,24,20,.98); font-size:11px; text-transform:uppercase; letter-spacing:1.05px; text-align:left; padding:0; border-bottom:1px solid rgba(85,242,162,.2); white-space:nowrap; }
-        .sort-head { width:100%; display:flex; align-items:center; gap:7px; padding:16px; border:0; color:inherit; background:transparent; font:inherit; font-weight:800; letter-spacing:inherit; text-transform:inherit; cursor:pointer; text-align:left; }
-        .sort-head:hover { color:#d9f8ed; background:rgba(85,242,162,.05); }
-        .sort-head:focus-visible { outline:2px solid var(--ns-green); outline-offset:-3px; }
-        .sort-head ha-icon { opacity:.35; --mdc-icon-size:16px; }
-        .sort-head.active { color:var(--ns-green); }
-        .sort-head.active ha-icon { opacity:1; }
-        th.no-sort { padding:16px; }
-        .column-filters th { position:sticky; top:49px; padding:8px; background:rgba(7,19,16,.98); }
-        .column-filter {
-          width:100%; min-width:95px; min-height:38px;
-          padding:9px 11px !important; border-radius:9px; font-size:12px;
-          color:#f4eee5; background:#35322f;
-          border:1px solid rgba(255,246,229,.12);
-        }
-        .column-filter::placeholder { color:#58776e; }
-        .column-filter.has-value {
-          color:#fff5e5; background-color:rgba(204,181,123,.14);
-          border-color:rgba(204,181,123,.62);
-          box-shadow:inset 3px 0 #ccb57b, 0 0 0 1px rgba(204,181,123,.08);
-        }
-        .column-filter.has-value::placeholder { color:#d6b985; }
-        select.column-filter {
-          min-width:125px; color-scheme:dark; cursor:pointer;
-          background-color:#35322f;
-        }
-        select.column-filter:hover { border-color:rgba(204,181,123,.38); }
-        select.column-filter:focus { background-color:#3b3733; }
-        select.column-filter option {
-          color:#f4eee5; background:#35322f; font-size:13px;
-        }
-        select.column-filter option:checked {
-          color:#fffaf1; background:#76502b;
-        }
-        .custom-column-filter { position:relative; min-width:190px; color:initial; }
-        .custom-column-filter summary {
-          min-height:38px; display:flex; align-items:center; justify-content:space-between;
-          gap:10px; padding:9px 11px; border-radius:9px; cursor:pointer;
-          color:#f4eee5; background:#35322f;
-          border:1px solid rgba(255,246,229,.12);
-          font-size:12px; font-weight:700; text-transform:none; letter-spacing:0;
-          list-style:none;
-        }
-        .custom-column-filter summary::-webkit-details-marker { display:none; }
-        .custom-column-filter summary::after {
-          content:""; width:7px; height:7px; flex:0 0 auto;
-          border-right:2px solid #e6ded3; border-bottom:2px solid #e6ded3;
-          transform:rotate(45deg) translateY(-2px); transition:transform .15s ease;
-        }
-        .custom-column-filter[open] summary {
-          border-color:rgba(204,181,123,.62);
-          box-shadow:0 0 0 3px rgba(204,181,123,.10);
-        }
-        .custom-column-filter[open] summary::after {
-          transform:rotate(225deg) translate(-2px,-1px);
-        }
-        .custom-column-filter.has-value summary {
-          color:#fff5e5; background:rgba(204,181,123,.14);
-          border-color:rgba(204,181,123,.62);
-          box-shadow:inset 3px 0 #ccb57b, 0 0 0 1px rgba(204,181,123,.08);
-        }
-        .custom-filter-menu {
-          position:absolute; z-index:30; top:calc(100% + 6px); left:0;
-          width:max-content; min-width:100%; max-width:320px; padding:6px;
-          border-radius:11px; background:#292725;
-          border:1px solid rgba(255,246,229,.14);
-          box-shadow:0 15px 38px rgba(0,0,0,.48);
-        }
-        .custom-filter-option {
-          width:100%; display:grid; grid-template-columns:18px minmax(130px,1fr) auto;
-          align-items:center; gap:8px; padding:9px 10px; border:0; border-radius:7px;
-          color:#e9e2d8; background:transparent; font:inherit; font-size:12px;
-          text-align:left; cursor:pointer; white-space:nowrap;
-          text-transform:none; letter-spacing:0;
-        }
-        .custom-filter-option:hover { color:#fffaf1; background:rgba(204,181,123,.11); }
-        .custom-filter-option.active { color:#fff6e8; background:rgba(204,181,123,.18); }
-        .custom-filter-option ha-icon { --mdc-icon-size:16px; color:var(--ns-green); }
-        .custom-filter-count {
-          min-width:25px; padding:2px 6px; border-radius:999px; text-align:center;
-          color:#c9c1b7; background:rgba(255,255,255,.06); font-size:10px;
-        }
-        .settings-select, .dns-status-select { width:100%; min-width:0; }
-        .settings-select .custom-filter-menu, .dns-status-select .custom-filter-menu { width:100%; box-sizing:border-box; }
-        .dns-status-select .custom-filter-option, .settings-select .custom-filter-option { grid-template-columns:18px minmax(0,1fr); }
-        .marker-filter { width:100%; min-width:165px !important; }
-        .onboarding-state { display:inline-flex; align-items:center; gap:6px; padding:6px 9px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
-        .onboarding-state.onboarding { color:#bcecff; background:rgba(80,215,255,.10); border:1px solid rgba(80,215,255,.28); }
-        .onboarding-state.assigned { color:#d9f5e7; background:rgba(86,190,130,.18); border:1px solid rgba(86,190,130,.32); }
-        .onboarding-state.unknown { color:#c5beb4; background:rgba(255,255,255,.06); }
-        td { padding:15px 16px; border-bottom:1px solid var(--ns-line); color:#d4ebe3; font-size:14px; line-height:1.4; vertical-align:middle; }
-        tbody tr { --state:var(--ns-green); transition:background .15s ease; }
-        tbody tr.off { --state:#82968f; opacity:.76; }
-        tbody tr.off.important-offline { --state:var(--ns-red); }
-        tbody tr:nth-child(even) { background:rgba(255,255,255,.018); }
-        tbody tr:hover { background:rgba(85,242,162,.065); }
-        tbody tr:last-child td { border-bottom:0; }
-        tbody tr.onboarding-row {
-          background:linear-gradient(90deg,rgba(240,185,79,.12),rgba(240,185,79,.025) 34%,transparent 70%);
-          animation:onboarding-shimmer 3.2s ease-in-out infinite;
-        }
-        tbody tr.onboarding-row td:first-child {
-          box-shadow:inset 4px 0 #f0b94f;
-        }
-        tbody tr.guest-row {
-          background:linear-gradient(90deg,rgba(88,185,214,.11),rgba(88,185,214,.025) 34%,transparent 70%);
-        }
-        tbody tr.guest-row td:first-child {
-          box-shadow:inset 4px 0 #58b9d6;
-        }
-        tbody tr.vlan-device-row td:last-child {
-          box-shadow:inset -4px 0 var(--vlan-color,#58b9d6);
-        }
-        tbody tr.guest-row:hover {
-          background:linear-gradient(90deg,rgba(88,185,214,.18),rgba(88,185,214,.055) 42%,rgba(88,185,214,.025));
-        }
-        tbody tr.onboarding-row:hover {
-          background:linear-gradient(90deg,rgba(240,185,79,.19),rgba(240,185,79,.055) 42%,rgba(204,181,123,.025));
-        }
-        @keyframes onboarding-shimmer {
-          0%,100% { filter:brightness(1); }
-          50% { filter:brightness(1.08); }
-        }
-        @media (prefers-reduced-motion:reduce) {
-          tbody tr.onboarding-row { animation:none; }
-        }
-        .entity-link { color:#effff8; background:none; border:0; padding:0; font:inherit; font-size:14px; font-weight:750; cursor:pointer; text-align:left; }
-        .entity-link:hover { color:var(--ns-green); text-decoration:underline; }
-        .device-cell { display:flex; align-items:center; gap:11px; min-width:0; }
-        .device-icon { flex:0 0 auto; width:35px; height:35px; display:grid; place-items:center; color:var(--ns-cyan); background:rgba(80,215,255,.08); border:1px solid rgba(80,215,255,.16); border-radius:10px; }
-        .device-icon ha-icon { --mdc-icon-size:20px; }
-        .device-icon.vpn { color:#c8a7ff; background:rgba(182,140,255,.1); border-color:rgba(182,140,255,.28); }
-        .device-icon.guest { color:#ffe08a; background:rgba(255,215,102,.09); border-color:rgba(255,215,102,.27); }
-        .device-icon.router { color:#aaffd0; background:rgba(85,242,162,.09); border-color:rgba(85,242,162,.25); }
-        .device-icon.mesh { color:#8eb7ff; background:rgba(70,125,255,.1); border-color:rgba(95,145,255,.3); }
-        .device-label { min-width:0; }
-        .entity { display:block; color:#73958a; font:500 11px ui-monospace,SFMono-Regular,Consolas,monospace; margin-top:4px; }
-        .entity-id-link { display:block; margin-top:4px; padding:0; border:0; color:#73958a; background:transparent; font:500 11px ui-monospace,SFMono-Regular,Consolas,monospace; text-align:left; cursor:pointer; }
-        .entity-id-link:hover { color:var(--ns-cyan); text-decoration:underline; }
-        .detail-stack { display:grid; gap:3px; white-space:nowrap; }
-        .detail-stack strong { color:#e4faf2; font-size:14px; font-weight:700; }
-        .detail-stack small { color:#82a49a; font-size:12px; }
-        .detail-stack .dns-alert { color:var(--ns-red); }
-        .dns-live-link { display:block; width:100%; padding:0; border:0; color:inherit; background:transparent; font:inherit; text-align:left; cursor:pointer; }
-        .dns-live-link:hover strong { color:var(--ns-cyan); text-decoration:underline; }
-        .rating { width:max-content; max-width:100%; min-width:0; box-sizing:border-box; display:inline-flex; align-items:center; gap:6px; margin-top:2px; padding:3px 7px; border-radius:999px; color:var(--rating-color); background:color-mix(in srgb,var(--rating-color) 10%,transparent); border:1px solid color-mix(in srgb,var(--rating-color) 24%,transparent); font-size:11px; font-weight:750; }
-        .rating::before { content:""; flex:0 0 auto; width:6px; height:6px; border-radius:50%; background:var(--rating-color); box-shadow:0 0 7px color-mix(in srgb,var(--rating-color) 65%,transparent); }
-        .rating-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .rating.good, .rating.okay { --rating-color:#b8b1a7; }
-        .rating.warn { --rating-color:#ffd766; }
-        .rating.bad { --rating-color:var(--ns-red); }
-        .mono { font:600 13px ui-monospace,SFMono-Regular,Consolas,monospace; white-space:nowrap; }
-        .log-panel { border-radius:18px; padding:24px; overflow:hidden; }
-        .log-title { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
-        .log-heading { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
-        .log-title strong { font-size:20px; }
-        .live { display:flex; align-items:center; gap:6px; color:var(--ns-green); font-size:10px; font-weight:800; letter-spacing:1px; }
-        .log-filter-summary { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:999px; color:var(--ns-cyan); background:rgba(80,215,255,.08); border:1px solid rgba(80,215,255,.22); font-size:12px; font-weight:700; }
-        .log-filter-summary[hidden] { display:none; }
-        .log-clear { display:grid; place-items:center; width:23px; height:23px; padding:0; border:0; border-radius:50%; color:#dff8ef; background:rgba(255,255,255,.09); cursor:pointer; }
-        .log-clear ha-icon { --mdc-icon-size:15px; }
-        .log-list { overflow:auto; max-height:70vh; border:1px solid var(--ns-line); border-radius:13px; }
-        .pihole-domain-form{display:flex;flex-wrap:wrap;align-items:end;gap:10px}.pihole-domain-form label{display:grid;gap:6px;flex:1 1 130px}.pihole-domain-form input,.pihole-domain-form select{min-width:0;width:100%;min-height:42px;border:1px solid var(--ns-line);border-radius:10px;background:var(--ns-surface);color:var(--ns-text);padding:8px;font:inherit}.pihole-domain-settings p{font-size:12px;line-height:1.6;color:var(--ns-muted)}.pihole-domain-list{max-height:260px;overflow:auto;margin-top:10px}.pihole-domain-list>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--ns-line)}.pihole-domain-list span{overflow-wrap:anywhere}
-        @media(max-width:800px){.settings-view .settings-context-title{flex-basis:auto}}
-        .log-table { width:100%; min-width:1020px; border-collapse:collapse; }
-        .log-table thead { position:sticky; top:0; z-index:3; background:#292823; }
-        :host([data-theme="light"]) .log-table thead { background:#f5f3ef; }
-        .log-table th { position:relative; padding:13px 16px; font-size:11px; }
-        .log-filters th { padding:8px; background:rgba(255,255,255,.018); }
-        .log-filters .column-filter { width:100%; min-width:140px; box-sizing:border-box; }
-        .log-filters .custom-column-filter { width:100%; min-width:170px; }
-        .log-entry { --log-color:var(--ns-cyan); background:color-mix(in srgb,var(--log-color) 2.5%,transparent); }
-        .log-entry td { padding:15px 16px; font-size:14px; border-bottom:1px solid var(--ns-line); }
-        .log-entry:last-child td { border-bottom:0; }
-        .log-entry:hover { background:color-mix(in srgb,var(--log-color) 7%,transparent); }
-        .log-event { display:flex; align-items:center; gap:10px; color:var(--log-color); font-weight:750; white-space:nowrap; }
-        .log-icon { width:28px; height:28px; border-radius:9px; display:grid; place-items:center; background:rgba(80,215,255,.09); color:var(--ns-cyan); }
-        .log-icon ha-icon { --mdc-icon-size:16px; }
-        .log-entry.offline { --log-color:#82968f; }
-        .log-entry.online { --log-color:var(--ns-green); }
-        .log-entry.discovered { --log-color:var(--ns-cyan); }
-        .log-entry.renamed { --log-color:var(--ns-cyan); }
-        .log-entry.internet_approval_revoked { --log-color:var(--ns-red); }
-        .log-entry.internet_approval_granted { --log-color:var(--ns-green); }
-        .log-entry.inventory_pruned { --log-color:#8ea6bd; }
-        .log-entry.device_forgotten { --log-color:var(--ns-red); }
-        .log-entry.internet_blocked { --log-color:var(--ns-red); }
-        .log-entry.internet_enforcement_failed { --log-color:#ffd766; }
-        .log-entry.mesh_changed { --log-color:#b68cff; }
-        .log-entry .log-icon { color:var(--log-color); background:color-mix(in srgb,var(--log-color) 12%,transparent); }
-        .log-message { color:#cce5dc; font-size:14px; line-height:1.45; }
-        .log-device { color:#effff8; font-size:14px; font-weight:750; }
-        .log-device-filter { display:inline-flex; align-items:center; gap:6px; max-width:100%; padding:4px 7px; margin:-4px -7px 0; border-radius:7px; color:#effff8; background:transparent; border:1px solid transparent; font:inherit; font-size:14px; font-weight:750; cursor:pointer; text-align:left; }
-        .log-device-filter:hover { color:#bcecff; background:rgba(80,215,255,.08); border-color:rgba(80,215,255,.22); }
-        .log-device-filter ha-icon { flex:0 0 auto; color:#73dfff; --mdc-icon-size:15px; opacity:.72; }
-        .log-device-filter span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .log-ip { color:#73958a; font:500 11px ui-monospace,SFMono-Regular,Consolas,monospace; margin-top:4px; }
-        .log-route { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:#9fbcb2; }
-        .log-route span { padding:3px 7px; border-radius:6px; color:#dff7ed; background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.07); }
-        .log-route ha-icon { color:var(--log-color); --mdc-icon-size:15px; }
-        .log-time { color:#9bb8af; font-size:13px; white-space:nowrap; }
-        .log-date { display:block; color:#58776e; font-size:11px; margin-top:3px; }
-        .dns-panel { border-radius:18px; padding:24px; background:var(--ns-panel); border:1px solid var(--ns-line); box-shadow:0 18px 50px rgba(0,0,0,.18); }
-        .dns-head { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:16px; }
-        .dns-head h2 { display:flex; align-items:center; gap:9px; margin:0 0 5px; font-size:20px; }
-        .dns-head h2 ha-icon { color:var(--ns-cyan); --mdc-icon-size:23px; }
-        .dns-head p { margin:0; color:#78998f; font-size:12px; }
-        .dns-actions { display:flex; align-items:center; gap:8px; }
-        .dns-head-tools { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
-        .dns-action { display:flex; align-items:center; gap:7px; padding:9px 11px; border-radius:9px; color:#cce5dc; background:rgba(255,255,255,.04); border:1px solid var(--ns-line); font:inherit; font-size:11px; font-weight:750; cursor:pointer; }
-        .dns-action:hover { border-color:rgba(80,215,255,.35); }
-        .dns-action ha-icon { --mdc-icon-size:16px; }
-        .dns-action.busy ha-icon { animation:spin .8s linear infinite; }
-        .dns-toolbar { display:grid; grid-template-columns:minmax(210px,1fr) 180px auto; gap:10px; margin-bottom:12px; }
-        .dns-toolbar input { padding-left:14px; }
-        .dns-client-filter { display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:10px; color:#bcecff; background:rgba(80,215,255,.08); border:1px solid rgba(80,215,255,.23); font-size:11px; font-weight:750; white-space:nowrap; }
-        .dns-client-filter button { display:grid; place-items:center; width:22px; height:22px; padding:0; border:0; border-radius:50%; color:#dff8ef; background:rgba(255,255,255,.09); cursor:pointer; }
-        .dns-client-filter ha-icon { --mdc-icon-size:14px; }
-        .dns-host-link { display:inline-flex; align-items:center; gap:6px; max-width:100%; padding:0; color:#effff8; background:transparent; border:0; font:inherit; font-size:12px; font-weight:750; cursor:pointer; text-align:left; }
-        .dns-host-link:hover { color:#bcecff; text-decoration:underline; text-underline-offset:3px; }
-        .dns-host-link ha-icon { flex:0 0 auto; --mdc-icon-size:15px; }
-        .dns-host-link span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .dns-list { overflow:auto; max-height:68vh; border:1px solid var(--ns-line); border-radius:13px; scrollbar-gutter:stable; }
-        .dns-table { width:100%; min-width:1200px; border-collapse:collapse; }
-        .dns-table th { padding:13px 14px; }
-        .dns-row { --dns-color:#b8b1a7; background:color-mix(in srgb,var(--dns-color) 2.5%,transparent); }
-        .dns-row.blocked { --dns-color:var(--ns-red); }
-        .dns-row:hover { background:color-mix(in srgb,var(--dns-color) 7%,transparent); }
-        .dns-row td { padding:13px 14px; font-size:12px; }
-        .dns-result { display:flex; align-items:center; gap:7px; width:max-content; color:var(--dns-color); font-weight:800; white-space:nowrap; }
-        .dns-result ha-icon { --mdc-icon-size:17px; }
-        .dns-domain { color:#edfff7; font:700 13px ui-monospace,SFMono-Regular,Consolas,monospace; }
-        .dns-answer { max-width:260px; overflow:hidden; text-overflow:ellipsis; color:#78998f; font:500 10px ui-monospace,SFMono-Regular,Consolas,monospace; white-space:nowrap; }
-        .dns-chip { display:inline-flex; padding:3px 6px; border-radius:6px; color:#b9d8cd; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.07); font-size:10px; font-weight:700; }
-        .dns-error { margin-bottom:12px; padding:11px 13px; border-radius:10px; color:#ffd5d9; background:rgba(255,107,120,.08); border:1px solid rgba(255,107,120,.23); font-size:12px; }
-        .dns-chart { margin-bottom:14px; padding:14px 16px 11px; border-radius:13px; background:rgba(2,10,8,.3); border:1px solid var(--ns-line); }
-        .dns-chart-head { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:11px; }
-        .dns-chart-title { color:#dff7ed; font-size:12px; font-weight:800; }
-        .dns-chart-legend { display:flex; align-items:center; flex-wrap:wrap; gap:13px; color:#8eaea4; font-size:10px; }
-        .dns-chart-legend span { display:flex; align-items:center; gap:6px; }
-        .dns-chart-legend i { width:8px; height:8px; border-radius:2px; background:var(--legend-color); }
-        .dns-chart-bars { display:flex; align-items:stretch; gap:3px; height:165px; padding-top:8px; border-bottom:1px solid rgba(139,255,210,.13); background:repeating-linear-gradient(to bottom,rgba(139,255,210,.06) 0 1px,transparent 1px 41px); }
-        .dns-chart-bucket { flex:1; min-width:10px; display:grid; grid-template-rows:1fr 18px; gap:5px; }
-        .dns-chart-columns { display:flex; align-items:flex-end; justify-content:center; gap:2px; min-height:0; }
-        .dns-chart-bar { width:min(8px,42%); min-height:0; border-radius:3px 3px 1px 1px; background:var(--bar-color); box-shadow:0 0 7px color-mix(in srgb,var(--bar-color) 35%,transparent); }
-        .dns-chart-bar.allowed { --bar-color:var(--ns-green); }
-        .dns-chart-bar.blocked { --bar-color:var(--ns-red); }
-        .dns-chart-label { color:#58776e; font-size:8px; text-align:center; white-space:nowrap; }
-        .dns-policy-actions { display:flex; gap:5px; white-space:nowrap; }
-        .dns-policy { padding:6px 8px; border-radius:7px; color:#b9d8cd; background:rgba(255,255,255,.04); border:1px solid var(--ns-line); font:inherit; font-size:10px; font-weight:750; cursor:pointer; }
-        .dns-policy.block { color:#ffd5d9; border-color:rgba(255,107,120,.25); }
-        .dns-policy.allow { color:#aaffd0; border-color:rgba(85,242,162,.25); }
-        .dns-policy-modal-backdrop { position:fixed; z-index:1100; inset:0; display:grid; place-items:center; padding:20px; background:rgba(0,8,7,.78); backdrop-filter:blur(8px); }
-        .dns-policy-modal { width:min(520px,100%); padding:23px; border-radius:18px; color:#eafff6; background:#0b1815; border:1px solid rgba(85,242,162,.28); box-shadow:0 28px 80px rgba(0,0,0,.55); }
-        .dns-policy-modal h3 { display:flex; align-items:center; gap:8px; margin:0 0 8px; font-size:19px; }
-        .dns-policy-modal h3 ha-icon { color:var(--ns-green); }
-        .dns-policy-modal p { margin:0; color:#8eaea4; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
-        .dns-policy-scope-actions { display:grid; gap:9px; margin-top:20px; }
-        .dns-policy-scope { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:10px; color:#dff7ed; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); font:inherit; font-size:12px; font-weight:750; text-align:left; cursor:pointer; }
-        .dns-policy-scope:hover { border-color:rgba(85,242,162,.35); background:rgba(85,242,162,.08); }
-        .dns-policy-scope:disabled { opacity:.45; cursor:not-allowed; }
-        .dns-policy-scope ha-icon { color:var(--ns-green); --mdc-icon-size:19px; }
-        .dns-policy-scope.cancel { justify-content:center; color:#8eaea4; background:transparent; border-color:transparent; }
-        .card-actions { display:flex; gap:7px; }
-        .watch { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; cursor:pointer; color:#68867d; background:rgba(2,10,8,.35); border:1px solid var(--ns-line); }
-        .watch ha-icon { --mdc-icon-size:19px; }
-        .watch.active { color:#ffd766; border-color:rgba(255,215,102,.35); background:rgba(255,215,102,.09); }
-        .watch.notify.active { color:var(--ns-cyan); border-color:rgba(80,215,255,.35); background:rgba(80,215,255,.09); }
-        .watch.presence.active { color:#8fffc2; border-color:rgba(143,255,194,.38); background:rgba(143,255,194,.10); }
-        .internet-state { display:grid; grid-template-columns:max-content max-content; align-items:center; justify-content:start; gap:7px 9px; min-width:125px; }
-        .internet-state > .internet-hint { grid-column:1 / -1; grid-row:2; }
-        .internet-state > button { grid-column:2; grid-row:1; justify-self:start; width:auto; min-width:0; }
-        .internet-label { width:max-content; padding:4px 8px; border-radius:999px; color:#9bb8af; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); font-size:11px; font-weight:750; }
-        .internet-label.trusted,
-        .internet-label.allowed { color:#aaffd0; background:rgba(85,242,162,.08); border-color:rgba(85,242,162,.25); }
-        .internet-label.learning { color:#bcecff; background:rgba(80,215,255,.09); border-color:rgba(80,215,255,.27); }
-        .internet-label.unchecked,
-        .internet-label.unmanaged,
-        .internet-label.infrastructure { color:#9bb0a9; background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.08); }
-        .internet-label.pending { color:#ffe08a; background:rgba(255,215,102,.09); border-color:rgba(255,215,102,.28); }
-        .internet-label.denied { color:var(--ns-red); background:rgba(255,107,120,.08); border-color:rgba(255,107,120,.24); }
-        .internet-label.error { color:#ffd766; }
-        .internet-hint { max-width:210px; color:#819d94; font-size:9px; line-height:1.3; }
-        .approve-internet { padding:7px 9px; border-radius:8px; color:#092018; background:var(--ns-green); border:0; font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
-        .block-internet { display:inline-flex; align-items:center; gap:5px; padding:5px 9px; border-radius:8px; color:var(--ns-muted); background:var(--ns-surface); border:1px solid var(--ns-line); font:inherit; font-size:11px; line-height:1.4; font-weight:700; cursor:pointer; }
-        .block-internet ha-icon { --mdc-icon-size:13px; }
-        .block-internet:hover { color:var(--ns-red); border-color:var(--ns-red); background:rgba(255,107,120,.06); }
-        .block-internet:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:3px; }
-        .block-internet:disabled, .approve-internet:disabled { opacity:.55; cursor:wait; }
-        .status { display:flex; align-items:center; gap:8px; color:var(--state); font-size:12px; text-transform:uppercase; letter-spacing:1px; font-weight:800; white-space:nowrap; }
-        .status-cell { display:grid; gap:4px; }
-        .status-time { color:#78998f; font-size:10px; line-height:1.45; white-space:pre-line; }
-        .private-mac { display:flex; align-items:center; gap:5px; margin-top:4px; color:#b68cff; font:700 10px Inter,Roboto,sans-serif; white-space:nowrap; }
-        .private-mac ha-icon { --mdc-icon-size:13px; }
-        .mac-vendor { display:flex; align-items:center; gap:5px; max-width:240px; margin-top:5px; color:var(--ns-cyan); font:700 10px Inter,Roboto,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:help; }
-        .mac-vendor ha-icon { flex:0 0 auto; --mdc-icon-size:13px; }
-        .guest-metric { cursor:pointer; }
-        .guest-metric .metric-value { display:flex; align-items:center; gap:9px; }
-        .guest-metric .metric-value ha-icon { color:var(--ns-cyan); --mdc-icon-size:25px; }
-        .guest-modal-backdrop { position:fixed; z-index:1000; inset:0; display:grid; place-items:center; padding:20px; background:rgba(0,8,7,.78); backdrop-filter:blur(8px); }
-        .guest-modal { width:min(720px,100%); max-height:min(780px,calc(100vh - 40px)); overflow:auto; padding:24px; border-radius:20px; color:#eafff6; background:#0b1815; border:1px solid rgba(80,215,255,.28); box-shadow:0 28px 80px rgba(0,0,0,.55); }
-        .guest-modal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:20px; }
-        .guest-modal-head h2 { display:flex; align-items:center; gap:9px; margin:0 0 5px; font-size:21px; }
-        .guest-modal-head h2 ha-icon { color:var(--ns-cyan); }
-        .guest-modal-head p { margin:0; color:#83a49a; font-size:12px; }
-        .guest-close { padding:7px; color:#b9d5cc; background:transparent; border:0; cursor:pointer; }
-        .guest-status-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px; }
-        .guest-status-card { padding:14px; border-radius:12px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08); }
-        .guest-status-card span { display:block; color:#78998f; font-size:10px; text-transform:uppercase; letter-spacing:.6px; }
-        .guest-status-card strong { display:block; margin-top:6px; font-size:15px; overflow-wrap:anywhere; }
-        .guest-client-list { display:grid; gap:9px; }
-        .guest-client { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; padding:12px 14px; border-radius:11px; background:rgba(80,215,255,.045); border:1px solid rgba(80,215,255,.13); }
-        .guest-client strong,.guest-client small { display:block; }
-        .guest-client small { margin-top:4px; color:#78998f; }
-        .guest-qr { display:grid; grid-template-columns:190px minmax(0,1fr); align-items:center; gap:20px; margin:18px 0; padding:18px; border-radius:14px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.09); }
-        .guest-qr img { display:block; width:190px; height:190px; padding:8px; box-sizing:border-box; border-radius:10px; background:#fff; }
-        .guest-qr-copy h3 { margin:0 0 7px; color:#eafff6; font-size:16px; }
-        .guest-qr-copy p { margin:0; color:#83a49a; font-size:12px; line-height:1.5; }
-        .guest-qr-copy strong { color:var(--ns-cyan); }
-        .guest-qr-unavailable { margin:18px 0; padding:14px; border-radius:12px; color:#83a49a; background:rgba(255,255,255,.025); border:1px dashed rgba(255,255,255,.12); font-size:12px; line-height:1.45; }
-        .device-web-link { display:inline-flex; align-items:center; gap:4px; color:var(--ns-cyan); font-family:inherit; font-size:11px; text-decoration:none; width:fit-content; }
-        .device-web-link:hover { text-decoration:underline; }
-        .device-web-link ha-icon { --mdc-icon-size:14px; }
-        .guest-control { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:18px 0; font-weight:700; }
-        .guest-toggle { display:flex; align-items:center; gap:10px; background:transparent; color:inherit; border:0; font:inherit; cursor:pointer; padding:8px; }
-        .guest-toggle-track { display:block; width:44px; height:26px; border-radius:20px; background:#66756e; padding:3px; box-sizing:border-box; }
-        .guest-toggle-track > span { display:block; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform .15s; }
-        .guest-toggle[aria-checked="true"] .guest-toggle-track { background:var(--ns-green); }
-        .guest-toggle[aria-checked="true"] .guest-toggle-track > span { transform:translateX(18px); }
-        .guest-toggle:disabled { opacity:.5; cursor:wait; }
-        .guest-toggle-error { color:var(--ns-red); }
-        .guest-actions { display:flex; justify-content:flex-end; margin-top:18px; }
-        .guest-show { display:flex; align-items:center; gap:7px; padding:10px 13px; border-radius:10px; color:#07130f; background:var(--ns-cyan); border:0; font:inherit; font-size:12px; font-weight:800; cursor:pointer; }
-        .dot { width:7px; height:7px; border-radius:50%; background:var(--state); box-shadow:0 0 11px var(--state); }
-        .empty { text-align:center; padding:80px 20px; color:#66857c; }
-        .empty ha-icon { --mdc-icon-size:54px; color:#34564b; margin-bottom:14px; }
-        .empty strong { display:block; color:#a9c9be; font-size:18px; margin-bottom:7px; }
-        .mesh-panel { position:relative; border-radius:18px; padding:24px; overflow:auto; min-height:430px; }
-        .mesh-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:28px; }
-        .mesh-head h2 { margin:0 0 6px; font-size:20px; }
-        .mesh-head p { margin:0; color:#8eaea4; font-size:14px; line-height:1.45; }
-        .mesh-actions { display:flex; align-items:center; gap:12px; }
-        .simulate-mesh { display:flex; align-items:center; gap:8px; padding:10px 13px; border-radius:10px; color:#dff7ed; background:rgba(182,140,255,.09); border:1px solid rgba(182,140,255,.3); font:inherit; font-size:12px; font-weight:750; cursor:pointer; white-space:nowrap; }
-        .simulate-mesh:hover { background:rgba(182,140,255,.17); }
-        .simulate-mesh:disabled { opacity:.45; cursor:default; }
-        .simulate-mesh ha-icon { color:#b68cff; --mdc-icon-size:18px; }
-        .simulation-status { display:none; align-items:center; gap:9px; margin:-12px 0 22px; padding:12px 15px; border-radius:11px; color:#e8ddff; background:rgba(182,140,255,.09); border:1px solid rgba(182,140,255,.25); font-size:13px; font-weight:650; }
-        .simulation-status.visible { display:flex; }
-        .simulation-status ha-icon { color:#b68cff; --mdc-icon-size:19px; }
-        .mesh-legend { display:flex; gap:14px; color:#88a79e; font-size:11px; white-space:nowrap; }
-        .legend-item { display:flex; align-items:center; gap:6px; }
-        .mesh-canvas { min-width:760px; }
-        .internet { width:max-content; margin:0 auto 34px; display:flex; align-items:center; gap:10px; padding:11px 18px; border-radius:999px; color:var(--ns-cyan); background:rgba(80,215,255,.08); border:1px solid rgba(80,215,255,.25); font-size:12px; font-weight:750; }
-        .mesh-groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:46px 22px; align-items:start; }
-        .mesh-group { position:relative; padding-top:26px; }
-        .mesh-group::before { content:""; position:absolute; top:-35px; left:50%; height:62px; border-left:1px dashed rgba(80,215,255,.38); }
-        .ap-node { position:relative; z-index:1; display:flex; align-items:center; gap:12px; width:max-content; max-width:100%; margin:0 auto 26px; padding:13px 16px; border-radius:14px; color:#ecfff6; background:linear-gradient(145deg,rgba(80,215,255,.16),rgba(85,242,162,.08)); border:1px solid rgba(80,215,255,.3); box-shadow:0 10px 28px rgba(0,0,0,.2); }
-        .ap-node ha-icon { color:var(--ns-cyan); --mdc-icon-size:26px; }
-        .ap-name { display:block; font-size:16px; font-weight:780; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .ap-count { display:block; margin-top:4px; color:#8eaea4; font-size:12px; }
-        .clients { position:relative; display:grid; gap:11px; }
-        .clients::before { content:""; position:absolute; top:-26px; bottom:50%; left:18px; border-left:1px solid rgba(85,242,162,.23); }
-        .client { --client-state:var(--ns-green); position:relative; display:grid; grid-template-columns:8px 34px minmax(0,1fr); align-items:center; gap:11px; min-width:0; padding:14px 15px 14px 35px; border-radius:13px; background:rgba(2,10,8,.5); border:1px solid rgba(139,255,210,.16); box-shadow:0 8px 20px rgba(0,0,0,.12); }
-        .client.off { --client-state:#82968f; opacity:.67; }
-        .client::before { content:""; position:absolute; left:18px; top:50%; width:12px; border-top:1px solid rgba(85,242,162,.28); }
-        .client .dot { flex:0 0 auto; background:var(--client-state); box-shadow:0 0 9px var(--client-state); }
-        .client ha-icon { color:var(--ns-cyan); --mdc-icon-size:25px; }
-        .client-info { min-width:0; }
-        .client-name { color:#f1fff9; font-size:15px; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .client-ip { color:#8eaea4; font:550 12px ui-monospace,SFMono-Regular,Consolas,monospace; margin-top:4px; }
-        .client-details { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
-        .client-detail { padding:4px 7px; border-radius:7px; color:#b8d7cc; background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.07); font-size:11px; font-weight:650; }
-        .client-detail.signal { color:#8fffc2; }
-        .mesh-group.handover-target .ap-node { animation:handover-target 1s ease-in-out infinite alternate; }
-        .simulation-ghost { position:absolute; z-index:20; pointer-events:none; margin:0; opacity:.96; border-color:#b68cff; box-shadow:0 0 35px rgba(182,140,255,.38); }
-        @keyframes handover-target { to { border-color:#b68cff; box-shadow:0 0 30px rgba(182,140,255,.35); transform:translateY(-3px); } }
-        .watch-layout { display:grid; grid-template-columns:minmax(300px,.8fr) minmax(0,1.5fr); gap:18px; }
-        .watch-layout.alerts-only { grid-template-columns:1fr; }
-        .watch-overview-grid { display:flex; flex-direction:column; gap:18px; }
-        .watch-overview-grid .presence-overview { order:1; margin-bottom:0; }
-        .watch-overview-grid .watch-layout { order:2; min-width:0; }
-        @media (min-width:1500px) {
-          .watch-overview-grid { display:grid; grid-template-columns:minmax(420px,.78fr) minmax(680px,1.22fr); align-items:start; }
-          .watch-overview-grid .watch-layout { order:1; }
-          .watch-overview-grid .presence-overview { order:2; }
-        }
-        .settings-view { display:grid; gap:18px; }
-        .settings-context-title { display:flex; align-items:center; gap:11px; }
-        .settings-back { display:grid; place-items:center; flex:0 0 auto; width:36px; height:36px; padding:0; border:1px solid var(--ns-line); border-radius:10px; color:#cce5dc; background:rgba(255,255,255,.04); cursor:pointer; }
-        .settings-back:hover { color:#fff7e9; border-color:rgba(204,181,123,.4); background:rgba(204,181,123,.12); }
-        .settings-back ha-icon { --mdc-icon-size:19px; }
-        .adguard-feature-list { display:grid; gap:8px; }
-        .adguard-feature { display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; padding:12px 13px; border:1px solid var(--ns-line); border-radius:11px; color:#b9d8cd; background:rgba(255,255,255,.025); font:inherit; text-align:left; cursor:pointer; }
-        .adguard-feature:hover { border-color:rgba(204,181,123,.32); background:rgba(204,181,123,.07); }
-        .adguard-feature strong, .adguard-feature small { display:block; }
-        .adguard-feature small { margin-top:3px; color:#78998f; font-size:10px; }
-        .adguard-feature-state { min-width:42px; padding:5px 8px; border-radius:999px; color:#9aa8a3; background:rgba(255,255,255,.06); font-size:10px; font-weight:800; text-align:center; }
-        .adguard-feature.active .adguard-feature-state { color:#092018; background:var(--ns-green); }
-        .query-log-warning { display:flex; align-items:flex-start; gap:8px; margin-top:11px; padding:10px; border-radius:9px; color:#dbc58f; background:rgba(255,215,102,.07); font-size:10px; line-height:1.45; }
-        .query-log-warning ha-icon { flex:0 0 auto; --mdc-icon-size:16px; }
-        .adguard-stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
-        .adguard-stat { padding:12px; border:1px solid var(--ns-line); border-radius:10px; color:#91b0a6; background:rgba(255,255,255,.025); font:inherit; text-align:left; cursor:pointer; }
-        .adguard-stat span, .adguard-stat strong { display:block; }
-        .adguard-stat span { font-size:10px; }
-        .adguard-stat strong { margin-top:6px; color:#effff8; font-size:18px; }
-        .dns-live-stats { margin:0 0 16px; padding:12px; border:1px solid var(--ns-line); border-radius:13px; background:rgba(255,255,255,.018); }
-        .dns-live-stats h3 { margin:0 0 9px; color:#78998f; font-size:10px; text-transform:uppercase; letter-spacing:1px; }
-        .dns-live-stats .adguard-stat-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
-        .dns-head .dns-live-stats { margin:0 2px 0 0; padding:0 12px 0 0; border:0; border-right:1px solid var(--ns-line); border-radius:0; background:transparent; }
-        .dns-head .dns-live-stats h3 { margin:0 0 4px; font-size:8px; line-height:1; }
-        .dns-head .dns-live-stats .adguard-stat-grid { display:flex; gap:5px; }
-        .dns-head .dns-live-stats .adguard-stat { min-width:82px; padding:5px 8px; border-radius:8px; background:rgba(255,255,255,.018); }
-        .dns-head .dns-live-stats .adguard-stat span { font-size:8px; white-space:nowrap; }
-        .dns-head .dns-live-stats .adguard-stat strong { margin-top:2px; font-size:12px; line-height:1.15; white-space:nowrap; }
-        .settings-tab-panel[hidden] { display:none !important; }
-        .settings-tab-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:10px; }
-        .settings-tab-panel.devices-panel { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(280px,.7fr); gap:14px; }
-        .settings-tab-panel.notifications-panel { grid-template-columns:minmax(280px,2fr) minmax(440px,3fr); gap:14px; }
-        .settings-tab-panel.ai-maintenance-panel { grid-template-columns:1fr; }
-        .settings-tab-panel.devices-panel .danger-zone { margin:0; align-self:stretch; }
-        .settings-tab-panel.devices-panel .cleanup-settings .rule { grid-template-columns:1fr; align-content:start; }
-        .settings-tab-panel.devices-panel .cleanup-settings .cleanup { width:100%; justify-content:center; justify-self:stretch; margin-top:8px; }
-        .watch-panel { border-radius:18px; padding:22px; min-width:0; }
-        .watch-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:15px; margin-bottom:18px; }
-        .watch-heading h2 { margin:0 0 5px; font-size:18px; }
-        .watch-heading p { margin:0; color:#6f9187; font-size:11px; }
-        .learning { display:flex; align-items:center; gap:7px; padding:7px 10px; border-radius:999px; color:#ffd766; background:rgba(255,215,102,.08); border:1px solid rgba(255,215,102,.22); font-size:10px; font-weight:750; white-space:nowrap; }
-        .learning-actions { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
-        .restart-learning { display:flex; align-items:center; gap:6px; padding:7px 10px; border-radius:9px; color:#ffd766; background:rgba(255,215,102,.06); border:1px solid rgba(255,215,102,.25); font:inherit; font-size:10px; font-weight:750; cursor:pointer; white-space:nowrap; }
-        .restart-learning ha-icon { --mdc-icon-size:15px; }
-        .learning-card { display:grid; gap:9px; padding:12px; border-radius:12px; background:rgba(80,215,255,.055); border:1px solid rgba(80,215,255,.16); }
-        .learning-card strong { color:#eafff6; font-size:13px; }
-        .learning-card p { margin:0; color:#91afa6; font-size:10px; line-height:1.45; }
-        .learning-card .learning-actions { justify-content:flex-start; }
-        .learning-action { padding:7px 9px; border-radius:8px; color:#bcecff; background:rgba(80,215,255,.07); border:1px solid rgba(80,215,255,.22); font:inherit; font-size:10px; font-weight:750; cursor:pointer; }
-        .security-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px; }
-        .security-card { padding:14px; border-radius:13px; background:rgba(2,10,8,.35); border:1px solid var(--ns-line); }
-        .security-card span { display:block; color:#78998f; font-size:9px; text-transform:uppercase; letter-spacing:.9px; }
-        .security-card strong { display:block; margin-top:6px; font-size:24px; color:var(--ns-cyan); }
-        .presence-overview { margin-bottom:18px; }
-        .presence-summary { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:11px; color:#cce5dc; background:rgba(143,255,194,.055); border:1px solid rgba(143,255,194,.14); font-size:11px; }
-        .presence-summary ha-icon { color:#8fffc2; --mdc-icon-size:19px; }
-        .presence-summary strong { color:#f4fff9; }
-        .presence-sensor-link { display:flex; align-items:center; gap:8px; padding:8px 11px; border-radius:10px; color:#9eaaa6; background:rgba(255,255,255,.035); border:1px solid var(--ns-line); font:inherit; font-size:11px; font-weight:780; cursor:pointer; white-space:nowrap; }
-        .presence-sensor-link.on { color:#bff8d8; background:rgba(143,255,194,.08); border-color:rgba(143,255,194,.25); }
-        .presence-sensor-link.off { color:#c7c1b8; }
-        .presence-sensor-link:hover { border-color:rgba(204,181,123,.42); box-shadow:0 0 0 3px rgba(204,181,123,.08); }
-        .presence-sensor-link ha-icon { --mdc-icon-size:18px; }
-        .presence-list { display:grid; gap:10px; margin-top:14px; }
-        .presence-row { display:grid; grid-template-columns:minmax(150px,230px) minmax(240px,1fr); align-items:center; gap:16px; }
-        .presence-person { display:grid; grid-template-columns:10px minmax(0,1fr); column-gap:9px; align-items:center; }
-        .presence-dot { width:8px; height:8px; border-radius:50%; background:#74817d; }
-        .presence-row.home .presence-dot { background:#8fffc2; box-shadow:0 0 10px rgba(143,255,194,.7); }
-        .presence-name { overflow:hidden; color:#effff8; font-size:12px; font-weight:760; text-overflow:ellipsis; white-space:nowrap; }
-        .watch-entity-link { padding:0; color:inherit; background:transparent; border:0; font:inherit; font-weight:inherit; text-align:left; cursor:pointer; }
-        .watch-entity-link:hover { color:#bcecff; text-decoration:underline; text-underline-offset:3px; }
-        .presence-state { grid-column:2; margin-top:3px; color:#a7bfb6; font-size:11px; line-height:1.4; }
-        .presence-row.home .presence-state { color:#8fd8b1; }
-        .presence-timeline { position:relative; height:24px; overflow:hidden; border-radius:8px; background:rgba(2,10,8,.42); border:1px solid var(--ns-line); }
-        .presence-timeline::before { content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg,transparent 0,transparent calc(25% - 1px),rgba(255,255,255,.055) 25%); }
-        .presence-segment { position:absolute; top:4px; bottom:4px; min-width:2px; border-radius:5px; background:linear-gradient(90deg,rgba(86,199,139,.55),#8fffc2); box-shadow:0 0 8px rgba(143,255,194,.2); }
-        .presence-axis { display:flex; justify-content:space-between; margin:6px 1px 0; color:#a7bfb6; font-size:11px; line-height:1.4; }
-        .alerts-panel { display:flex; flex-direction:column; max-height:calc(100dvh - 64px); }
-        .alerts-panel .alert-list { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding-right:5px; scrollbar-width:thin; scrollbar-color:rgba(204,181,123,.42) transparent; }
-        .alerts-panel .alert-list::-webkit-scrollbar { width:7px; }
-        .alerts-panel .alert-list::-webkit-scrollbar-track { background:transparent; }
-        .alerts-panel .alert-list::-webkit-scrollbar-thumb { border-radius:999px; background:rgba(204,181,123,.32); }
-        .alert-list { display:grid; gap:9px; }
-        .alert-item { --alert-color:#ffd766; display:grid; grid-template-columns:38px 1fr auto; align-items:center; gap:12px; padding:13px; border-radius:13px; background:color-mix(in srgb,var(--alert-color) 5%,rgba(2,10,8,.4)); border:1px solid color-mix(in srgb,var(--alert-color) 22%,transparent); }
-        .alert-item.critical { --alert-color:var(--ns-red); }
-        .alert-item.resolved { --alert-color:#66857c; opacity:.62; }
-        .alert-symbol { width:36px; height:36px; display:grid; place-items:center; border-radius:10px; color:var(--alert-color); background:color-mix(in srgb,var(--alert-color) 11%,transparent); }
-        .alert-symbol ha-icon { --mdc-icon-size:20px; }
-        .alert-name { color:#effff8; font-size:12px; font-weight:760; }
-        .alert-message { color:#9dbbb1; font-size:11px; margin-top:3px; line-height:1.35; }
-        .alert-time { color:#58776e; font-size:9px; margin-top:4px; }
-        .ack { border:1px solid rgba(85,242,162,.25); color:var(--ns-green); background:rgba(85,242,162,.07); border-radius:9px; padding:8px 10px; font:inherit; font-size:10px; font-weight:750; cursor:pointer; }
-        .alert-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
-        .alert-action { padding:7px 9px; border-radius:8px; color:#bcecff; background:rgba(80,215,255,.06); border:1px solid rgba(80,215,255,.2); font:inherit; font-size:9px; font-weight:750; cursor:pointer; }
-        .rule-list { display:grid; gap:10px; }
-        .watch-settings-panel .rule-list {
-          grid-template-columns:repeat(3,minmax(0,1fr)); align-items:start;
-        }
-        .settings-view .watch-panel { padding:17px; }
-        .settings-view .watch-heading { margin-bottom:13px; }
-        .settings-view .watch-settings-panel .rule-list { display:block; }
-        .settings-view .watch-settings-panel .rule-group {
-          width:100%; margin:0; padding:5px 10px; box-sizing:border-box;
-        }
-        .settings-view .rule { grid-template-columns:minmax(0,1fr) 180px; gap:12px; padding:9px 3px; }
-        .settings-view .rule label { font-size:13px; }
-        .settings-view .rule small { margin-top:3px; font-size:10px; line-height:1.3; }
-        .settings-view .rule input { min-height:36px; padding:7px 10px; font-size:13px; }
-        .settings-view .rule input[type="checkbox"] { width:22px; height:22px; min-height:22px; }
-        .dependent-settings[hidden] { display:none; }
-        .unit-input { display:grid; grid-template-columns:minmax(70px,1fr) auto; align-items:center; overflow:hidden; border-radius:10px; border:1px solid var(--ns-line); background:rgba(2,10,8,.35); }
-        .unit-input input { border:0 !important; border-radius:0; background:transparent; box-shadow:none !important; }
-        .unit-input span { padding:0 12px; color:#c5d9d2; font-size:11px; font-weight:700; white-space:nowrap; }
-        .mobile-details { display:none; }
-        .filter-chips { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:10px 54px 8px 12px; background:rgba(2,10,8,.25); border-bottom:1px solid var(--ns-line); }
-        .filter-chips:empty { display:none; }
-        .filter-chip { display:inline-flex; align-items:center; gap:5px; padding:6px 8px; border-radius:999px; color:#cce5dc; background:rgba(80,215,255,.07); border:1px solid rgba(80,215,255,.2); font:inherit; font-size:10px; cursor:pointer; }
-        .filter-reset { margin-left:auto; padding:6px 8px; color:#ffe08a; background:transparent; border:0; font:inherit; font-size:10px; font-weight:750; cursor:pointer; }
-        .settings-dirty { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:9px 11px; border-radius:11px; color:#ffe5a5; background:rgba(255,215,102,.08); border:1px solid rgba(255,215,102,.24); font-size:10px; }
-        .settings-save-area { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
-        .settings-dirty[hidden] { display:none; }
-        .settings-dirty-actions { display:flex; gap:6px; margin-left:auto; }
-        .discard-settings { padding:7px 9px; border-radius:8px; color:#c9d8d3; background:rgba(255,255,255,.04); border:1px solid var(--ns-line); font:inherit; font-size:10px; cursor:pointer; }
-        .advanced-settings { grid-column:1 / -1; padding:8px; border-radius:11px; border:1px dashed rgba(182,140,255,.24); }
-        .advanced-settings > summary { padding:6px; color:#d4b9ff; font-size:11px; font-weight:800; cursor:pointer; }
-        .advanced-settings > *:not(summary) { margin-top:8px; }
-        .confirm-backdrop { position:fixed; z-index:1200; inset:0; display:grid; place-items:center; padding:18px; background:rgba(0,8,7,.78); backdrop-filter:blur(8px); }
-        .confirm-dialog { width:min(460px,100%); padding:23px; border-radius:18px; color:#eafff6; background:#13231f; border:1px solid rgba(80,215,255,.26); box-shadow:0 28px 80px rgba(0,0,0,.58); }
-        .confirm-dialog h2 { margin:12px 0 8px; font-size:19px; }
-        .confirm-dialog p { margin:0; color:#9dbbb1; font-size:12px; line-height:1.55; white-space:pre-line; }
-        .confirm-icon { display:grid; place-items:center; width:38px; height:38px; border-radius:11px; color:#bcecff; background:rgba(80,215,255,.09); }
-        .confirm-icon.danger { color:#ff9ca7; background:rgba(255,107,120,.1); }
-        .confirm-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
-        .confirm-actions button { padding:9px 12px; border-radius:9px; font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
-        .confirm-cancel { color:#c9d8d3; background:rgba(255,255,255,.04); border:1px solid var(--ns-line); }
-        .confirm-accept { color:#082018; background:var(--ns-green); border:0; }
-        .confirm-accept.danger { color:#fff; background:#b8404d; }
-        button:focus-visible, summary:focus-visible, input:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:2px; }
-        .settings-view .danger-zone { margin-top:14px; padding:12px 14px; }
-        .settings-view .cleanup-settings { margin:0 0 10px; padding:5px 10px; }
-        .settings-view .cleanup-settings .cleanup { min-height:36px; padding:7px 11px; justify-self:end; font-size:12px; }
-        .settings-view .cleanup-settings .cleanup-result { margin:7px 3px 4px; }
-        .rule-group { padding:7px 12px; border:1px solid var(--ns-line); border-radius:13px; }
-        .rule-group h3 { margin:3px 0 4px; color:#c7b99f; font-size:10px; text-transform:uppercase; letter-spacing:1.1px; }
-        .rule-group h3 { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-        .settings-help-button { display:grid; place-items:center; flex:0 0 auto; width:24px; height:24px; padding:0; border-radius:50%; color:#d8c9b2; background:rgba(255,255,255,.045); border:1px solid rgba(255,246,229,.14); font:800 12px/1 Inter,Roboto,sans-serif; cursor:pointer; }
-        .settings-help-button:hover { color:#fff7e9; background:rgba(204,181,123,.15); border-color:rgba(204,181,123,.42); }
-        .settings-help-backdrop { position:fixed; z-index:90; inset:0; display:grid; place-items:center; padding:20px; background:rgba(7,6,5,.72); backdrop-filter:blur(7px); }
-        .settings-help-backdrop[hidden] { display:none; }
-        .settings-help-dialog { width:min(620px,calc(100vw - 32px)); max-height:min(720px,calc(100dvh - 40px)); overflow:auto; padding:24px; border-radius:18px; color:#eee7dd; background:#393531; border:1px solid rgba(204,181,123,.28); box-shadow:0 26px 80px rgba(0,0,0,.58); }
-        .settings-help-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; }
-        .settings-help-head h2 { margin:0; color:#fff8ed; font-size:20px; }
-        .settings-help-close { display:grid; place-items:center; width:34px; height:34px; padding:0; border-radius:10px; color:#d8d0c6; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.11); cursor:pointer; }
-        .settings-help-close ha-icon { --mdc-icon-size:20px; }
-        .settings-help-copy { display:grid; gap:12px; }
-        .settings-help-copy p { margin:0; color:#c9c1b7; font-size:13px; line-height:1.6; }
-        .settings-help-copy strong { color:#f4dfbd; }
-        .rule-group.basics { background:rgba(204,181,123,.045); border-color:rgba(204,181,123,.15); }
-        .rule-group.vlan-settings { background:rgba(80,215,255,.035); border-color:rgba(80,215,255,.14); }
-        .vlan-settings-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
-        .vlan-settings-head h3 { margin:0; }
-        .settings-heading-actions { display:flex; align-items:center; gap:8px; }
-        .vlan-add, .vlan-remove { display:inline-grid; place-items:center; border:1px solid rgba(80,215,255,.24); color:#bcecff; background:rgba(80,215,255,.07); cursor:pointer; }
-        .vlan-add { grid-template-columns:auto auto; gap:6px; padding:7px 10px; border-radius:9px; font:inherit; font-size:11px; font-weight:750; }
-        .vlan-add ha-icon, .vlan-remove ha-icon { --mdc-icon-size:17px; }
-        .vlan-list { display:grid; gap:9px; }
-        .vlan-row { display:grid; grid-template-columns:minmax(130px,1.2fr) 90px minmax(150px,1.25fr) minmax(130px,1fr) 58px 100px 34px; align-items:end; gap:8px; padding:10px; border:1px solid var(--ns-line); border-left:4px solid var(--vlan-color,#58b9d6); border-radius:11px; background:rgba(2,10,8,.27); }
-        .vlan-field { display:grid; gap:4px; min-width:0; color:#78998f; font-size:9px; font-weight:750; letter-spacing:.45px; text-transform:uppercase; }
-        .vlan-field input, .vlan-field select { width:100%; min-width:0; min-height:36px; box-sizing:border-box; padding:7px 8px; border:1px solid var(--ns-line); border-radius:8px; color:var(--ns-text); background:rgba(2,10,8,.4); font:inherit; font-size:12px; text-align:left; }
-        .vlan-field input[type="color"] { min-width:48px; padding:3px; cursor:pointer; }
-        .vlan-field.monitoring { justify-items:center; }
-        .vlan-field.monitoring input { width:22px; min-height:22px; accent-color:var(--ns-green); }
-        .vlan-remove { width:34px; height:34px; padding:0; border-radius:9px; color:#ffaaa0; border-color:rgba(255,107,95,.24); background:rgba(255,107,95,.06); }
-        .vlan-empty-note { margin:8px 2px 0; color:var(--ns-muted); font-size:10px; line-height:1.45; }
-        .rule-group.presence-settings { background:rgba(143,255,194,.04); border-color:rgba(143,255,194,.14); }
-        .rule-group.device-settings { background:rgba(80,215,255,.035); border-color:rgba(80,215,255,.13); }
-        .rule-group.onboarding-settings { background:rgba(240,185,79,.055); border-color:rgba(240,185,79,.18); }
-        .rule-group.onboarding-settings .rule { grid-template-columns:minmax(0,1fr) 190px; }
-        .rule-group.onboarding-settings input[type="text"] {
-          width:190px; box-sizing:border-box; font-variant-numeric:tabular-nums;
-        }
-        .rule-group.detection-settings { background:rgba(182,140,255,.04); border-color:rgba(182,140,255,.14); }
-        .rule-group.alert-rule-settings { background:rgba(255,215,102,.035); border-color:rgba(255,215,102,.14); }
-        .rule-group.notification-settings { background:rgba(80,215,255,.035); border-color:rgba(80,215,255,.13); }
-        .rule-group.notification-target-settings { background:rgba(143,255,194,.025); border-color:rgba(143,255,194,.12); }
-        .notification-target-description { margin:4px 3px 8px; color:var(--ns-muted); font-size:10px; line-height:1.4; }
-        .notify-target-section { display:grid; gap:8px; padding:10px 3px 4px; border-top:1px solid var(--ns-line); }
-        .notify-target-heading { display:flex; align-items:end; justify-content:space-between; gap:10px; }
-        .notify-target-heading > label { display:grid; gap:3px; color:var(--ns-text); font-size:13px; font-weight:750; }
-        .notify-target-heading small { color:var(--ns-muted); font-size:10px; font-weight:500; }
-        .notify-target-count { flex:0 0 auto; color:#f4dfbd; font-size:10px; font-weight:750; }
-        .notify-target-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:6px; position:sticky; top:0; z-index:2; padding:2px 0 5px; background:var(--ns-panel); }
-        .notify-target-search { min-width:0; height:34px; box-sizing:border-box; padding:7px 10px 7px 32px !important; text-align:left !important; background:rgba(255,255,255,.035) !important; }
-        .notify-search-wrap { position:relative; min-width:0; }
-        .notify-search-wrap ha-icon { position:absolute; z-index:1; left:9px; top:8px; color:var(--ns-muted); --mdc-icon-size:17px; pointer-events:none; }
-        .notify-target-action { padding:0 9px; border:1px solid var(--ns-line); border-radius:9px; color:var(--ns-muted); background:rgba(255,255,255,.035); font:inherit; font-size:9px; font-weight:750; cursor:pointer; }
-        .notify-target-action:hover { color:#fff7e9; border-color:rgba(204,181,123,.38); background:rgba(204,181,123,.12); }
-        .notify-target-list { display:grid; gap:5px; max-height:210px; overflow:auto; padding-right:3px; scrollbar-gutter:stable; }
-        .notify-target { display:grid; grid-template-columns:28px minmax(0,1fr) 24px; align-items:center; gap:9px; min-height:42px; padding:7px 9px; border:1px solid var(--ns-line); border-radius:10px; background:rgba(255,255,255,.018); cursor:pointer; transition:.18s ease; }
-        .notify-target[hidden] { display:none; }
-        .notify-target:hover { border-color:rgba(204,181,123,.28); background:rgba(204,181,123,.07); }
-        .notify-target:has(input:checked) { border-color:rgba(204,181,123,.46); background:rgba(204,181,123,.11); box-shadow:inset 3px 0 #e5ad50; }
-        .notify-target input { position:absolute; width:1px; height:1px; min-height:0; opacity:0; pointer-events:none; }
-        .notify-target-icon { display:grid; place-items:center; width:28px; height:28px; border-radius:8px; color:var(--ns-cyan); background:rgba(80,215,255,.09); }
-        .notify-target-icon.telegram { color:#69c9f2; background:rgba(45,169,225,.12); }
-        .notify-target-icon ha-icon { --mdc-icon-size:17px; }
-        .notify-target-copy { display:grid; gap:2px; min-width:0; }
-        .notify-target strong { overflow:hidden; color:var(--ns-text); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
-        .notify-target small, .notify-target-empty { color:var(--ns-muted); font-size:9px; overflow-wrap:anywhere; }
-        .notify-target-check { display:grid; place-items:center; width:21px; height:21px; border:1px solid var(--ns-line); border-radius:7px; color:transparent; }
-        .notify-target-check ha-icon { --mdc-icon-size:15px; }
-        .notify-target input:checked ~ .notify-target-check { color:#2b2115; border-color:#e5ad50; background:#e5ad50; }
-        .notify-target-empty { padding:10px; border:1px dashed var(--ns-line); border-radius:10px; }
-        .notify-event-hint { display:flex; align-items:flex-start; gap:8px; margin-top:4px; padding:9px 10px; border-radius:10px; color:var(--ns-muted); background:rgba(80,215,255,.055); font-size:10px; line-height:1.4; }
-        .notify-event-hint ha-icon { flex:0 0 auto; --mdc-icon-size:17px; color:var(--ns-cyan); }
-        .notify-event-hint code, .notify-target-empty code { color:var(--ns-text); }
-        .rule-group.ai-config-settings { background:rgba(182,140,255,.045); border-color:rgba(182,140,255,.17); }
-        .rule-group.ai-config-settings .rule { grid-template-columns:minmax(0,1fr) 190px; }
-        .rule-group.ai-config-settings .settings-select summary { white-space:nowrap; }
-        .rule-group.ai-config-settings .settings-select .custom-filter-menu { left:auto; right:0; width:max-content; min-width:220px; }
-        .rule-group.ai-config-settings .settings-select .custom-filter-option span { white-space:nowrap; }
-        .rule { display:grid; grid-template-columns:minmax(0,1fr) 130px; align-items:center; gap:20px; padding:14px 4px; border-bottom:1px solid var(--ns-line); }
-        .rule:last-child { border-bottom:0; }
-        .rule label { color:#e4faf2; font-size:14px; font-weight:680; line-height:1.35; }
-        .rule small { display:block; color:#78998f; font-size:12px; font-weight:450; line-height:1.4; margin-top:5px; }
-        .rule input { min-height:44px; padding:10px 12px; text-align:right; font-size:15px; }
-        .rule input[type="checkbox"] { width:25px; height:25px; min-height:25px; justify-self:end; accent-color:var(--ns-green); }
-        .ai-settings .rule-list { grid-template-columns:repeat(3,minmax(0,1fr)); align-items:stretch; }
-        .ai-settings .rule { grid-template-columns:1fr; align-content:start; border:1px solid var(--ns-line); border-radius:13px; padding:12px; }
-        .ai-settings .rule input, .ai-settings .rule select { width:100%; justify-self:stretch; }
-        .ai-settings .rule input[type="checkbox"] { width:22px; justify-self:end; }
-        .ai-settings .rule select {
-          min-width:0; box-sizing:border-box;
-        }
-        .rule-actions { display:flex; gap:9px; margin-top:22px; }
-        .save-rules { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; border:0; border-radius:11px; padding:14px; color:#092018; background:var(--ns-green); font:inherit; font-size:14px; font-weight:800; cursor:pointer; transition:background .18s ease,color .18s ease,opacity .18s ease; }
-        .watch-heading .save-rules { flex:0 0 auto; min-width:170px; padding:11px 16px; white-space:nowrap; }
-        .save-rules ha-icon { --mdc-icon-size:18px; }
-        .save-rules.busy ha-icon { animation:spin .8s linear infinite; }
-        .save-rules.saved { color:#10271d; background:#76d89d; }
-        .save-rules.failed { color:#fff3f1; background:#a94242; }
-        .save-rules:disabled { cursor:not-allowed; }
-        .save-rules.busy:disabled { cursor:wait; }
-        .danger-zone { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:18px; margin-top:24px; padding:16px; border-radius:13px; background:rgba(255,107,120,.045); border:1px solid rgba(255,107,120,.18); }
-        .danger-zone strong { display:block; color:#ffd5d9; font-size:13px; }
-        .danger-zone p { margin:4px 0 0; color:#9d817e; font-size:11px; line-height:1.4; }
-        .danger-zone .cleanup { flex:0 0 auto; }
-        .danger-zone .cleanup-result { flex-basis:100%; margin:0; }
-        .ai-panel { margin-top:18px; border-radius:18px; padding:22px; background:var(--ns-panel); border:1px solid rgba(182,140,255,.22); box-shadow:0 18px 50px rgba(0,0,0,.18); }
-        .ai-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:18px; }
-        .ai-head h2 { display:flex; align-items:center; gap:9px; margin:0 0 5px; font-size:19px; }
-        .ai-head h2 ha-icon { color:#b68cff; --mdc-icon-size:23px; }
-        .ai-head p { margin:0; color:#78998f; font-size:11px; }
-        .ai-run { display:flex; align-items:center; gap:8px; padding:10px 13px; border-radius:10px; color:#f1eaff; background:rgba(182,140,255,.1); border:1px solid rgba(182,140,255,.3); font:inherit; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; }
-        .ai-run ha-icon { --mdc-icon-size:18px; }
-        .ai-run.busy ha-icon { animation:spin .8s linear infinite; }
-        .ai-run:disabled { opacity:.6; cursor:wait; }
-        .ai-actions { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
-        .ai-prompt-toggle { display:flex; align-items:center; gap:7px; padding:10px 12px; border-radius:10px; color:#cce5dc; background:rgba(255,255,255,.04); border:1px solid var(--ns-line); font:inherit; font-size:11px; font-weight:750; cursor:pointer; white-space:nowrap; }
-        .ai-prompt-toggle ha-icon { --mdc-icon-size:17px; }
-        .ai-prompt-toggle:disabled { opacity:.45; cursor:not-allowed; }
-        .ai-prompt { margin:0 0 16px; padding:14px; max-height:360px; overflow:auto; border-radius:12px; color:#b9d8cd; background:rgba(2,10,8,.48); border:1px solid rgba(182,140,255,.22); font:500 11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
-        .ai-prompt[hidden] { display:none; }
-        .ai-error { margin-bottom:14px; padding:11px 13px; border-radius:10px; color:#ffd5d9; background:rgba(255,107,120,.08); border:1px solid rgba(255,107,120,.23); font-size:12px; }
-        .ai-report { display:grid; grid-template-columns:150px minmax(0,1fr); gap:18px; }
-        .ai-score { --score-color:var(--ns-green); display:grid; place-items:center; align-content:center; min-height:150px; padding:16px; border-radius:16px; color:var(--score-color); background:color-mix(in srgb,var(--score-color) 8%,rgba(2,10,8,.38)); border:1px solid color-mix(in srgb,var(--score-color) 25%,transparent); }
-        .ai-score.warn { --score-color:#ffd766; } .ai-score.bad { --score-color:var(--ns-red); }
-        .ai-score strong { font-size:48px; line-height:1; }
-        .ai-score span { margin-top:7px; color:#9dbbb1; font-size:11px; font-weight:750; }
-        .ai-score small { margin-top:7px; font-size:10px; }
-        .ai-copy { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-        .ai-copy article { padding:13px; border-radius:12px; background:rgba(2,10,8,.3); border:1px solid var(--ns-line); }
-        .ai-copy article.summary { grid-column:1/-1; }
-        .ai-copy h3 { margin:0 0 7px; color:#b68cff; font-size:10px; text-transform:uppercase; letter-spacing:.8px; }
-        .ai-copy p { margin:0; color:#cce5dc; font-size:12px; line-height:1.5; white-space:pre-line; }
-        .ai-history { display:flex; align-items:flex-end; gap:5px; height:74px; margin-top:15px; padding:9px 10px 0; border-top:1px solid var(--ns-line); }
-        .ai-history-bar { flex:1; min-width:8px; max-width:34px; height:calc(var(--score) * 10%); border-radius:5px 5px 2px 2px; background:linear-gradient(to top,rgba(182,140,255,.35),#b68cff); cursor:help; }
-        .ai-empty { padding:35px 20px; text-align:center; color:#78998f; font-size:12px; }
-        .ai-view { display:grid; grid-template-columns:minmax(0,1fr); gap:18px; align-items:start; }
-        .ai-view .ai-panel { order:1; margin-top:0; }
-        .ai-settings { order:2; border-color:rgba(182,140,255,.18); }
-        @media (min-width:1700px) {
-          .ai-panel { padding:30px; }
-          .ai-head { margin-bottom:24px; }
-          .ai-head h2 { font-size:25px; }
-          .ai-head h2 ha-icon { --mdc-icon-size:29px; }
-          .ai-head p { font-size:14px; }
-          .ai-run, .ai-prompt-toggle { padding:13px 17px; font-size:14px; }
-          .ai-run ha-icon, .ai-prompt-toggle ha-icon { --mdc-icon-size:20px; }
-          .ai-report { grid-template-columns:190px minmax(0,1fr); gap:22px; }
-          .ai-score { min-height:190px; padding:20px; }
-          .ai-score strong { font-size:62px; }
-          .ai-score span { font-size:14px; }
-          .ai-score small { font-size:12px; }
-          .ai-copy { gap:14px; }
-          .ai-copy article { padding:18px; }
-          .ai-copy h3 { font-size:12px; }
-          .ai-copy p { font-size:15px; line-height:1.55; }
-          .ai-history { height:100px; margin-top:20px; padding-top:13px; }
-          .ai-history-bar { max-width:44px; }
-          .ai-empty { padding:50px 24px; font-size:15px; }
-        }
-
-        /* Warm smoked-glass theme, inspired by the supplied dashboard reference. */
-        header {
-          margin-bottom:24px; padding:4px 2px 0;
-          border-bottom:1px solid rgba(255,255,255,.035);
-          padding-bottom:20px;
-        }
-        .version-info, .metric-note, .entity, .entity-id-link, .status-time,
-        .log-date, .alert-time { color:#aaa49a; }
-        .scan {
-          color:#fff8ed; background:rgba(255,255,255,.055);
-          border-color:rgba(255,241,215,.15); border-radius:999px; padding:11px 17px;
-          box-shadow:inset 0 1px rgba(255,255,255,.04);
-        }
-        .scan:hover { background:rgba(204,181,123,.16); border-color:rgba(204,181,123,.38); }
-        /* Graphite glass with restrained gold and semantic status accents. */
-        .metrics {
-          gap:14px; padding:0; border-radius:20px;
-          background:transparent; border:0; box-shadow:none;
-          backdrop-filter:none;
-        }
-        .metric {
-          min-height:150px; padding:18px 20px; border-radius:18px;
-          background:linear-gradient(145deg,rgba(44,46,49,.94),rgba(25,28,31,.96));
-          border-color:rgba(231,224,208,.10);
-          box-shadow:0 10px 28px rgba(0,0,0,.16),inset 0 1px rgba(255,255,255,.055);
-          backdrop-filter:none;
-        }
-        .metric::before { content:""; position:absolute; top:0; left:22px; right:22px; height:1px; background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--glow) 65%,transparent),transparent); pointer-events:none; }
-        .metric::after { display:block; width:140px; height:110px; opacity:.09; filter:blur(35px); pointer-events:none; }
-        .metric.devices { --glow:#e9bf70; }
-        .metric.events-metric { --glow:#91b9d4; }
-        .metric.dns-metric { --glow:#74d8af; }
-        .metric.watch-metric { --glow:#e9bf70; }
-        .metric-label { font-weight:750; }
-        .metric-note { line-height:1.5; }
-        .nav-metric.active { border-color:rgba(231,185,101,.55); box-shadow:0 0 0 1px rgba(231,185,101,.08),0 12px 30px rgba(0,0,0,.20); }
-        .device-count strong, .metric-value, .function-count strong { font-variant-numeric:tabular-nums; }
-        .metric .device-count.online strong { color:#83ddba; }
-        .metric .device-count.offline strong { color:#a4adb8; }
-        .metric .device-count.new strong { color:#efca86; }
-        .device-count + .device-count, .function-count + .function-count { border-color:rgba(255,255,255,.075); }
-        .metric.dns-metric .metric-status-value, .metric.dns-metric .metric-status-value ha-icon { color:#8ddfbd; }
-        .metric .metric-settings { background:rgba(255,255,255,.025); border-color:rgba(255,255,255,.07); }
-        .nav-metric:hover, .metric:is(button):hover { border-color:rgba(231,185,101,.45); }
-        .metric:focus-visible, .device-count:focus-visible, .function-count:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:3px; }
-
-        .metric-label, .security-card span { color:#c1bbb1; font-size:10px; letter-spacing:.8px; }
-        .metric-value, .device-count strong { color:#fffaf1; font-weight:650; }
-        .device-count.online strong, .metric.network .metric-value,
-        .metric.connections .metric-value { color:var(--ns-cyan); }
-        .metric:is(button):hover {
-          background:linear-gradient(135deg,rgba(124,116,105,.68),rgba(71,67,61,.64));
-          border-color:rgba(204,181,123,.32);
-        }
-        .connection-panel {
-          background:rgba(67,63,59,.48); border-color:var(--ns-line);
-          backdrop-filter:none; box-shadow:none;
-        }
-        .tabs {
-          background:rgba(67,63,59,.48); border-color:var(--ns-line);
-          backdrop-filter:blur(22px); box-shadow:0 18px 45px rgba(10,8,5,.17);
-        }
-        .tabs { width:100%; padding:6px; border-radius:15px; }
-        .tab { flex:1; justify-content:center; color:#bdb7ad; border-radius:11px; font-size:13px; }
-        .tab.active, .filter.active {
-          color:#fff9ee; background:linear-gradient(135deg,rgba(239,166,67,.86),rgba(194,105,29,.92));
-          box-shadow:0 8px 22px rgba(224,139,40,.18), inset 0 1px rgba(255,255,255,.25);
-        }
-        .toolbar { padding:10px; border-radius:16px; }
-        input, select {
-          color:#fffaf1; background:rgba(33,31,29,.38);
-          border-color:rgba(255,246,229,.1); border-radius:10px;
-        }
-        select {
-          color-scheme:dark;
-          cursor:pointer;
-          background-color:#35322f;
-          border-color:rgba(204,181,123,.20);
-          box-shadow:inset 0 1px rgba(255,255,255,.035);
-        }
-        select:hover { border-color:rgba(204,181,123,.40); background-color:#3b3733; }
-        select option, select optgroup {
-          color:#f8f2e8;
-          background:#35322f;
-          font-family:"Manrope","Avenir Next","Segoe UI Variable","Segoe UI",sans-serif;
-        }
-        select option:checked {
-          color:#fffaf1;
-          background:#9a5d24;
-        }
-        input:focus, select:focus { border-color:rgba(204,181,123,.58); box-shadow:0 0 0 3px rgba(204,181,123,.10); }
-        .search ha-icon { color:#b0a99e; }
-        .filter { color:#bdb7ad; }
-        .table-panel, .log-panel, .dns-panel, .mesh-panel, .watch-panel, .ai-panel {
-          border-radius:16px; background:linear-gradient(145deg,rgba(31,34,37,.94),rgba(22,25,28,.96));
-          border-color:rgba(255,246,229,.10);
-          box-shadow:0 24px 58px rgba(8,6,4,.26), inset 0 1px rgba(255,255,255,.035);
-          backdrop-filter:blur(22px);
-        }
-        th { color:#aeb4bc; background:#202427; border-bottom-color:rgba(231,185,101,.17); }
-        .column-filters th { background:#191d20; }
-        td { color:#e5e7eb; border-bottom-color:rgba(255,255,255,.055); }
-        tbody tr:nth-child(even) { background:rgba(255,255,255,.012); }
-        tbody tr:hover { background:rgba(231,185,101,.055); }
-        .entity-link, .detail-stack strong, .connection-name, .log-device,
-        .alert-name, .rule label, .client-name { color:#fffaf1; }
-        .device-icon, .log-icon {
-          color:var(--ns-cyan); background:rgba(204,181,123,.10);
-          border-color:rgba(204,181,123,.18);
-        }
-        .device-icon.vpn { color:#d4b9ff; background:rgba(182,140,255,.12); border-color:rgba(182,140,255,.3); }
-        .device-icon.guest { color:#ffe08a; background:rgba(255,215,102,.1); border-color:rgba(255,215,102,.3); }
-        .device-icon.router { color:#aaffd0; background:rgba(85,242,162,.1); border-color:rgba(85,242,162,.28); }
-        .device-icon.mesh { color:#8eb7ff; background:rgba(70,125,255,.12); border-color:rgba(95,145,255,.34); }
-        .column-picker-button {
-          color:#f4dfbd; background:rgba(204,181,123,.08); border-color:rgba(204,181,123,.25);
-        }
-        .column-picker {
-          background:#393531; border-color:rgba(204,181,123,.28);
-        }
-        .column-picker { box-shadow:0 24px 60px rgba(10,8,5,.45); }
-        .security-card, .ai-copy article, .client, .connection-card {
-          background:rgba(35,32,29,.30); border-color:rgba(255,246,229,.09);
-        }
-        .save-rules, .approve-internet {
-          color:#2c2115; background:linear-gradient(135deg,#f0d39a,#cfa45d);
-          box-shadow:0 8px 22px rgba(224,139,40,.20);
-        }
-        .internet {
-          color:#f6d8a6; background:rgba(204,181,123,.09); border-color:rgba(204,181,123,.25);
-        }
-        .ap-node {
-          background:linear-gradient(145deg,rgba(204,181,123,.18),rgba(255,255,255,.045));
-          border-color:rgba(204,181,123,.28);
-        }
-        ::selection { color:#2b2115; background:#ccb57b; }
-
-        /* Shared settings design: one visual language across every section. */
-        .settings-view .watch-panel { background:var(--ns-panel); border-color:var(--ns-line); box-shadow:0 16px 42px rgba(10,8,5,.18),inset 0 1px rgba(255,255,255,.04); }
-        .settings-view .rule-group,
-        .settings-view .rule-group.basics,
-        .settings-view .rule-group.vlan-settings,
-        .settings-view .rule-group.presence-settings,
-        .settings-view .rule-group.device-settings,
-        .settings-view .rule-group.onboarding-settings,
-        .settings-view .rule-group.detection-settings,
-        .settings-view .rule-group.alert-rule-settings,
-        .settings-view .rule-group.notification-settings,
-        .settings-view .rule-group.notification-target-settings,
-        .settings-view .rule-group.ai-config-settings { background:var(--ns-surface); border:1px solid var(--ns-line); border-radius:13px; }
-        .settings-view .rule-group h3 { color:var(--ns-subtle); }
-        .settings-view .rule label, .settings-view .adguard-feature strong { color:var(--ns-text); }
-        .settings-view .rule small, .settings-view .watch-heading p, .settings-view .adguard-feature small,
-        .settings-view .notification-target-description, .settings-view .vlan-empty-note { color:var(--ns-muted); }
-        .settings-view .adguard-feature, .settings-view .vlan-row, .settings-view .notify-target,
-        .settings-view .learning-card, .settings-view .security-card { color:var(--ns-text); background:var(--ns-surface-raised); border-color:var(--ns-line); }
-        .settings-view input:not([type="checkbox"]):not([type="color"]), .settings-view select,
-        .settings-view .unit-input { color:var(--ns-text); background:var(--ns-field); border-color:var(--ns-line); }
-        .settings-view .unit-input span { color:var(--ns-muted); }
-        .settings-view .adguard-feature-state { color:var(--ns-muted); background:var(--ns-surface-raised); }
-        .settings-view .adguard-feature.active .adguard-feature-state, .settings-view .save-rules { color:#2d1b09; background:#ccb57b; }
-        .settings-view .query-log-warning { color:#f2d798; background:rgba(230,162,63,.09); border:1px solid rgba(230,162,63,.2); }
-
-        /* Light theme follows Home Assistant's active light/dark setting. */
-        :host([data-theme="light"]) {
-          --ns-bg:#f6f3ee;
-          --ns-panel:rgba(255,255,255,.78);
-          --ns-line:rgba(91,72,48,.14);
-          --ns-text:#2d2925;
-          --ns-muted:#655f58;
-          --ns-subtle:#746c62;
-          --ns-surface:#fffdfa;
-          --ns-surface-raised:#ffffff;
-          --ns-field:#ffffff;
-          --ns-green:#a85b17;
-          --ns-cyan:#8d5a1f;
-          --ns-red:#c43f3f;
-          color-scheme:light;
-          color:#29241f;
-          background:
-            radial-gradient(ellipse at 54% 42%,rgba(229,164,80,.18),transparent 31rem),
-            radial-gradient(ellipse at 16% 76%,rgba(184,136,78,.10),transparent 28rem),
-            linear-gradient(135deg,rgba(255,255,255,.8),transparent 48%),
-            var(--ns-bg);
-        }
-        :host([data-theme="light"]) .shell::before {
-          opacity:.18;
-          background-image:radial-gradient(rgba(92,69,43,.20) .45px,transparent .45px);
-          mix-blend-mode:multiply;
-        }
-        :host([data-theme="light"]) header { border-bottom-color:rgba(91,72,48,.10); }
-        :host([data-theme="light"]) h1,
-        :host([data-theme="light"]) .metric-value,
-        :host([data-theme="light"]) .device-count strong,
-        :host([data-theme="light"]) .entity-link,
-        :host([data-theme="light"]) .detail-stack strong,
-        :host([data-theme="light"]) .connection-name,
-        :host([data-theme="light"]) .log-device,
-        :host([data-theme="light"]) .log-device-filter,
-        :host([data-theme="light"]) .dns-host-link,
-        :host([data-theme="light"]) .alert-name,
-        :host([data-theme="light"]) .rule label,
-        :host([data-theme="light"]) .client-name { color:#29241f; }
-        :host([data-theme="light"]) .version-info,
-        :host([data-theme="light"]) .metric-note,
-        :host([data-theme="light"]) .entity,
-        :host([data-theme="light"]) .entity-id-link,
-        :host([data-theme="light"]) .status-time,
-        :host([data-theme="light"]) .log-date,
-        :host([data-theme="light"]) .alert-time,
-        :host([data-theme="light"]) .ai-empty { color:#756d63; }
-        :host([data-theme="light"]) .metric-label,
-        :host([data-theme="light"]) .security-card span { color:#6e665c; }
-        :host([data-theme="light"]) .scan {
-          color:#5c3918; background:rgba(255,255,255,.76);
-          border-color:rgba(139,83,26,.22); box-shadow:0 7px 18px rgba(91,61,29,.08);
-        }
-        :host([data-theme="light"]) .scan:hover { color:#3e240f; background:#fff6e8; }
-        :host([data-theme="light"]) .metrics {
-          background:rgba(229,221,210,.62); border-color:rgba(91,72,48,.12);
-          box-shadow:inset 0 1px rgba(255,255,255,.72);
-        }
-        :host([data-theme="light"]) .metric {
-          background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(242,237,229,.94));
-          border-color:rgba(91,72,48,.12); box-shadow:0 8px 20px rgba(82,61,36,.07);
-        }
-        :host([data-theme="light"]) .metric:is(button):hover {
-          background:linear-gradient(135deg,#fffaf2,#eee5d9); border-color:rgba(168,91,23,.30);
-        }
-        :host([data-theme="light"]) .connection-panel,
-        :host([data-theme="light"]) .tabs,
-        :host([data-theme="light"]) .toolbar {
-          background:rgba(255,255,255,.76); border-color:rgba(91,72,48,.14);
-          box-shadow:0 14px 36px rgba(82,61,36,.07);
-        }
-        :host([data-theme="light"]) .tab,
-        :host([data-theme="light"]) .filter { color:#665f56; }
-        :host([data-theme="light"]) .tab.active,
-        :host([data-theme="light"]) .filter.active { color:#fffaf2; }
-        :host([data-theme="light"]) input,
-        :host([data-theme="light"]) select {
-          color:#302a24; background:#fffdf9; border-color:rgba(91,72,48,.17); color-scheme:light;
-        }
-        :host([data-theme="light"]) select:hover { background-color:#fff8ec; }
-        :host([data-theme="light"]) select option,
-        :host([data-theme="light"]) select optgroup { color:#302a24; background:#fffdf9; }
-        :host([data-theme="light"]) select option:checked { color:#fff; background:#a85b17; }
-        :host([data-theme="light"]) .search ha-icon { color:#766d62; }
-        :host([data-theme="light"]) .table-panel,
-        :host([data-theme="light"]) .log-panel,
-        :host([data-theme="light"]) .dns-panel,
-        :host([data-theme="light"]) .mesh-panel,
-        :host([data-theme="light"]) .watch-panel,
-        :host([data-theme="light"]) .ai-panel {
-          background:linear-gradient(145deg,rgba(255,255,255,.90),rgba(242,237,230,.86));
-          border-color:rgba(91,72,48,.14);
-          box-shadow:0 20px 48px rgba(82,61,36,.10),inset 0 1px rgba(255,255,255,.82);
-        }
-        :host([data-theme="light"]) th { color:#665e54; background:rgba(235,229,220,.98); }
-        :host([data-theme="light"]) .column-filters th { background:rgba(245,241,235,.98); }
-        :host([data-theme="light"]) td { color:#3d3731; border-bottom-color:rgba(91,72,48,.10); }
-        :host([data-theme="light"]) tbody tr:nth-child(even) { background:rgba(104,82,55,.025); }
-        :host([data-theme="light"]) tbody tr:hover { background:rgba(208,127,35,.08); }
-        :host([data-theme="light"]) .column-picker,
-        :host([data-theme="light"]) .custom-filter-menu,
-        :host([data-theme="light"]) .dns-policy-modal,
-        :host([data-theme="light"]) .guest-modal,
-        :host([data-theme="light"]) .settings-help-dialog {
-          color:#302a24; background:#fffaf3; border-color:rgba(168,91,23,.24);
-          box-shadow:0 24px 60px rgba(82,61,36,.20);
-        }
-        :host([data-theme="light"]) .column-picker-head { color:#302b26; border-bottom-color:#ded7ce; }
-        :host([data-theme="light"]) .column-picker label { color:#38332e; font-weight:700; }
-        :host([data-theme="light"]) .column-picker label:hover { color:#653b12; background:#fff3df; }
-        :host([data-theme="light"]) .column-picker input { accent-color:#a85b17; }
-        :host([data-theme="light"]) .column-picker-close {
-          color:#625b53; background:#f4f0ea; border-color:#d7cfc5;
-        }
-        :host([data-theme="light"]) .column-picker-close:hover {
-          color:#633a13; background:#fff2df; border-color:#d49a53;
-        }
-        :host([data-theme="light"]) .dns-policy-modal-backdrop,
-        :host([data-theme="light"]) .guest-modal-backdrop,
-        :host([data-theme="light"]) .settings-help-backdrop { background:rgba(72,60,47,.38); }
-        :host([data-theme="light"]) .security-card,
-        :host([data-theme="light"]) .ai-copy article,
-        :host([data-theme="light"]) .client,
-        :host([data-theme="light"]) .connection-card,
-        :host([data-theme="light"]) .guest-status-card {
-          background:rgba(255,255,255,.64); border-color:rgba(91,72,48,.13);
-        }
-        :host([data-theme="light"]) .guest-qr { background:rgba(255,255,255,.64); border-color:rgba(91,72,48,.13); }
-        :host([data-theme="light"]) .guest-qr-copy h3 { color:#302a24; }
-        :host([data-theme="light"]) .guest-qr-copy p,
-        :host([data-theme="light"]) .guest-qr-unavailable { color:#665e54; }
-        :host([data-theme="light"]) .client-detail,
-        :host([data-theme="light"]) .log-route span,
-        :host([data-theme="light"]) .dns-chip,
-        :host([data-theme="light"]) .internet-label { color:#625a51; background:rgba(91,72,48,.06); border-color:rgba(91,72,48,.11); }
-        :host([data-theme="light"]) .internet-label.trusted,
-        :host([data-theme="light"]) .internet-label.allowed { color:#237448; background:#e8f5ec; border-color:#b9dcc5; }
-        :host([data-theme="light"]) .internet-label.learning { color:#246c86; background:#e5f4f9; border-color:#b8dce8; }
-        :host([data-theme="light"]) .internet-label.pending { color:#805b12; background:#fff4d5; border-color:#ead49a; }
-        :host([data-theme="light"]) .internet-label.denied { color:#b42318; background:#fdecea; border-color:#efc1bc; }
-        :host([data-theme="light"]) .internet-label.error { color:#8a5b08; background:#fff4d5; border-color:#ead49a; }
-        :host([data-theme="light"]) .dns-chart,
-        :host([data-theme="light"]) .ai-prompt,
-        :host([data-theme="light"]) .presence-timeline { background:rgba(109,85,54,.055); }
-        :host([data-theme="light"]) .ai-copy p,
-        :host([data-theme="light"]) .presence-summary,
-        :host([data-theme="light"]) .dns-action { color:#514a43; }
-        :host([data-theme="light"]) .settings-help-button,
-        :host([data-theme="light"]) .settings-help-close { color:#625a51; background:rgba(91,72,48,.06); }
-        :host([data-theme="light"]) .device-list tbody tr,
-        :host([data-theme="light"]) .log-table tbody tr,
-        :host([data-theme="light"]) .dns-table tbody tr { --light-card-bg:rgba(255,253,249,.96); }
-        :host([data-theme="light"]) .function-count strong { color:#81501d; }
-        :host([data-theme="light"]) .function-count.presence strong,
-        :host([data-theme="light"]) .function-count.presence ha-icon { color:#2f7f50; }
-        :host([data-theme="light"]) .function-count span,
-        :host([data-theme="light"]) .device-count span { color:#72695f; }
-        :host([data-theme="light"]) .metric.ai-metric .metric-value { color:#6f4bc1; }
-        :host([data-theme="light"]) .connection-time,
-        :host([data-theme="light"]) .connection-checked,
-        :host([data-theme="light"]) .connection-device-info { color:#746b61; }
-        :host([data-theme="light"]) .column-filter::placeholder { color:#7b746c; }
-        :host([data-theme="light"]) .column-filter,
-        :host([data-theme="light"]) .custom-filter-summary {
-          color:#403a34; background:#fffdfa; border-color:rgba(91,72,48,.18);
-        }
-        :host([data-theme="light"]) .custom-filter-option { color:#514a43; }
-        :host([data-theme="light"]) .custom-filter-option:hover { color:#30271f; background:rgba(168,91,23,.09); }
-        :host([data-theme="light"]) .custom-filter-option.active { color:#6b390e; background:rgba(168,91,23,.14); }
-        :host([data-theme="light"]) .custom-filter-count { color:#645b52; background:rgba(91,72,48,.07); }
-        :host([data-theme="light"]) .onboarding-state.assigned { color:#25643f; background:#e2f2e7; border-color:#b9dcc5; }
-        :host([data-theme="light"]) .onboarding-state.unknown { color:#645e57; background:#eeece8; }
-        :host([data-theme="light"]) .detail-stack small,
-        :host([data-theme="light"]) .log-ip,
-        :host([data-theme="light"]) .log-time,
-        :host([data-theme="light"]) .log-date,
-        :host([data-theme="light"]) .dns-answer,
-        :host([data-theme="light"]) .dns-chart-legend,
-        :host([data-theme="light"]) .dns-chart-label { color:#70685f; }
-        :host([data-theme="light"]) .rating.good,
-        :host([data-theme="light"]) .rating.okay { --rating-color:#6d675f; }
-        :host([data-theme="light"]) .log-entry { background:color-mix(in srgb,var(--log-color) 4%,#fffdf9); }
-        :host([data-theme="light"]) .log-entry:hover { background:color-mix(in srgb,var(--log-color) 10%,#fffaf4); }
-        :host([data-theme="light"]) .log-entry.discovered { --log-color:#28748d; }
-        :host([data-theme="light"]) .log-entry.renamed { --log-color:#28748d; }
-        :host([data-theme="light"]) .log-entry.internet_approval_revoked { --log-color:#b42318; }
-        :host([data-theme="light"]) .log-entry.internet_approval_granted { --log-color:#18794e; }
-        :host([data-theme="light"]) .log-entry.inventory_pruned { --log-color:#536b7d; }
-        :host([data-theme="light"]) .log-entry.device_forgotten { --log-color:#b42318; }
-        :host([data-theme="light"]) .log-entry.internet_blocked { --log-color:#b42318; }
-        :host([data-theme="light"]) .log-entry.internet_enforcement_failed { --log-color:#9b6a11; }
-        :host([data-theme="light"]) .log-entry.mesh_changed { --log-color:#7650ce; }
-        :host([data-theme="light"]) .log-message { color:#5c554e; }
-        :host([data-theme="light"]) .log-device-filter ha-icon { color:#397e98; opacity:1; }
-        :host([data-theme="light"]) .log-route { color:#655e56; }
-        :host([data-theme="light"]) .dns-action,
-        :host([data-theme="light"]) .ai-prompt-toggle,
-        :host([data-theme="light"]) .simulate-mesh {
-          color:#51483e; background:#fffaf2; border-color:rgba(91,72,48,.16);
-        }
-        :host([data-theme="light"]) .dns-client-filter { color:#286b84; background:#edf8fb; border-color:#c5e3eb; }
-        :host([data-theme="light"]) .dns-row { --dns-color:#686159; background:color-mix(in srgb,var(--dns-color) 3%,#fffdf9); }
-        :host([data-theme="light"]) .dns-row:hover { background:color-mix(in srgb,var(--dns-color) 9%,#fffaf4); }
-        :host([data-theme="light"]) .dns-domain { color:#403932; }
-        :host([data-theme="light"]) .dns-chart-title { color:#4b433b; }
-        :host([data-theme="light"]) .dns-chart-bars {
-          border-bottom-color:rgba(91,72,48,.16);
-          background:repeating-linear-gradient(to bottom,rgba(91,72,48,.07) 0 1px,transparent 1px 41px);
-        }
-        :host([data-theme="light"]) .dns-policy { color:#5d554d; background:#fffaf3; }
-        :host([data-theme="light"]) .dns-policy.block { color:#a93838; border-color:#e8bebe; }
-        :host([data-theme="light"]) .dns-policy.allow { color:#277043; border-color:#b9dcc5; }
-        :host([data-theme="light"]) .dns-policy-scope { color:#403932; background:#fff; border-color:rgba(91,72,48,.16); }
-        :host([data-theme="light"]) .dns-policy-modal p,
-        :host([data-theme="light"]) .guest-modal-head p,
-        :host([data-theme="light"]) .guest-status-card span,
-        :host([data-theme="light"]) .guest-client small,
-        :host([data-theme="light"]) .mesh-head p,
-        :host([data-theme="light"]) .mesh-legend { color:#6f675e; }
-        :host([data-theme="light"]) .guest-close { color:#514a43; }
-        :host([data-theme="light"]) .guest-client { background:#f3f8f7; border-color:#d5e6e2; }
-        :host([data-theme="light"]) .empty { color:#70685f; }
-        :host([data-theme="light"]) .empty strong { color:#403932; }
-        :host([data-theme="light"]) .ap-node { color:#3c342c; box-shadow:0 10px 26px rgba(82,61,36,.10); }
-        :host([data-theme="light"]) .ap-count,
-        :host([data-theme="light"]) .client-ip { color:#6d655d; }
-        :host([data-theme="light"]) .client-detail.signal { color:#267447; }
-        :host([data-theme="light"]) .watch { color:#70685f; background:#f3efe9; }
-        :host([data-theme="light"]) .watch.active { color:#91610b; background:#fff7dc; }
-        :host([data-theme="light"]) .watch.notify.active { color:#2b7088; background:#edf8fb; }
-        :host([data-theme="light"]) .watch.presence.active { color:#287247; background:#eaf7ee; }
-        :host([data-theme="light"]) .watch-heading p,
-        :host([data-theme="light"]) .rule small,
-        :host([data-theme="light"]) .presence-state,
-        :host([data-theme="light"]) .presence-axis { color:#6f675e; }
-        :host([data-theme="light"]) .learning,
-        :host([data-theme="light"]) .restart-learning { color:#8b5e0c; background:#fff8df; border-color:#e8d49b; }
-        :host([data-theme="light"]) .presence-summary { color:#3f5948; background:#edf7f0; border-color:#cfe5d5; }
-        :host([data-theme="light"]) .presence-summary strong,
-        :host([data-theme="light"]) .presence-name { color:#343b36; }
-        :host([data-theme="light"]) .presence-sensor-link { color:#5d5750; background:#f5f2ed; }
-        :host([data-theme="light"]) .presence-sensor-link.on { color:#286f46; background:#eaf6ee; border-color:#bfdcc8; }
-        :host([data-theme="light"]) .presence-row.home .presence-state { color:#347c51; }
-        :host([data-theme="light"]) .presence-timeline::before {
-          background:repeating-linear-gradient(90deg,transparent 0,transparent calc(25% - 1px),rgba(91,72,48,.10) 25%);
-        }
-        :host([data-theme="light"]) .alert-item {
-          --alert-color:#946411;
-          background:color-mix(in srgb,var(--alert-color) 7%,#fffdf9);
-          border-color:color-mix(in srgb,var(--alert-color) 25%,#e5ded4);
-        }
-        :host([data-theme="light"]) .alert-item.critical { --alert-color:#b43b3b; }
-        :host([data-theme="light"]) .alert-item.resolved { --alert-color:#77716a; opacity:.68; }
-        :host([data-theme="light"]) .alert-name { color:#3b342d; }
-        :host([data-theme="light"]) .alert-message { color:#625a52; }
-        :host([data-theme="light"]) .alert-time { color:#756d65; }
-        :host([data-theme="light"]) .ack { color:#6d460d; background:#fff8e9; border-color:#d9bd8c; }
-        :host([data-theme="light"]) .alert-action { color:#24536b; background:#edf5f8; border-color:#9dbbc9; }
-        :host([data-theme="light"]) .alert-action:hover { color:#173b50; background:#dcebf2; border-color:#668fa3; }
-        :host([data-theme="light"]) .alert-actions button:focus-visible { outline:2px solid #24536b; outline-offset:3px; }
-        :host([data-theme="light"]) .watch-entity-link:hover { color:#24536b; }
-        :host([data-theme="light"]) .rule-group { background:#fffdfa; border-color:rgba(91,72,48,.13); }
-        :host([data-theme="light"]) .rule-group.basics { background:#fff9ef; border-color:#ead8bc; }
-        :host([data-theme="light"]) .rule-group.vlan-settings { background:#f5fafb; border-color:#d7e7eb; }
-        :host([data-theme="light"]) .vlan-row { background:#fff; }
-        :host([data-theme="light"]) .vlan-field input,
-        :host([data-theme="light"]) .vlan-field select { color:#39332d; background:#fff; border-color:#d7d0c7; }
-        :host([data-theme="light"]) .rule-group.presence-settings { background:#f5fbf7; border-color:#d5e9db; }
-        :host([data-theme="light"]) .rule-group.device-settings,
-        :host([data-theme="light"]) .rule-group.notification-settings { background:#f5fafb; border-color:#d7e7eb; }
-        :host([data-theme="light"]) .rule-group.notification-target-settings { background:#f5faf7; border-color:#d5e7da; }
-        :host([data-theme="light"]) .rule-group.onboarding-settings { background:#fffaf0; border-color:#eadfc6; }
-        :host([data-theme="light"]) .rule-group.detection-settings,
-        :host([data-theme="light"]) .rule-group.ai-config-settings { background:#faf8ff; border-color:#e1d9f2; }
-        :host([data-theme="light"]) .rule-group h3 { color:#756044; }
-        :host([data-theme="light"]) .rule label { color:#39332d; }
-        :host([data-theme="light"]) .settings-help-head h2 { color:#342d26; }
-        :host([data-theme="light"]) .settings-help-copy p { color:#5f574f; }
-        :host([data-theme="light"]) .settings-help-copy strong { color:#79501c; }
-        :host([data-theme="light"]) .danger-zone strong { color:#a43636; }
-        :host([data-theme="light"]) .danger-zone p { color:#735f5c; }
-        :host([data-theme="light"]) .ai-head p,
-        :host([data-theme="light"]) .ai-score span { color:#6b635b; }
-        :host([data-theme="light"]) .ai-run { color:#5f3daf; background:#f3effd; border-color:#d8cdf2; }
-        :host([data-theme="light"]) .ai-prompt { color:#514a43; background:#f5f1eb; }
-        :host([data-theme="light"]) .ai-score {
-          background:color-mix(in srgb,var(--score-color) 9%,#fffdf9);
-          border-color:color-mix(in srgb,var(--score-color) 28%,#e3ddd5);
-        }
-        :host([data-theme="light"]) .ai-score.warn { --score-color:#9a6a10; }
-        :host([data-theme="light"]) .ai-copy h3 { color:#6844bd; }
-        :host([data-theme="light"]) .ai-copy p { color:#514a43; }
-        :host([data-theme="light"]) .tab:focus-visible {
-          outline:2px solid rgba(141,90,31,.65); outline-offset:2px;
-        }
-        :host([data-theme="light"]) select.column-filter,
-        :host([data-theme="light"]) .custom-column-filter summary {
-          color:#40382f; background:#fffdfa; border-color:#cfc4b6;
-          box-shadow:inset 0 1px rgba(255,255,255,.9);
-        }
-        :host([data-theme="light"]) select.column-filter:hover,
-        :host([data-theme="light"]) select.column-filter:focus,
-        :host([data-theme="light"]) .custom-column-filter[open] summary {
-          color:#352a20; background:#fff8ed; border-color:#b6752f;
-          box-shadow:0 0 0 3px rgba(182,117,47,.13);
-        }
-        :host([data-theme="light"]) .custom-column-filter summary::after {
-          border-right-color:#675d52; border-bottom-color:#675d52;
-        }
-        :host([data-theme="light"]) select.column-filter option,
-        :host([data-theme="light"]) select.column-filter optgroup {
-          color:#342e28; background:#fffdfa;
-        }
-        :host([data-theme="light"]) select.column-filter option:checked {
-          color:#fff; background:#a85b17;
-        }
-        :host([data-theme="light"]) .column-filter.has-value,
-        :host([data-theme="light"]) select.column-filter.has-value,
-        :host([data-theme="light"]) .custom-column-filter.has-value summary {
-          color:#643706; background:#f6e5c3; border-color:#d89a42;
-          box-shadow:inset 4px 0 #b66b1e,0 0 0 1px rgba(182,107,30,.10);
-          font-weight:800;
-        }
-        :host([data-theme="light"]) .column-filter.has-value::placeholder { color:#77552d; }
-        :host([data-theme="light"]) tbody tr { --state:#2d7b4c; }
-        :host([data-theme="light"]) tbody tr.off { --state:#7b817e; opacity:.88; }
-        :host([data-theme="light"]) tbody tr.off.important-offline { --state:#b33e3e; }
-        :host([data-theme="light"]) .status { text-shadow:none; }
-        :host([data-theme="light"]) .status .dot { box-shadow:0 0 0 3px color-mix(in srgb,var(--state) 14%,transparent); }
-        :host([data-theme="light"]) .dns-row.allowed { --dns-color:#287347; }
-        :host([data-theme="light"]) .dns-row.blocked { --dns-color:#b33939; }
-        :host([data-theme="light"]) .dns-row.allowed .dns-result { color:#287347; }
-        :host([data-theme="light"]) .dns-row.blocked .dns-result { color:#b33939; }
-        :host([data-theme="light"]) .dns-row.allowed { background:#f4faf6; }
-        :host([data-theme="light"]) .dns-row.blocked { background:#fff5f4; }
-        :host([data-theme="light"]) .dns-row.allowed:hover { background:#eaf6ee; }
-        :host([data-theme="light"]) .dns-row.blocked:hover { background:#fce9e7; }
-        :host([data-theme="light"]) .presence-summary {
-          color:#294c36; background:#e5f3e9; border-color:#b8d9c2;
-        }
-        :host([data-theme="light"]) .presence-summary ha-icon { color:#28784a; }
-        :host([data-theme="light"]) .presence-summary strong { color:#21452e; }
-        :host([data-theme="light"]) .presence-dot { background:#777f79; }
-        :host([data-theme="light"]) .presence-row.home .presence-dot {
-          background:#31a45d; box-shadow:0 0 0 3px rgba(49,164,93,.17);
-        }
-        :host([data-theme="light"]) .presence-row.home .presence-state { color:#267044; font-weight:750; }
-        :host([data-theme="light"]) .presence-timeline {
-          background:#ebe9e4; border-color:#d3ccc2;
-          box-shadow:inset 0 1px 3px rgba(70,54,35,.08);
-        }
-        :host([data-theme="light"]) .presence-segment {
-          background:linear-gradient(90deg,#64ad79,#55d37b);
-          box-shadow:0 0 0 1px rgba(45,123,76,.10),0 2px 7px rgba(45,123,76,.15);
-        }
-        :host([data-theme="light"]) .presence-axis,
-        :host([data-theme="light"]) .presence-state { color:#514b44; font-weight:600; }
-        :host([data-theme="light"]) .settings-view .cleanup-settings .cleanup {
-          color:#fff; background:#b83d3d; border-color:#a62f2f;
-          box-shadow:0 6px 16px rgba(184,61,61,.18);
-          opacity:1;
-        }
-        :host([data-theme="light"]) .settings-view .cleanup-settings .cleanup:hover {
-          color:#fff; background:#9f3030; border-color:#8f2727;
-        }
-        :host([data-theme="light"]) .settings-view .cleanup-settings .cleanup:focus-visible {
-          outline:2px solid rgba(184,61,61,.45); outline-offset:2px;
-        }
-        :host([data-theme="light"]) .settings-view .cleanup-settings .cleanup:disabled {
-          color:#8a8178; background:#e9e4de; border-color:#d5cec5; box-shadow:none; opacity:.72;
-        }
-        :host([data-theme="light"]) .nav-metric.active { border-color:#c87825; background:#fff9ef; box-shadow:0 0 0 1px rgba(200,120,37,.16),0 12px 26px rgba(78,54,28,.10); }
-        :host([data-theme="light"]) .header-action { color:#575048; background:#f7f4ef; border-color:#d8d1c8; }
-        :host([data-theme="light"]) .header-action:hover,
-        :host([data-theme="light"]) .header-action.active { color:#643b16; background:#fff7ea; border-color:#d99a4c; }
-        :host([data-theme="light"]) .metric-settings,
-        :host([data-theme="light"]) .settings-back { color:#6d665e; background:rgba(255,255,255,.55); border-color:#d7d0c7; }
-        :host([data-theme="light"]) .metric-status-value,
-        :host([data-theme="light"]) .adguard-stat strong,
-        :host([data-theme="light"]) .learning-card strong { color:#29251f; }
-        :host([data-theme="light"]) .adguard-stat,
-        :host([data-theme="light"]) .dns-live-stats { color:#625c54; background:#fff; border-color:#d9d2c9; }
-        :host([data-theme="light"]) .adguard-stat span,
-        :host([data-theme="light"]) .dns-live-stats h3 { color:#625c54; }
-        :host([data-theme="light"]) .settings-view .watch-panel {
-          color:var(--ns-text); background:#fbfaf7; border-color:#d8d1c8;
-          box-shadow:0 14px 34px rgba(74,57,37,.08),inset 0 1px rgba(255,255,255,.9);
-        }
-        :host([data-theme="light"]) .settings-view .rule-group,
-        :host([data-theme="light"]) .settings-view .rule-group.basics,
-        :host([data-theme="light"]) .settings-view .rule-group.vlan-settings,
-        :host([data-theme="light"]) .settings-view .rule-group.presence-settings,
-        :host([data-theme="light"]) .settings-view .rule-group.device-settings,
-        :host([data-theme="light"]) .settings-view .rule-group.onboarding-settings,
-        :host([data-theme="light"]) .settings-view .rule-group.detection-settings,
-        :host([data-theme="light"]) .settings-view .rule-group.alert-rule-settings,
-        :host([data-theme="light"]) .settings-view .rule-group.notification-settings,
-        :host([data-theme="light"]) .settings-view .rule-group.notification-target-settings,
-        :host([data-theme="light"]) .settings-view .rule-group.ai-config-settings { background:#fff; border-color:#ded8cf; }
-        :host([data-theme="light"]) .settings-view .rule-group h3,
-        :host([data-theme="light"]) .settings-view .vlan-field { color:#6d6255; }
-        :host([data-theme="light"]) .settings-view .rule label,
-        :host([data-theme="light"]) .settings-view .adguard-feature strong { color:#302b26; }
-        :host([data-theme="light"]) .settings-view .rule small,
-        :host([data-theme="light"]) .settings-view .watch-heading p,
-        :host([data-theme="light"]) .settings-view .adguard-feature small,
-        :host([data-theme="light"]) .settings-view .notification-target-description,
-        :host([data-theme="light"]) .settings-view .vlan-empty-note { color:#655f58; }
-        :host([data-theme="light"]) .settings-view .adguard-feature,
-        :host([data-theme="light"]) .settings-view .vlan-row,
-        :host([data-theme="light"]) .settings-view .notify-target,
-        :host([data-theme="light"]) .settings-view .learning-card,
-        :host([data-theme="light"]) .settings-view .security-card { color:#302b26; background:#faf8f4; border-color:#ddd6cd; }
-        :host([data-theme="light"]) .settings-view .adguard-feature:hover,
-        :host([data-theme="light"]) .settings-view .notify-target:hover { background:#fff7e9; border-color:#d49a53; }
-        :host([data-theme="light"]) .settings-view input:not([type="checkbox"]):not([type="color"]),
-        :host([data-theme="light"]) .settings-view select,
-        :host([data-theme="light"]) .settings-view .unit-input { color:#302b26; background:#fff; border-color:#cec6bc; }
-        :host([data-theme="light"]) .settings-view .unit-input span { color:#5f5952; background:#f0ece6; }
-        :host([data-theme="light"]) .settings-view .adguard-feature-state { color:#5f5952; background:#ece8e2; }
-        :host([data-theme="light"]) .settings-view .adguard-feature.active .adguard-feature-state,
-        :host([data-theme="light"]) .settings-view .save-rules { color:#2e1c09; background:#ccb57b; box-shadow:0 5px 14px rgba(166,101,25,.18); }
-        :host([data-theme="light"]) .settings-view .query-log-warning { color:#73500d; background:#fff7df; border-color:#e7d49e; }
-        :host([data-theme="light"]) .settings-view .learning-card p { color:#625c54; }
-        :host([data-theme="light"]) .settings-view .learning-action { color:#65400f; background:#fff5e3; border-color:#ddbd8d; }
-        :host([data-theme="light"]) .column-picker-button {
-          color:#55300c; background:#fff0d5; border-color:#c98a3c;
-          box-shadow:0 5px 14px rgba(116,72,23,.14);
-        }
-        :host([data-theme="light"]) .column-picker-button:hover {
-          color:#48280b; background:#ffedcf; border-color:#c98535;
-        }
-        :host([data-theme="light"]) .confirm-backdrop { background:rgba(72,60,47,.38); }
-        :host([data-theme="light"]) .confirm-dialog {
-          color:#302b26; background:#fffaf3; border-color:#d9bd91;
-          box-shadow:0 28px 72px rgba(82,61,36,.22);
-        }
-        :host([data-theme="light"]) .confirm-dialog p { color:#625a52; }
-        :host([data-theme="light"]) .confirm-icon { color:#74501d; background:#fff1d9; }
-        :host([data-theme="light"]) .confirm-cancel,
-        :host([data-theme="light"]) .discard-settings {
-          color:#514b44; background:#f4f0ea; border-color:#d5cdc3;
-        }
-        :host([data-theme="light"]) .confirm-cancel:hover,
-        :host([data-theme="light"]) .discard-settings:hover { color:#302b26; background:#eae4dc; }
-        :host([data-theme="light"]) .settings-dirty {
-          color:#704b0c; background:#fff4d8; border-color:#e3cb91;
-        }
-        :host([data-theme="light"]) .advanced-settings {
-          background:#faf8f4; border-color:#cfc3b5;
-        }
-        :host([data-theme="light"]) .advanced-settings > summary { color:#65429b; }
-        :host([data-theme="light"]) .vlan-add,
-        :host([data-theme="light"]) .notify-target-action {
-          color:#65400f; background:#fff6e7; border-color:#ddbc8a;
-        }
-        :host([data-theme="light"]) .vlan-add:hover,
-        :host([data-theme="light"]) .notify-target-action:hover {
-          color:#432608; background:#ffebca; border-color:#cc8b3e;
-        }
-        :host([data-theme="light"]) .notify-target-count { color:#704b16; }
-        :host([data-theme="light"]) .filter-chip,
-        :host([data-theme="light"]) .cleanup-result {
-          color:#315d6b; background:#edf7fa; border-color:#bfdde5;
-        }
-        :host([data-theme="light"]) .cleanup-summary { color:#625b53; }
-        :host([data-theme="light"]) .filter-reset { color:#75500d; }
-        :host([data-theme="light"]) .log-clear,
-        :host([data-theme="light"]) .dns-client-filter button {
-          color:#4f4942; background:#e9e5df; border:1px solid #d4cdc4;
-        }
-        :host([data-theme="light"]) .log-clear:hover,
-        :host([data-theme="light"]) .dns-client-filter button:hover {
-          color:#2f2a25; background:#ddd7cf;
-        }
-        :host([data-theme="light"]) .vlan-remove {
-          color:#a93630; background:#fff0ee; border-color:#e7bbb6;
-        }
-        :host([data-theme="light"]) .guest-inline {
-          color:#225f73; background:#e8f5f8; border:1px solid #b9dce4;
-        }
-        :host([data-theme="light"]) .guest-inline:hover {
-          color:#174756; background:#dceff4; border-color:#85bdca;
-        }
-        :host([data-theme="light"]) .rating.warn {
-          --rating-color:#8a6200; background:#fff5d2; border-color:#dfc568;
-        }
-        :host([data-theme="light"]) .rating.bad {
-          --rating-color:#a52e2e; background:#fdebea; border-color:#e5aaa7;
-        }
-        :host([data-theme="light"]) .rating.good,
-        :host([data-theme="light"]) .rating.okay {
-          color:#514b44; background:#efede9; border-color:#c9c4bd;
-        }
-        :host([data-theme="light"]) .metric-settings {
-          color:#5f574e; background:#f7f3ed; border-color:#cec6bc;
-        }
-        :host([data-theme="light"]) .metric-settings:hover {
-          color:#57310c; background:#fff0d7; border-color:#cc9149;
-        }
-        :host([data-theme="light"]) ::selection { color:#fff; background:#a85b17; }
-
-        @media (max-width:1100px) {
-          .tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); width:100%; overflow:visible; }
-          .tab { min-width:0; padding:10px 8px; }
-          .settings-tab-panel.notifications-panel { grid-template-columns:1fr; }
-          .settings-tab-panel.devices-panel { grid-template-columns:1fr; }
-          .ai-settings .rule-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
-        }
-        @media (max-width:1200px) { .metrics { grid-template-columns:repeat(3,1fr); } }
-        @media (max-width:800px) {
-          .shell { padding-top:20px; } header { align-items:flex-start; flex-wrap:wrap; } .scan span { display:none; }
-          .ha-menu { display:grid; }
-          .header-actions { margin-left:auto; }
-          .header-settings span { display:none; }
-          .metrics { grid-template-columns:1fr 1fr; } .toolbar { flex-wrap:wrap; }
-          .connection-panel { grid-template-columns:1fr; }
-          .search { flex-basis:100%; } .filters { flex:1; } .filter { flex:1; }
-          .cleanup { flex:1; justify-content:center; }
-          select { min-width:120px; }
-          .mesh-head { flex-direction:column; } .mesh-panel { padding:18px; }
-          .watch-layout { grid-template-columns:1fr; } .security-metrics { grid-template-columns:1fr 1fr; }
-          .presence-row { grid-template-columns:1fr; gap:7px; }
-          .settings-tab-panel, .settings-tab-panel.ai-maintenance-panel { grid-template-columns:1fr; }
-          .dns-live-stats .adguard-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-          .vlan-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
-          .vlan-field.name, .vlan-field.network { grid-column:span 2; }
-          .rule-group.ai-config-settings .rule { grid-template-columns:1fr; }
-          .rule-group.ai-config-settings .settings-select { width:100%; }
-          .ai-settings .rule-list { grid-template-columns:1fr; }
-          .danger-zone { align-items:stretch; }
-          .danger-zone .cleanup { width:100%; justify-content:center; }
-          .ai-view { grid-template-columns:1fr; } .ai-head { flex-direction:column; } .ai-report { grid-template-columns:1fr; } .ai-copy { grid-template-columns:1fr; } .ai-copy article.summary { grid-column:auto; }
-          .log-panel, .dns-panel { padding:16px; } .log-title, .dns-head { align-items:flex-start; }
-          .dns-head { flex-direction:column; } .dns-head-tools { width:100%; justify-content:flex-start; } .dns-head .dns-live-stats { width:100%; padding:0 0 10px; border-right:0; border-bottom:1px solid var(--ns-line); } .dns-head .dns-live-stats .adguard-stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .dns-toolbar { grid-template-columns:1fr; }
-        }
-        @media (max-width:620px) {
-          .shell { padding:14px 10px 34px; }
-          header { gap:12px; margin-bottom:18px; }
-          .header-actions { width:100%; display:grid; grid-template-columns:minmax(0,1fr) 44px 44px; }
-          .header-action, .scan { justify-content:center; min-width:0; }
-          .connection-status span { overflow:hidden; text-overflow:ellipsis; }
-          .brand { min-width:0; gap:11px; }
-          .logo { width:46px; height:46px; border-radius:14px; }
-          h1 { font-size:27px; }
-          .version-info { font-size:9px; }
-          .scan { flex:0 0 44px; width:44px; height:44px; justify-content:center; padding:0; }
-          .metrics { grid-template-columns:1fr 1fr; }
-          .metric.devices, .functions-metric, .metric.connections, .metric.watch-metric { grid-column:1 / -1; }
-          .guest-qr { grid-template-columns:1fr; justify-items:center; text-align:center; }
-          .tabs { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:6px; }
-          .tab { min-height:43px; padding:9px 7px; font-size:12px; }
-          .tab ha-icon { --mdc-icon-size:18px; }
-          .table-column-picker { top:6px; right:8px; }
-          .table-panel, .log-list, .dns-list { max-height:none; overflow:visible; }
-          .device-list, .log-list { border:0; background:transparent; box-shadow:none; }
-          .device-list table, .device-list tbody,
-          .log-table, .log-table tbody,
-          .dns-table, .dns-table tbody { display:block; width:100%; min-width:0; }
-          .device-list thead, .log-table thead { display:block; width:100%; }
-          .log-table thead { position:static; background:none !important; }
-          .device-list thead > tr:first-child,
-          .log-table thead > tr:first-child,
-          .dns-table thead { display:none; }
-          .device-list .column-filters,
-          .log-table .log-filters {
-            position:static; display:grid; grid-template-columns:1fr 1fr;
-            gap:8px; margin:0 0 10px; padding:46px 0 10px;
-          }
-          .log-table .log-filters { padding-top:0; }
-          .device-list .column-filters th,
-          .log-table .log-filters th {
-            position:static; display:block; min-width:0; padding:0; border:0;
-            background:transparent;
-          }
-          .device-list .column-filters th[data-column="name"],
-          .device-list .column-filters th[data-column="ip"],
-          .device-list .column-filters th[data-column="vlan"],
-          .log-table .log-filters th:first-child,
-          .log-table .log-filters th:nth-child(2),
-          .log-table .log-filters th:last-child { grid-column:1 / -1; }
-          .device-list .column-filters th[data-column="mac"],
-          .device-list .column-filters th[data-column="connection"],
-          .device-list .column-filters th[data-column="rate"],
-          .device-list .column-filters th[data-column="address"],
-          .device-list .column-filters th[data-column="dns"],
-          .device-list .column-filters th[data-column="source"],
-          .device-list .column-filters th[data-column="internet"] { display:none; }
-          .device-list .custom-column-filter,
-          .device-list .column-filter,
-          .log-table .custom-column-filter,
-          .log-table .column-filter { width:100%; min-width:0 !important; }
-          .custom-filter-menu { position:fixed; z-index:110; left:12px !important; right:12px !important; top:auto; bottom:12px; width:auto !important; max-width:none; max-height:62dvh; overflow:auto; }
-          .device-list tbody tr,
-          .log-table tbody tr,
-          .dns-table tbody tr {
-            display:block; margin:0 0 10px; overflow:hidden; border:1px solid var(--ns-line);
-            border-radius:14px; background:var(--light-card-bg,rgba(38,35,32,.92));
-            box-shadow:0 10px 24px rgba(0,0,0,.14);
-          }
-          .device-list tbody td,
-          .log-table tbody td,
-          .dns-table tbody td {
-            display:grid; grid-template-columns:92px minmax(0,1fr); align-items:center;
-            gap:10px; min-width:0; padding:10px 12px; white-space:normal;
-            border-bottom:1px solid rgba(255,255,255,.055);
-          }
-          .device-list tbody td:last-child,
-          .log-table tbody td:last-child,
-          .dns-table tbody td:last-child { border-bottom:0; }
-          .device-list tbody td[colspan],
-          .log-table tbody td[colspan] { display:block; padding:18px; }
-          .device-list tbody td[colspan]::before,
-          .log-table tbody td[colspan]::before { display:none; }
-          .device-list tbody td::before,
-          .log-table tbody td::before,
-          .dns-table tbody td::before {
-            content:attr(data-label); color:#8eaea4; font-size:9px; font-weight:800;
-            letter-spacing:.7px; text-transform:uppercase;
-          }
-          .device-list td[data-column="name"] { grid-template-columns:1fr; padding-top:14px; }
-          .device-list td[data-column="name"]::before { display:none; }
-          .device-list td[data-column="state"] { grid-template-columns:1fr; }
-          .device-list td[data-column="state"]::before { display:none; }
-          .device-list .status-cell { flex-direction:row; align-items:center; justify-content:space-between; gap:10px; }
-          .device-list .card-actions { justify-content:flex-end; }
-          .device-list .mobile-details { display:grid; flex-shrink:0; margin-left:auto; }
-          .device-list .device-label { flex:1; }
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="onboarding"],
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="mac"],
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="connection"],
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="mesh"],
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="rate"],
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="address"],
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="dns"],
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="source"] { display:none; }
-          .device-list tbody tr.mobile-expanded { border-color:rgba(80,215,255,.35); }
-          .device-list .internet-state { min-width:0; }
-          .alert-item { grid-template-columns:36px minmax(0,1fr); }
-          .alert-actions { grid-column:1 / -1; justify-content:flex-start; }
-          .log-panel, .dns-panel, .mesh-panel, .watch-panel, .ai-panel { padding:13px; border-radius:14px; }
-          .log-table tbody td:first-child { grid-template-columns:1fr; }
-          .log-table tbody td:first-child::before { display:none; }
-          .dns-head .dns-actions { width:100%; display:grid; grid-template-columns:1fr 1fr; }
-          .dns-action { justify-content:center; min-height:42px; }
-          .dns-chart { padding:12px 8px; }
-          .dns-chart-label { font-size:7px; }
-          .dns-table .dns-answer { max-width:100%; }
-          .mesh-canvas { min-width:0; }
-          .mesh-groups { grid-template-columns:1fr; gap:30px; }
-          .settings-view .watch-heading { flex-direction:column; align-items:stretch; }
-          .settings-view .watch-heading > div { min-width:0; }
-          .settings-view .watch-heading .save-rules {
-            width:100%; min-width:0; max-width:100%; white-space:normal;
-          }
-          .rule-group.onboarding-settings .rule,
-          .rule-group.ai-config-settings .rule,
-          .settings-view .rule { grid-template-columns:1fr; }
-          .rule-group.onboarding-settings input[type="text"] { width:100%; }
-          .vlan-row { grid-template-columns:1fr 1fr; }
-          .settings-view .rule input[type="checkbox"] { justify-self:end; }
-          .settings-help-backdrop { padding:8px; }
-          .settings-help-dialog { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); padding:18px; }
-        }
-        :host([narrow]) .ha-menu { display:grid; }
-        @media (max-width:460px) {
-          .metrics { gap:9px; }
-          .metric { padding:15px; }
-          .metric-value { font-size:27px; }
-          .metric.network .metric-value { font-size:15px; }
-          .function-count strong { gap:4px; font-size:21px; }
-          .function-count { padding-inline:5px; }
-        }
-        .metric-overview { display:contents; }
-        .mobile-overview-toggle, .mobile-overview-actions, .mobile-device-controls { display:none; }
-        @media (max-width:620px) {
-          .metrics { display:flex; flex-direction:column; gap:7px; padding:0; border:0; background:transparent; box-shadow:none; margin-bottom:12px; }
-          .metrics .metric.devices { min-height:0; padding:8px 11px; }
-          .metrics .devices .metric-label-row { margin-bottom:3px; }
-          .metrics .devices .device-counts { margin:0; gap:4px; }
-          .metrics .devices .device-count { display:flex; align-items:baseline; justify-content:center; gap:5px; padding:4px; }
-          .metrics .devices .device-count strong { font-size:19px; }
-          .metrics .devices .device-count span { font-size:9px; }
-          .metrics .devices .guest-inline { margin-top:4px; padding:3px 6px; font-size:10px; }
-          .metrics .devices { position:relative; }
-          .metrics .devices .guest-inline { max-width:calc(100% - 36px); }
-          .mobile-overview-toggle { position:absolute; bottom:4px; right:5px; display:grid; place-items:center; width:30px; height:30px; padding:0; border:0; border-radius:7px; background:transparent; color:var(--ns-text,#eee5d5); cursor:pointer; }
-          .mobile-overview-actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-          .mobile-alert-summary { display:flex; align-items:center; gap:6px; min-height:36px; border:1px solid var(--ns-line); border-radius:9px; background:rgba(255,255,255,.04); color:var(--ns-text,#eee5d5); padding:5px 9px; font:inherit; font-size:12px; cursor:pointer; }
-          .mobile-overview-toggle ha-icon, .mobile-alert-summary ha-icon { --mdc-icon-size:18px; }
-          .mobile-alert-summary { color:var(--ns-yellow,#d9c58e); }
-          .overview-expanded .mobile-overview-toggle ha-icon { transform:rotate(180deg); }
-          .metric-overview { display:none; }
-          .overview-expanded .metric-overview { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-          .metric-overview .metric { min-height:0; padding:10px; }
-          .metric-overview .metric-value, .metric-overview .metric-status-value { font-size:20px; }
-          .metric-overview .function-count strong { font-size:17px; }
-          .mobile-device-controls { display:block; margin-bottom:8px; }
-          .mobile-search-row { display:flex; gap:7px; padding-right:51px; }
-          .mobile-device-search { box-sizing:border-box; height:44px; display:flex; align-items:center; flex:1; min-width:0; gap:7px; padding:0 10px; border:1px solid var(--ns-line); border-radius:10px; background:var(--light-card-bg,rgba(38,35,32,.92)); }
-          .mobile-device-search ha-icon { --mdc-icon-size:20px; color:var(--ns-cyan); }
-          .mobile-device-search input { width:100%; min-width:0; height:100%; padding:0; box-sizing:border-box; border:0; outline:0; background:transparent; color:inherit; font:inherit; font-size:13px; }
-          .mobile-device-search:focus-within { border-color:var(--ns-cyan); }
-          .mobile-filter-toggle { display:flex; align-items:center; justify-content:center; gap:3px; box-sizing:border-box; min-width:44px; height:44px; padding:0 6px; border:1px solid var(--ns-line); border-radius:10px; background:var(--light-card-bg,rgba(38,35,32,.92)); color:inherit; cursor:pointer; }
-          .mobile-filter-toggle ha-icon { --mdc-icon-size:21px; }
-          .mobile-filter-toggle.active { color:var(--ns-yellow,#d9c58e); }
-          .mobile-filter-toggle span { font-size:11px; font-weight:700; }
-          .mobile-device-filters { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:10px 0; }
-          .mobile-device-filters[hidden] { display:none; }
-          .mobile-filter-field { min-width:0; display:grid; gap:4px; }
-          .mobile-filter-field > span { font-size:10px; color:var(--ns-muted,#bcb5a8); }
-          .mobile-device-filters .custom-column-filter { width:100%; min-width:0 !important; }
-          .device-list .column-filters { display:none; }
-          .device-list .filter-chips { margin-bottom:8px; gap:5px; }
-          .device-list .filter-chip, .device-list .filter-reset { font-size:11px; padding:5px 7px; }
-          .table-column-picker, :host([data-theme="light"]) .table-column-picker { top:0; right:0; box-sizing:border-box; width:44px; height:44px; border-radius:10px; border:1px solid var(--ns-line); background:var(--light-card-bg,rgba(38,35,32,.92)); color:inherit; }
-          .table-column-picker ha-icon { --mdc-icon-size:21px; }
-          .device-list tbody tr { display:flex; flex-direction:column; }
-          .device-list tbody td { padding:7px 11px; }
-          .device-list td[data-column="name"] { order:-3; padding-top:10px; }
-          .device-list td[data-column="state"] { order:-2; }
-          .device-list td[data-column="ip"] { order:-1; }
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="vlan"],
-          .device-list tbody tr:not(.mobile-expanded) td[data-column="internet"] { display:none; }
-          .device-list .status-cell { display:flex; flex-wrap:nowrap; }
-          .device-list .status-cell .status-time { font-size:9px; text-align:right; }
-          .device-list .status-cell .status-time br { display:none; }
-        }
-
-        /* Adapt to each card's width, including narrow desktop columns. */
-        .watch-metric { container-type:inline-size; container-name:nodarion-watch; }
-        @container nodarion-watch (max-width:360px) {
-          .function-counts { gap:4px; }
-          .function-count { padding-inline:3px; }
-          .watch-metric .function-count strong { font-size:clamp(13px,7cqi,23px); gap:3px; white-space:nowrap; }
-          .function-count ha-icon { --mdc-icon-size:13px; flex-shrink:0; }
-          .function-count span { font-size:8px; letter-spacing:.15px; }
-        }
-        .settings-view { min-width:0; }
-        .settings-view .watch-heading { flex-wrap:wrap; }
-        .settings-context-title { min-width:0; flex:1 1 290px; }
-        .settings-context-title > div { min-width:0; }
-        .settings-context-title p { overflow-wrap:anywhere; }
-        .settings-save-area { min-width:0; max-width:100%; }
-        .settings-view .rule-group, .settings-view .learning-card { min-width:0; }
-        .settings-tab-panel.general-panel { grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); }
-        .vlan-settings { container-type:inline-size; container-name:nodarion-vlan; }
-        .vlan-settings-head { flex-wrap:wrap; }
-        .vlan-settings-head h3 { min-width:0; overflow-wrap:anywhere; }
-        .settings-view .rule input:not([type="checkbox"]):not([type="color"]) { min-width:0; width:100%; box-sizing:border-box; }
-        .settings-view .unit-input { min-width:0; }
-        @container nodarion-vlan (max-width:760px) {
-          .vlan-row { grid-template-columns:repeat(3,minmax(0,1fr)); }
-          .vlan-field.name, .vlan-field.network { grid-column:auto; }
-        }
-        @container nodarion-vlan (max-width:460px) {
-          .vlan-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
-          .vlan-field.name, .vlan-field.network { grid-column:1 / -1; }
-        }
-        :host([data-theme="dark"]) .settings-view { --ns-field:rgba(255,238,209,.075); }
-        :host([data-theme="dark"]) .settings-view input:not([type="checkbox"]):not([type="color"]),
-        :host([data-theme="dark"]) .settings-view select,
-        :host([data-theme="dark"]) .settings-view .settings-select summary,
-        :host([data-theme="dark"]) .settings-view .unit-input {
-          background:var(--ns-field); border-color:rgba(239,220,186,.17);
-        }
-        :host([data-theme="dark"]) .settings-view .unit-input input:not([type="checkbox"]):not([type="color"]) { background:transparent; }
-        :host([data-theme="dark"]) .settings-view .unit-input span { background:rgba(255,238,209,.035); }
-        :host(:not([data-theme="light"])) .github-thanks { background:rgba(255,255,255,.018); border-color:rgba(255,255,255,.065); }
-        :host(:not([data-theme="light"])) .scan { color:#241c10; background:linear-gradient(135deg,#f0d39a,#cfa45d); border-color:#eed3a2; box-shadow:0 5px 20px rgba(215,171,95,.12),inset 0 1px rgba(255,255,255,.35); }
-        :host(:not([data-theme="light"])) .scan:hover { background:#f4dcae; }
-        :host(:not([data-theme="light"])) .column-filter { background:#252a2e; color:#e7e9ec; border-color:rgba(255,255,255,.09); }
-        :host(:not([data-theme="light"])) .column-filter::placeholder { color:#929ba5; }
-        :host(:not([data-theme="light"])) .column-filter.has-value { background:rgba(231,185,101,.10); border-color:rgba(231,185,101,.5); }
-        :host(:not([data-theme="light"])) .device-list tr.on { --state:#83ddba; }
-        :host(:not([data-theme="light"])) .entity-id-link { color:#929aa5; font-size:10px; }
-        :host(:not([data-theme="light"])) .status-time { color:#929aa5; }
-        :host(:not([data-theme="light"])) .device-icon { box-shadow:inset 0 1px rgba(255,255,255,.06); }
-        .device-list .entity-link { font-weight:750; letter-spacing:-.15px; }
-        .device-list .internet-label { padding:5px 9px; border-radius:8px; }
-        .device-list .internet-hint { max-width:235px; line-height:1.5; }
-        .device-list .device-web-link { margin-top:3px; padding:4px 7px; border:1px solid color-mix(in srgb,var(--ns-cyan) 20%,transparent); border-radius:6px; background:color-mix(in srgb,var(--ns-cyan) 5%,transparent); }
-        .device-list .device-web-link:hover { background:color-mix(in srgb,var(--ns-cyan) 12%,transparent); text-decoration:none; }
-        :host([data-theme="light"]) .metrics { background:transparent; border:0; box-shadow:none; }
-        :host([data-theme="light"]) .metric::after { opacity:.045; }
-        :host([data-theme="light"]) .metric .device-count.online strong { color:#237453; }
-        :host([data-theme="light"]) .metric .device-count.offline strong { color:#6c7380; }
-        :host([data-theme="light"]) .metric .device-count.new strong { color:#91601a; }
-        :host([data-theme="light"]) .metric.dns-metric .metric-status-value,
-        :host([data-theme="light"]) .metric.dns-metric .metric-status-value ha-icon { color:#237453; }
-        @media (min-width:1201px) {
-          .metrics .device-count strong { font-size:36px; font-weight:750; letter-spacing:-1.5px; }
-          .metrics .metric-value { font-size:34px; font-weight:750; }
-          .metrics .metric-label { font-size:10px; letter-spacing:1.2px; }
-        }
-        @media (max-width:800px) {
-          .metric::before { left:16px; right:16px; }
-          .metric::after { width:90px; height:70px; }
-        }
-        @media (max-width:800px) {
-          :host(:not([data-theme="light"])) .device-list tbody tr { background:linear-gradient(135deg,#24272a,#1a1e21); border-color:rgba(255,255,255,.09); box-shadow:0 8px 20px rgba(0,0,0,.12); }
-        }
-        @media (prefers-reduced-motion:reduce) {
-          .nav-metric, .device-count, .function-count, .scan, .device-list tr { transition:none; }
-          .nav-metric:hover, .metric:is(button):hover, .scan:hover { transform:none; }
-        }
-        /* Fine overview: quiet surfaces, lighter type and line-only selections. */
-        :host { --ns-overview-edge:rgba(232,229,219,.085); }
-        :host([data-theme="light"]) { --ns-overview-edge:rgba(88,71,49,.13); }
-        :host .metrics { gap:12px; }
-        :host .metrics .metric {
-          border-radius:15px; border-color:var(--ns-overview-edge);
-          box-shadow:0 5px 16px rgba(0,0,0,.08),inset 0 1px rgba(255,255,255,.025);
-        }
-        :host(:not([data-theme="light"])) .metrics .metric {
-          background:linear-gradient(140deg,rgba(36,39,42,.85),rgba(25,28,31,.88));
-        }
-        :host([data-theme="light"]) .metrics .metric { background:linear-gradient(140deg,rgba(255,255,255,.85),rgba(247,244,239,.82)); box-shadow:0 4px 14px rgba(78,58,34,.045); }
-        :host .metrics .metric::before { opacity:.3; left:22px; right:22px; }
-        :host .metrics .metric::after { width:85px; height:65px; opacity:.045; filter:blur(28px); }
-        :host .metrics .nav-metric.active { border-color:var(--ns-overview-edge); box-shadow:0 5px 16px rgba(0,0,0,.08); }
-        :host .metrics .nav-metric.active::before { opacity:.8; }
-        :host .metrics .nav-metric:hover { transform:none; border-color:color-mix(in srgb,var(--ns-cyan) 25%,var(--ns-overview-edge)); }
-        :host .metrics .metric-label { font-size:11px; font-weight:550; text-transform:none; letter-spacing:.2px; }
-        :host .metrics .metric-label-row { min-height:22px; }
-        :host .metrics .metric-note { font-size:10px; font-weight:400; opacity:.9; }
-        :host .metrics .metric-status-value { font-size:19px; font-weight:550; gap:7px; }
-        :host .metrics .metric-status-value ha-icon { --mdc-icon-size:19px; }
-        :host .metrics .device-count, :host .metrics .function-count {
-          position:relative; border:0; border-radius:0; padding:4px 8px 7px;
-          background:transparent; box-shadow:none; transform:none;
-        }
-        :host .metrics .device-count.active, :host .metrics .function-count.active,
-        :host .metrics .device-count:hover, :host .metrics .function-count:hover { background:transparent; box-shadow:none; transform:none; }
-        :host .metrics .device-count::after, :host .metrics .function-count::after {
-          content:""; position:absolute; left:8px; right:8px; bottom:0; height:1px;
-          border-radius:1px; background:var(--ns-cyan); opacity:0; pointer-events:none;
-        }
-        :host .metrics .device-count.active::after, :host .metrics .function-count.active::after { opacity:.85; }
-        :host .metrics .device-count:not(.active):hover::after, :host .metrics .function-count:not(.active):hover::after { opacity:.3; }
-        :host .metrics .device-count + .device-count::before,
-        :host .metrics .function-count + .function-count::before {
-          content:""; position:absolute; left:0; top:25%; bottom:30%; width:1px;
-          background:var(--ns-overview-edge); pointer-events:none;
-        }
-        :host .metrics .device-count strong { font-weight:550; letter-spacing:-.8px; }
-        :host .metrics .function-count strong { font-weight:550; letter-spacing:-.5px; }
-        :host .metrics .device-count span, :host .metrics .function-count span { font-weight:500; text-transform:none; letter-spacing:.2px; margin-top:4px; }
-        :host .metrics .function-count ha-icon { --mdc-icon-size:15px; }
-        :host .metrics .metric-settings {
-          width:24px; height:24px; padding:4px; border:0; border-radius:7px;
-          background:transparent; box-shadow:none; color:var(--ns-muted); opacity:.65;
-        }
-        :host .metrics .metric-settings:hover, :host .metrics .metric-settings:focus-visible {
-          opacity:1; color:var(--ns-cyan); background:var(--ns-surface-raised); transform:none;
-        }
-        :host .metrics .metric-settings:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:2px; }
-        :host .metrics .guest-inline {
-          gap:5px; margin-top:4px; padding:2px 0; border:0; border-radius:4px; background:transparent;
-          color:var(--ns-muted); font-size:10px; font-weight:450; box-shadow:none;
-        }
-        :host .metrics .guest-inline:hover { background:transparent; color:var(--ns-cyan); }
-        :host .metrics .guest-inline:focus-visible { outline:2px solid var(--ns-cyan); outline-offset:3px; }
-        :host .metrics .guest-inline ha-icon { --mdc-icon-size:13px; opacity:.8; }
-        @media (min-width:801px) {
-          :host .metrics { align-items:stretch; }
-          :host .metrics .metric { min-height:126px; padding:12px 17px; }
-          :host .metrics .device-count strong { font-size:32px; }
-          :host .metrics .metric-value { font-size:30px; font-weight:550; letter-spacing:-.8px; }
-          :host .metrics .function-count strong { font-size:22px; }
-          :host .metrics .function-counts, :host .metrics .device-counts { margin-top:5px; }
-        }
-        @media (max-width:800px) {
-          :host .metrics .device-count, :host .metrics .function-count { padding-bottom:6px; }
-          :host .metrics .metric-overview .metric { min-height:0; }
-          :host .metrics .metric-settings { opacity:.85; }
-        }
-        /* Shared Engelsoft/Pager room backdrop and warm glass material. */
-        :host {
-          --ns-room-glass:linear-gradient(135deg,rgba(66,62,58,.68),rgba(34,32,30,.76) 55%,rgba(65,51,39,.68));
-          --ns-room-shadow:0 18px 46px rgba(0,0,0,.32),0 2px 9px rgba(0,0,0,.16),inset 0 1px rgba(255,255,255,.20),inset 0 -1px rgba(0,0,0,.20);
-          --ns-room-head:rgba(43,40,37,.94);
-          --ns-line:rgba(235,209,160,.27); --ns-overview-edge:var(--ns-line);
-          --ns-muted:#b8beb8; --ns-cyan:#d9bd8b; --ns-text:#f4f2ed;
-          --ns-panel:var(--ns-room-glass);
-          background:linear-gradient(90deg,rgba(7,8,8,.24),rgba(9,9,8,.42) 48%,rgba(8,7,6,.20)),url("/engelsoft_nodarion/room-interior.png") center / cover fixed,#171512;
-        }
-        :host([data-theme="light"]) {
-          --ns-room-glass:linear-gradient(130deg,rgba(251,249,246,.82),rgba(242,237,231,.76));
-          --ns-room-shadow:0 15px 38px rgba(42,55,71,.15),0 2px 6px rgba(42,55,71,.07),inset 0 1px rgba(255,255,255,.90),inset 0 -1px rgba(70,86,104,.13);
-          --ns-room-head:rgba(247,243,237,.94);
-          --ns-line:rgba(132,110,73,.24); --ns-overview-edge:var(--ns-line);
-          --ns-muted:#62716b; --ns-cyan:#886735; --ns-text:#303b38;
-          background:linear-gradient(115deg,rgba(224,232,229,.65),rgba(237,231,216,.62)),url("/engelsoft_nodarion/room-background.png") center / cover fixed,#e5e5dd;
-        }
-        .shell { max-width:none; margin-inline:auto; isolation:auto; }
-        @media (min-width:1201px) {
-          .shell { width:92%; padding-inline:0; }
-        }
-        :host(:not([data-theme="light"])) :is(.metrics .metric,.table-panel,.log-panel,.dns-panel,.mesh-panel,.watch-panel,.ai-panel,.connection-panel,.toolbar,.guest-modal),
-        :host([data-theme="light"]) :is(.metrics .metric,.table-panel,.log-panel,.dns-panel,.mesh-panel,.watch-panel,.ai-panel,.connection-panel,.toolbar,.guest-modal) {
-          background:var(--ns-room-glass); border:1px solid var(--ns-line);
-          box-shadow:var(--ns-room-shadow); border-radius:25px;
-          backdrop-filter:blur(22px) saturate(120%);
-          -webkit-backdrop-filter:blur(22px) saturate(120%);
-        }
-        :host .metrics .nav-metric.active { border-color:var(--ns-line); box-shadow:var(--ns-room-shadow); }
-        :host .metrics .metric::before, :host .metrics .metric::after { display:none; }
-        :host .device-list th, :host .device-list .column-filters th {
-          background:var(--ns-room-head); border-bottom-color:var(--ns-line);
-          backdrop-filter:blur(22px) saturate(120%);
-          -webkit-backdrop-filter:blur(22px) saturate(120%);
-        }
-        :host .device-list td { border-bottom-color:color-mix(in srgb,var(--ns-line) 65%,transparent); }
-        :host .device-list tr:nth-child(even) { background:rgba(198,163,104,.025); }
-        :host .device-list tr:hover { background:rgba(198,163,104,.07); }
-        :host .device-list .entity-link { color:var(--ns-cyan); }
-        :host .device-list .column-filter {
-          background:rgba(99,100,90,.12); border-color:var(--ns-line); color:var(--ns-text); border-radius:12px;
-        }
-        :host .device-list .column-filter.has-value { background:rgba(198,163,104,.14); border-color:var(--ns-cyan); }
-        :host .device-list .column-filter::placeholder { color:var(--ns-muted); }
-        :host .metrics .metric-settings { color:var(--ns-muted); }
-        :host .device-list .card-actions button, :host .column-picker-button {
-          border-radius:11px; border-color:var(--ns-line); background:rgba(198,163,104,.045);
-        }
-        @media (max-width:800px) {
-          :host .metrics .metric { border-radius:20px; }
-          :host(:not([data-theme="light"])) .table-panel.device-list,
-          :host([data-theme="light"]) .table-panel.device-list { background:transparent; border:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
-          :host(:not([data-theme="light"])) .device-list tbody tr,
-          :host([data-theme="light"]) .device-list tbody tr {
-            border:1px solid var(--ns-line); border-radius:20px;
-            background:var(--ns-room-glass); box-shadow:var(--ns-room-shadow);
-            backdrop-filter:blur(22px) saturate(120%); -webkit-backdrop-filter:blur(22px) saturate(120%);
-          }
-        }
-        /* One continuous metric surface: avoid bands from stacked glow layers. */
-        :host(:not([data-theme="light"])) .metrics .metric {
-          background:linear-gradient(135deg,rgba(70,65,60,.66) 0%,rgba(44,40,36,.64) 55%,rgba(65,52,39,.68) 100%);
-          background-repeat:no-repeat; background-origin:border-box;
-          box-shadow:0 12px 32px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.14);
-        }
-        :host([data-theme="light"]) .metrics .metric {
-          background:linear-gradient(135deg,rgba(251,249,246,.82),rgba(242,237,231,.76));
-          background-repeat:no-repeat; background-origin:border-box;
-          box-shadow:0 12px 28px rgba(42,55,71,.12),inset 0 1px rgba(255,255,255,.90);
-        }
-        /* One champagne-gold accent, shared with the scan action. */
-        :host { --ns-action-gold:linear-gradient(135deg,#f0d39a,#cfa45d); --ns-action-ink:#241c10; --ns-yellow:#d9c58e; }
-        :host([data-theme="light"]) { --ns-green:#9a7b3d; --ns-yellow:#886735; }
-        :host .settings-view .save-rules:not(.saved):not(.failed),
-        :host .approve-internet, :host .confirm-primary:not(.danger) {
-          background:var(--ns-action-gold); color:var(--ns-action-ink);
-          box-shadow:0 5px 18px rgba(185,157,96,.13),inset 0 1px rgba(255,255,255,.28);
-        }
-        :host .settings-view .save-rules.saved { background:#76d89d; color:#10271d; }
-        :host .settings-view .save-rules.failed { background:#a94242; color:#fff3f1; }
-        :host .rule input[type="checkbox"], :host .column-picker input,
-        :host .vlan-field.monitoring input { accent-color:#ccb57b; }
-        :host .settings-view .adguard-feature.active .adguard-feature-state { color:#342a16; background:#ccb57b; }
-        :host .watch.active { color:#d9c58e; border-color:rgba(204,181,123,.35); background:rgba(204,181,123,.09); }
-        :host([data-theme="light"]) .watch.active { color:#886735; }
-        :host .tabs .tab.active, :host .filter.active { background:var(--ns-action-gold); color:var(--ns-action-ink); box-shadow:0 5px 16px rgba(185,157,96,.12); }
-        /* Neutral smoked glass and restrained filter states, without olive/yellow fills. */
-        :host { --ns-muted:#bcb7b0; --ns-subtle:#a8a099; --ns-filter-surface:rgba(97,89,80,.14); --ns-filter-edge:rgba(215,199,174,.23); }
-        :host([data-theme="light"]) { --ns-muted:#68615a; --ns-subtle:#797169; --ns-filter-surface:rgba(255,252,248,.82); --ns-filter-edge:rgba(122,105,83,.26); }
-        :host(:is([data-theme="dark"],[data-theme="light"])) :is(.column-filter,select.column-filter,.custom-column-filter summary) {
-          background:var(--ns-filter-surface); color:var(--ns-text); border-color:var(--ns-filter-edge); box-shadow:none;
-        }
-        :host(:is([data-theme="dark"],[data-theme="light"])) :is(.column-filter.has-value,select.column-filter.has-value,.custom-column-filter.has-value summary) {
-          background:var(--ns-filter-surface); color:var(--ns-text); border-color:var(--ns-filter-edge);
-          box-shadow:inset 0 -1px color-mix(in srgb,var(--ns-cyan) 35%,transparent);
-        }
-        :host(:is([data-theme="dark"],[data-theme="light"])) :is(.column-filter:focus-visible,.custom-column-filter summary:focus-visible) {
-          outline:2px solid color-mix(in srgb,var(--ns-cyan) 60%,transparent); outline-offset:2px;
-        }
-        :host(:is([data-theme="dark"],[data-theme="light"])) .custom-filter-option.active {
-          background:var(--ns-surface-raised); color:var(--ns-text); box-shadow:none;
-        }
-        /* Isolate overview cards from participant-table hover compositing. */
-        :host .metrics { position:relative; isolation:isolate; }
-        :host(:not([data-theme="light"])) .metrics .metric,
-        :host([data-theme="light"]) .metrics .metric {
-          backdrop-filter:none; -webkit-backdrop-filter:none;
-        }
-        :host(:not([data-theme="light"])) .metrics .metric {
-          background:linear-gradient(135deg,rgba(63,58,53,.85),rgba(37,34,31,.86) 55%,rgba(57,46,36,.86));
-        }
-        :host(:not([data-theme="light"])) .table-panel.device-list,
-        :host([data-theme="light"]) .table-panel.device-list {
-          box-shadow:inset 0 1px rgba(255,255,255,.14),inset 0 -1px rgba(0,0,0,.12);
-        }
-        /* Light-mode header text must remain readable over the room backdrop. */
-        :host([data-theme="light"]) header { border-bottom-color:rgba(89,72,49,.18); }
-        :host([data-theme="light"]) .version-info { color:#514a40; font-size:11px; font-weight:500; }
-        :host([data-theme="light"]) .eyebrow { color:#725526; }
-        :host([data-theme="light"]) .github-thanks {
-          background:rgba(255,253,248,.90); border-color:rgba(113,91,60,.24);
-          color:#302b25; box-shadow:0 3px 12px rgba(73,56,34,.05);
-        }
-        :host([data-theme="light"]) .github-thanks strong { color:#302b25; font-weight:700; }
-        :host([data-theme="light"]) .github-thanks small { color:#554e44; font-weight:450; }
-        :host([data-theme="light"]) .github-thanks > ha-icon { color:#80612d; }
-        :host([data-theme="light"]) .github-thanks:hover { background:#fffdf8; border-color:#9b8055; }
-        :host([data-theme="light"]) .header-action { color:#453c30; background:rgba(255,253,248,.94); border-color:rgba(113,91,60,.24); }
-        :host([data-theme="light"]) .connection-status span { color:#453c30; }
-        :host([data-theme="light"]) .connection-status ha-icon { color:#80612d; }
-        :host([data-theme="light"]) .scan { color:#46351c; background:#fffaf0; border-color:rgba(113,91,60,.30); }
-        /* Dark icon strokes on light surfaces, including offline rows. */
-        :host([data-theme="light"]) .device-list .device-icon {
-          color:#715523; background:#eee7da; border-color:#bba681;
-          box-shadow:inset 0 1px rgba(255,255,255,.85);
-        }
-        :host([data-theme="light"]) .device-list .device-icon.router { color:#28633f; background:#e1eee3; border-color:#8eb69a; }
-        :host([data-theme="light"]) .device-list .device-icon.mesh { color:#365aa0; background:#e3e9f5; border-color:#9aafd0; }
-        :host([data-theme="light"]) .device-list .device-icon.vpn { color:#704395; background:#ede4f4; border-color:#b49ac9; }
-        :host([data-theme="light"]) .device-list .device-icon.guest { color:#785615; background:#f3ead5; border-color:#c3aa72; }
-        :host([data-theme="light"]) .device-list .device-icon ha-icon { --mdc-icon-size:21px; }
-        :host([data-theme="light"]) .device-list tr.off { opacity:1; }
-        :host([data-theme="light"]) .device-list tr.off .entity-link { color:#6c5a38; }
-        :host([data-theme="light"]) .device-list .card-actions button { color:#635d53; border-color:#bdb3a2; }
-        :host([data-theme="light"]) .device-list .watch.active { color:#805e1c; border-color:#bda46f; background:#f2e7cd; }
-        :host([data-theme="light"]) .device-list .watch.notify.active { color:#245e7b; border-color:#92b2c1; background:#e1eef4; }
-        :host([data-theme="light"]) .device-list .watch.presence.active { color:#28633f; border-color:#8eb69a; background:#e1eee3; }
-        .device-ip-line { display:flex; align-items:center; gap:8px; white-space:nowrap; min-height:28px; }
-        .device-list .device-ip-line .device-web-link {
-          display:inline-flex; flex:0 0 auto; align-items:center; gap:4px; margin:0;
-          height:26px; padding:4px 7px; font-family:inherit; font-size:11px; font-weight:600; line-height:1.2; cursor:pointer;
-          white-space:nowrap; text-decoration:none; box-sizing:border-box;
-        }
-        .device-gui-menu {
-          position:fixed; inset:auto; margin:0; width:190px; padding:6px;
-          border:1px solid var(--ns-line); border-radius:12px;
-          background:#2c2823; color:var(--ns-text); box-shadow:0 12px 32px rgba(0,0,0,.3);
-        }
-        .device-gui-menu a { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px; border-radius:7px; font-family:inherit; font-size:12px; font-weight:600; line-height:1.3; color:var(--ns-text); text-decoration:none; }
-        .device-gui-menu a:hover, .device-gui-menu a:focus-visible { background:var(--ns-surface-raised); }
-        .device-gui-menu ha-icon { --mdc-icon-size:15px; }
-        :host([data-theme="light"]) .device-gui-menu { background:#fffaf2; }
-      </style>
+      <style>${panelStyles}</style>
       <div class="shell">
         <header>
           <div class="brand">
-            <button class="ha-menu" type="button" title="Home-Assistant-Menü öffnen" aria-label="Home-Assistant-Menü öffnen"><ha-icon icon="mdi:menu"></ha-icon></button>
-            <a class="logo" href="https://github.com/engelsofta/nodarion" target="_blank" rel="noopener noreferrer" title="Nodarion auf GitHub öffnen" aria-label="Nodarion auf GitHub öffnen"><img src="/engelsoft_nodarion_icon.png" alt=""></a>
+            <button class="ha-menu" type="button" title="${t("Home-Assistant-Menü öffnen")}" aria-label="${t("Home-Assistant-Menü öffnen")}"><ha-icon icon="mdi:menu"></ha-icon></button>
+            <span class="logo"><img src="/engelsoft_nodarion_icon.png" alt=""></span>
             <div>
               <div class="eyebrow">Engelsoft</div>
               <h1>Nodarion</h1>
               <div class="version-info"></div>
             </div>
           </div>
-          <a class="github-thanks" href="https://github.com/engelsofta/nodarion" target="_blank" rel="noopener noreferrer" aria-label="Nodarion mit einem Stern auf GitHub unterstützen" title="Nodarion mit einem Stern auf GitHub unterstützen">
-            <ha-icon icon="mdi:star-outline" aria-hidden="true"></ha-icon>
-            <span class="github-thanks-copy"><strong>Nodarion gefällt dir?</strong><small>Ein Stern auf GitHub sagt Danke.</small></span>
-          </a>
-          <a class="github-thanks github-issue" href="https://github.com/engelsofta/nodarion/issues/new/choose" target="_blank" rel="noopener noreferrer" aria-label="Issue auf GitHub melden" title="Issue auf GitHub melden">
-            <ha-icon icon="mdi:bug-outline" aria-hidden="true"></ha-icon>
-            <span class="github-thanks-copy"><strong>Issue auf GitHub melden</strong><small>Fehler gefunden oder eine Idee?</small></span>
-          </a>
           <div class="header-actions">
-            <button class="header-action connection-status" type="button" title="Verbindungsdetails anzeigen"><ha-icon icon="mdi:lan-connect"></ha-icon><span>Verbindungen werden geladen</span><ha-icon icon="mdi:chevron-down"></ha-icon></button>
-            <button class="header-action header-settings" type="button" title="Allgemeine Einstellungen öffnen" aria-label="Allgemeine Einstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button>
-            <button class="scan"><ha-icon icon="mdi:radar"></ha-icon><span>Jetzt scannen</span></button>
+            <button class="header-action connection-status" type="button" title="${t("Verbindungsdetails anzeigen")}"><ha-icon icon="mdi:lan-connect"></ha-icon><span>${t("Verbindungen werden geladen")}</span><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+            <button class="header-action header-settings" type="button" title="${t("Allgemeine Einstellungen öffnen")}" aria-label="${t("Allgemeine Einstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button>
+            <button class="scan"><ha-icon icon="mdi:radar"></ha-icon><span>${t("Jetzt scannen")}</span></button>
           </div>
         </header>
         <section class="connection-panel" hidden></section>
+        <nav class="panel-navigation" aria-label="${t("Nodarion-Ansichten")}">
+          <button type="button" data-nav-tab="participants"><ha-icon icon="mdi:devices"></ha-icon>${t("Geräte")}</button>
+          <button type="button" data-nav-tab="log"><ha-icon icon="mdi:text-box-search-outline"></ha-icon>${t("Ereignisse")}</button>
+          <button type="button" data-nav-tab="dns"><ha-icon icon="mdi:shield-check-outline"></ha-icon>DNS</button>
+          <button type="button" data-nav-tab="ai"><ha-icon icon="mdi:chart-line"></ha-icon>${t("Analyse")}</button>
+          <button type="button" data-nav-tab="watch"><ha-icon icon="mdi:shield-eye-outline"></ha-icon>${t("Überwachung")}</button>
+        </nav>
         <section class="metrics"></section>
         <section class="tab-view" data-view="participants">
           <button class="column-picker-button table-column-picker" type="button" title="Tabellenspalten auswählen" aria-label="Tabellenspalten auswählen"><ha-icon icon="mdi:cog-outline"></ha-icon></button>
@@ -3302,7 +586,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         <section class="tab-view" data-view="log" hidden>
           <section class="log-panel">
             <div class="log-title">
-              <div class="log-heading"><strong>Live-Log</strong><span class="log-filter-summary" hidden><span class="log-filter-name"></span><button class="log-clear" title="Gerätefilter aufheben"><ha-icon icon="mdi:close"></ha-icon></button></span></div>
+              <div class="log-heading"><strong>${t("Live-Log")}</strong><span class="log-filter-summary" hidden><span class="log-filter-name"></span><button class="log-clear" title="Gerätefilter aufheben"><ha-icon icon="mdi:close"></ha-icon></button></span></div>
               <span class="live"><i class="dot"></i> LIVE</span>
             </div>
             <div class="log-list"></div>
@@ -3379,16 +663,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
         this._render();
         return;
       }
-      const navigation = event.target.closest("[data-nav-tab]");
-      if (navigation) this._navigateTo(navigation.dataset.navTab);
+      if (event.target.closest("[data-open-watch]")) this._navigateTo("watch");
     });
-    this.shadowRoot.querySelector(".metrics").addEventListener("keydown", (event) => {
-      if (!["Enter", " "].includes(event.key)) return;
-      const navigation = event.target.closest("[data-nav-tab]");
-      if (!navigation || event.target.closest("button")) return;
-      event.preventDefault();
-      this._navigateTo(navigation.dataset.navTab);
+    this.shadowRoot.querySelector(".panel-navigation").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-nav-tab]");
+      if (button) this._navigateTo(button.dataset.navTab);
     });
+    this._showTab(this._activeTab);
     this.shadowRoot.querySelector(".device-list").addEventListener("click", (event) => {
       if (event.target.closest(".mobile-filter-toggle")) {
         this._mobileFiltersExpanded = !this._mobileFiltersExpanded;
@@ -3460,14 +741,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const mobileDetails = event.target.closest(".mobile-details");
       if (mobileDetails) {
         const row = mobileDetails.closest("tr");
-        row?.classList.toggle("mobile-expanded");
-        mobileDetails.setAttribute("aria-expanded", String(row?.classList.contains("mobile-expanded")));
-        mobileDetails.querySelector("ha-icon")?.setAttribute(
-          "icon",
-          row?.classList.contains("mobile-expanded")
-            ? "mdi:chevron-up"
-            : "mdi:chevron-down"
-        );
+        const key = mobileDetails.dataset.device;
+        const expanded = !this._expandedDevices.has(key);
+        if (expanded) this._expandedDevices.add(key);
+        else this._expandedDevices.delete(key);
+        row.classList.toggle("mobile-expanded", expanded);
+        mobileDetails.setAttribute("aria-expanded", String(expanded));
         return;
       }
       const button = event.target.closest(".watch");
@@ -3743,7 +1022,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       if (!event.target.matches(".pihole-domain-form")) return;
       event.preventDefault();
       const form = new FormData(event.target);
-      this._adguardAction({ action:"adguard_set_domain_policy", domain:String(form.get("domain") || "").trim(), policy:form.get("policy") }, "Domain-Regel für alle derzeit konfigurierten Pi-hole-Gruppen speichern? Beim Sperren wird eine vorhandene exakte Freigabe dieser Domain entfernt.");
+      this._adguardAction({ action:"adguard_set_domain_policy", domain:String(form.get("domain") || "").trim(), policy:form.get("policy") }, t("Domain-Regel für alle derzeit konfigurierten Pi-hole-Gruppen speichern? Beim Sperren wird eine vorhandene exakte Freigabe dieser Domain entfernt."));
     });
     this.shadowRoot.addEventListener("click", (event) => {
       const guiButton = event.target.closest(".device-gui-button");
@@ -3810,7 +1089,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         return;
       }
       if (event.target.closest(".end-learning")) {
-        this._confirm({ title:"Lernphase beenden", message:"Neue Geräte werden danach wieder geprüft.", confirmLabel:"Jetzt beenden" }).then((confirmed) => {
+        this._confirm({ title:t("Lernphase beenden"), message:t("Neue Geräte werden danach wieder geprüft."), confirmLabel:t("Jetzt beenden") }).then((confirmed) => {
           if (confirmed) {
           this._monitorAction({ action: "end_learning" });
           }
@@ -3849,7 +1128,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         prompt.toggleAttribute("hidden");
         const button = event.target.closest(".ai-prompt-toggle");
         const open = !prompt.hasAttribute("hidden");
-        button.innerHTML = `<ha-icon icon="${open ? "mdi:eye-off-outline" : "mdi:code-json"}"></ha-icon>${open ? "Prompt ausblenden" : "Prompt anzeigen"}`;
+        button.innerHTML = `<ha-icon icon="${open ? "mdi:eye-off-outline" : "mdi:code-json"}"></ha-icon>${open ? t("Prompt ausblenden") : t("Prompt anzeigen")}`;
         return;
       }
       const aiButton = event.target.closest(".ai-run");
@@ -3866,7 +1145,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       }
       const removePiHoleRule = event.target.closest("[data-pihole-remove]");
       if (removePiHoleRule) {
-        this._adguardAction({ action:"adguard_delete_rule", rule:removePiHoleRule.dataset.piholeRemove }, "Diese Pi-hole-Domain-Regel wirklich entfernen?");
+        this._adguardAction({ action:"adguard_delete_rule", rule:removePiHoleRule.dataset.piholeRemove }, t("Diese Pi-hole-Domain-Regel wirklich entfernen?"));
         return;
       }
       const adguardSwitch = event.target.closest("[data-adguard-switch]");
@@ -3885,19 +1164,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const helpButton = event.target.closest("[data-settings-help]");
       if (helpButton) {
         const help = {
-          basics:["Grundlagen", "Mit Überwachung aktiv werden sämtliche Warn- und Prüfregeln gemeinsam geschaltet. Die Erkennung und Anzeige der Teilnehmer läuft unabhängig davon weiter.", "Die Lernphase behandelt bereits vorhandene Teilnehmer vorübergehend als bekannt. Neue Warnungen greifen nach Ablauf der eingestellten Tage."],
-          vlans:["VLANs und Netzwerksegmente", "Jeder Eintrag ordnet ein IPv4-Subnetz einem Namen, einer VLAN-ID und einer Farbe zu. Die VLAN-Farbe erscheint am rechten Rand der Gerätetabelle; interne Kennzeichnungen wie Gastnetz oder Einrichtungsbereich bleiben links.", "Vertrauenswürdig steht für normale interne Geräte. Eingeschränkt ist für IoT- oder begrenzte Netze gedacht. Gast nimmt Teilnehmer von der regulären Internet-Freigabeprüfung aus. Isoliert stuft einen Wechsel in dieses Segment als kritisch ein. Infrastruktur schützt Router, Switches und Access Points vor der normalen Gerätesperre.", "Überwachung aktiviert den Ping-/TCP-Scanner und VLAN-Wechselwarnungen für dieses Subnetz. Deaktivierte Segmente bleiben zugeordnet und sichtbar, werden aber nicht aktiv durch den Segmentscanner geprüft. Subnetze dürfen sich nicht überschneiden."],
-          presence:["Anwesenheit", "Haus-markierte Geräte melden sich sofort als anwesend. Erst wenn ein Gerät länger als das Anwesenheits-Timeout nicht erreichbar ist, gilt es als abwesend.", "Der optionale Home-Assistant-Binary-Sensor ist aktiv, sobald mindestens eines dieser Geräte zuhause ist. Er eignet sich beispielsweise für Licht-, Heizungs- oder Alarm-Automationen."],
-          devices:["Geräteüberwachung", "Neue Geräte werden erst nach der Bestätigungszeit gemeldet. Kurze oder fehlerhafte Erkennungen lösen dadurch nicht sofort eine Warnung aus.", "Für Geräte mit Stern gilt die Offline-Frist. Nach deren Ablauf erscheint eine Warnung, sofern das Gerät weiterhin nicht erreichbar ist."],
-          onboarding:["Neue Geräte", "Der Bereich für neue Geräte kennzeichnet Teilnehmer im angegebenen DHCP-Adressbereich als neu. Adressen außerhalb dieses Bereichs erscheinen als regulärer Bereich.", "Bei automatischer Übernahme liest Nodarion Start und Ende direkt aus der FRITZ!Box. Optional können neue Geräte sofort überwacht oder zusätzlich in Home Assistant gemeldet werden."],
-          guest:["Gastzugang", "Ist die Gastnetzüberwachung aktiv, übernimmt Nodarion Teilnehmer aus dem FRITZ!Box-Gastzugang, zeigt sie in der Tabelle an und protokolliert ihre Aktivität. Gastgeräte sind von der normalen Internet-Freigabeprüfung ausgenommen.", "Neue Gäste können beim ersten Verbinden gemeldet werden. Die Ruhezeitprüfung hebt Gastaktivität im festgelegten Zeitraum hervor; die maximale Gastdauer erzeugt nach Ablauf der gewählten Stunden eine Warnung."],
-          quiet:["Ruhezeiten", "Während der Ruhezeit kann das Aktivwerden eines Geräts als Auffälligkeit gemeldet werden. Zeiträume über Mitternacht, beispielsweise 23:00 bis 06:00 Uhr, werden automatisch korrekt behandelt.", "Ist die Prüfung deaktiviert, beeinflusst die Ruhezeit weder Erkennung noch Anwesenheitssteuerung."],
-          checks:["Weitere Prüfungen", "Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln eine Warnung wegen instabiler Verbindung entsteht.", "Die Identitätsprüfung meldet, wenn an derselben IP-Adresse eine andere MAC-Adresse erscheint. Ein Wechsel wird erst nach wiederholter Bestätigung übernommen, damit einzelne fehlerhafte Scans keinen Alarm auslösen."],
-          notifications:["Benachrichtigungen", "Die HA-Glocke zeigt neue Auffälligkeiten als dauerhafte Meldung direkt in Home Assistant. Warnungen und kritische Meldungen können unabhängig voneinander an die ausgewählten Ziele gesendet werden.", "Unabhängig von diesen Schaltern erzeugt jede neue Warnung das Home-Assistant-Ereignis nodarion_alert. Damit lassen sich eigene Automationen und weitere Eskalationswege bauen."],
-          targets:["Benachrichtigungsziele", "Hier legst du fest, welche in Home Assistant eingerichteten Notify-Dienste Nodarion verwenden darf, beispielsweise die Companion App oder einen Telegram Bot.", "Alle und Keine ändern nur die aktuelle Auswahl. Wirksam wird sie zusammen mit den übrigen Änderungen erst nach dem Speichern. Ohne ausgewähltes Ziel bleiben HA-Glocke und nodarion_alert weiterhin verfügbar."],
-          adguard:[...(this._dnsProvider().id === "pihole" ? ["Pi-hole DNS-Schutz", "Der Schalter aktiviert oder deaktiviert die DNS-Blockierung von Pi-hole. Protokollierung, Datenschutzstufe und Gruppen verwaltest du in Pi-hole.", "Domain-Regeln in Nodarion gelten für alle derzeit konfigurierten Pi-hole-Gruppen. Clientbezogene Freigaben, Regex-Regeln und weitere Pi-hole-Einstellungen bleiben in der Pi-hole-Oberfläche."] : ["Schutzfunktionen", "Gesamtschutz ist der Hauptschalter von AdGuard Home. DNS-Filterung wendet Blocklisten und eigene Regeln an; Safe Browsing blockiert bekannte Phishing- und Malware-Ziele; Jugendschutz sperrt nicht jugendfreie Inhalte; Safe Search erzwingt den sicheren Modus unterstützter Suchmaschinen.", "Das Query-Log wird für DNS-Live, Gerätezuordnung und KI-Auswertungen benötigt. Wird es ausgeschaltet, arbeitet der DNS-Schutz weiter, Nodarion erhält jedoch keine aktuellen DNS-Anfragen mehr."])],
-          ai:["KI-Analyse", "Die tägliche Auswertung fasst Netzwerkzustand, Änderungen und Auffälligkeiten nach dem gewählten Zeitpunkt zusammen. Eine manuelle Analyse bleibt im KI-Reiter jederzeit möglich.", "Mit anonymisiertem DNS-Datenschutz werden keine lesbaren Domainnamen an die KI übergeben. Domainnamen mitsenden ermöglicht detailliertere Bewertungen, gibt aber entsprechend mehr Informationen weiter."],
-          cleanup:["Bereinigung", "Anzeige bereinigen entfernt alte Offline-Einträge, behält aber gespeicherte Gerätefreigaben. Vollständig vergessen entfernt zusätzlich Überwachungs- und Anwesenheitsmarkierungen.", "Vor beiden Aktionen zeigt Nodarion die Anzahl betroffener und geschützter Teilnehmer an und fragt nochmals nach."],
+          basics:[t("Grundlagen"), t("Mit Überwachung aktiv werden sämtliche Warn- und Prüfregeln gemeinsam geschaltet. Die Erkennung und Anzeige der Teilnehmer läuft unabhängig davon weiter."), t("Die Lernphase behandelt bereits vorhandene Teilnehmer vorübergehend als bekannt. Neue Warnungen greifen nach Ablauf der eingestellten Tage.")],
+          vlans:[t("VLANs und Netzwerksegmente"), t("Jeder Eintrag ordnet ein IPv4-Subnetz einem Namen, einer VLAN-ID und einer Farbe zu. Die VLAN-Farbe erscheint am rechten Rand der Gerätetabelle; interne Kennzeichnungen wie Gastnetz oder Einrichtungsbereich bleiben links."), t("Vertrauenswürdig steht für normale interne Geräte. Eingeschränkt ist für IoT- oder begrenzte Netze gedacht. Gast nimmt Teilnehmer von der regulären Internet-Freigabeprüfung aus. Isoliert stuft einen Wechsel in dieses Segment als kritisch ein. Infrastruktur schützt Router, Switches und Access Points vor der normalen Gerätesperre."), t("Überwachung aktiviert den Ping-/TCP-Scanner und VLAN-Wechselwarnungen für dieses Subnetz. Deaktivierte Segmente bleiben zugeordnet und sichtbar, werden aber nicht aktiv durch den Segmentscanner geprüft. Subnetze dürfen sich nicht überschneiden.")],
+          presence:[t("Anwesenheit"), t("Haus-markierte Geräte melden sich sofort als anwesend. Erst wenn ein Gerät länger als das Anwesenheits-Timeout nicht erreichbar ist, gilt es als abwesend."), t("Der optionale Home-Assistant-Binary-Sensor ist aktiv, sobald mindestens eines dieser Geräte zuhause ist. Er eignet sich beispielsweise für Licht-, Heizungs- oder Alarm-Automationen.")],
+          devices:[t("Geräteüberwachung"), t("Neue Geräte werden erst nach der Bestätigungszeit gemeldet. Kurze oder fehlerhafte Erkennungen lösen dadurch nicht sofort eine Warnung aus."), t("Für Geräte mit Stern gilt die Offline-Frist. Nach deren Ablauf erscheint eine Warnung, sofern das Gerät weiterhin nicht erreichbar ist.")],
+          onboarding:[t("Neue Geräte"), t("Der Bereich für neue Geräte kennzeichnet Teilnehmer im angegebenen DHCP-Adressbereich als neu. Adressen außerhalb dieses Bereichs erscheinen als regulärer Bereich."), t("Bei automatischer Übernahme liest Nodarion Start und Ende direkt aus der FRITZ!Box. Optional können neue Geräte sofort überwacht oder zusätzlich in Home Assistant gemeldet werden.")],
+          guest:[t("Gastzugang"), t("Ist die Gastnetzüberwachung aktiv, übernimmt Nodarion Teilnehmer aus dem FRITZ!Box-Gastzugang, zeigt sie in der Tabelle an und protokolliert ihre Aktivität. Gastgeräte sind von der normalen Internet-Freigabeprüfung ausgenommen."), t("Neue Gäste können beim ersten Verbinden gemeldet werden. Die Ruhezeitprüfung hebt Gastaktivität im festgelegten Zeitraum hervor; die maximale Gastdauer erzeugt nach Ablauf der gewählten Stunden eine Warnung.")],
+          quiet:[t("Ruhezeiten"), t("Während der Ruhezeit kann das Aktivwerden eines Geräts als Auffälligkeit gemeldet werden. Zeiträume über Mitternacht, beispielsweise 23:00 bis 06:00 Uhr, werden automatisch korrekt behandelt."), t("Ist die Prüfung deaktiviert, beeinflusst die Ruhezeit weder Erkennung noch Anwesenheitssteuerung.")],
+          checks:[t("Weitere Prüfungen"), t("Häufige Online-/Offline-Wechsel innerhalb einer Stunde kennzeichnen eine instabile Verbindung. Der Grenzwert bestimmt, ab wie vielen Wechseln eine Warnung wegen instabiler Verbindung entsteht."), t("Die Identitätsprüfung meldet, wenn an derselben IP-Adresse eine andere MAC-Adresse erscheint. Ein Wechsel wird erst nach wiederholter Bestätigung übernommen, damit einzelne fehlerhafte Scans keinen Alarm auslösen.")],
+          notifications:[t("Benachrichtigungen"), t("Die HA-Glocke zeigt neue Auffälligkeiten als dauerhafte Meldung direkt in Home Assistant. Warnungen und kritische Meldungen können unabhängig voneinander an die ausgewählten Ziele gesendet werden."), t("Unabhängig von diesen Schaltern erzeugt jede neue Warnung das Home-Assistant-Ereignis nodarion_alert. Damit lassen sich eigene Automationen und weitere Eskalationswege bauen.")],
+          targets:[t("Benachrichtigungsziele"), t("Hier legst du fest, welche in Home Assistant eingerichteten Notify-Dienste Nodarion verwenden darf, beispielsweise die Companion App oder einen Telegram Bot."), t("Alle und Keine ändern nur die aktuelle Auswahl. Wirksam wird sie zusammen mit den übrigen Änderungen erst nach dem Speichern. Ohne ausgewähltes Ziel bleiben HA-Glocke und nodarion_alert weiterhin verfügbar.")],
+          adguard:[...(this._dnsProvider().id === "pihole" ? [t("Pi-hole DNS-Schutz"), t("Der Schalter aktiviert oder deaktiviert die DNS-Blockierung von Pi-hole. Protokollierung, Datenschutzstufe und Gruppen verwaltest du in Pi-hole."), t("Domain-Regeln in Nodarion gelten für alle derzeit konfigurierten Pi-hole-Gruppen. Clientbezogene Freigaben, Regex-Regeln und weitere Pi-hole-Einstellungen bleiben in der Pi-hole-Oberfläche.")] : [t("Schutzfunktionen"), t("Gesamtschutz ist der Hauptschalter von AdGuard Home. DNS-Filterung wendet Blocklisten und eigene Regeln an; Safe Browsing blockiert bekannte Phishing- und Malware-Ziele; Jugendschutz sperrt nicht jugendfreie Inhalte; Safe Search erzwingt den sicheren Modus unterstützter Suchmaschinen."), t("Das Query-Log wird für DNS-Live, Gerätezuordnung und KI-Auswertungen benötigt. Wird es ausgeschaltet, arbeitet der DNS-Schutz weiter, Nodarion erhält jedoch keine aktuellen DNS-Anfragen mehr.")])],
+          ai:[t("KI-Analyse"), t("Die tägliche Auswertung fasst Netzwerkzustand, Änderungen und Auffälligkeiten nach dem gewählten Zeitpunkt zusammen. Eine manuelle Analyse bleibt im KI-Reiter jederzeit möglich."), t("Mit anonymisiertem DNS-Datenschutz werden keine lesbaren Domainnamen an die KI übergeben. Domainnamen mitsenden ermöglicht detailliertere Bewertungen, gibt aber entsprechend mehr Informationen weiter.")],
+          cleanup:[t("Bereinigung"), t("Anzeige bereinigen entfernt alte Offline-Einträge, behält aber gespeicherte Gerätefreigaben. Vollständig vergessen entfernt zusätzlich Überwachungs- und Anwesenheitsmarkierungen."), t("Vor beiden Aktionen zeigt Nodarion die Anzahl betroffener und geschützter Teilnehmer an und fragt nochmals nach.")],
         }[helpButton.dataset.settingsHelp];
         if (!help) return;
         this._settingsHelp = help;
@@ -3924,7 +1203,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         const selected = settingsView.querySelectorAll("[data-notify-target]:checked").length;
         const total = settingsView.querySelectorAll("[data-notify-target]").length;
         const count = settingsView.querySelector(".notify-target-count");
-        if (count) count.textContent = `${selected} von ${total} ausgewählt`;
+        if (count) count.textContent = t("{0} von {1} ausgewählt", selected, total);
         this._dirtyRules.add("notify_targets");
         this._captureSettingsDraft(settingsView);
         this._updateSettingsDirtyUi(settingsView);
@@ -4009,7 +1288,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
         const selected = settingsView.querySelectorAll("[data-notify-target]:checked").length;
         const total = settingsView.querySelectorAll("[data-notify-target]").length;
         const count = settingsView.querySelector(".notify-target-count");
-        if (count) count.textContent = `${selected} von ${total} ausgewählt`;
+        if (count) count.textContent = t("{0} von {1} ausgewählt", selected, total);
         this._dirtyRules.add("notify_targets");
       }
       const rule = event.target?.dataset?.rule;
@@ -4160,7 +1439,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     ).length;
     const connectionStatus = this.shadowRoot.querySelector(".connection-status");
     if (connectionStatus) {
-      const connectionLabel = `${activeConnections}/${configuredConnections.length} Verbindungen aktiv`;
+      const connectionLabel = t("{0}/{1} Verbindungen aktiv", activeConnections, configuredConnections.length);
       const label = connectionStatus.querySelector("span");
       if (label) label.textContent = connectionLabel;
       connectionStatus.title = `${connectionLabel} · letztes Update ${age}`;
@@ -4169,8 +1448,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const adguardConnection = connections.adguard || {};
     const protection = this._hass.states[this._dnsProvider().id === "pihole" ? "switch.nodarion_pihole_gesamtschutz" : "switch.nodarion_adguard_gesamtschutz"]?.state;
     const dnsStatus = !adguardConnection.configured
-      ? "Nicht eingerichtet"
-      : adguardConnection.available ? protection === "on" ? "Schutz aktiv" : protection === "off" ? "Schutz aus" : "Verbunden" : "Nicht erreichbar";
+      ? t("Nicht eingerichtet")
+      : adguardConnection.available ? protection === "on" ? t("Schutz aktiv") : protection === "off" ? t("Schutz aus") : t("Verbunden") : t("Nicht erreichbar");
     const dnsRatioEntity = this._hass.states["sensor.nodarion_dns_blockquote"];
     const dnsRatio = dnsRatioEntity && !["unknown", "unavailable"].includes(dnsRatioEntity.state)
       ? `${Number(dnsRatioEntity.state).toLocaleString(activeLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} % blockiert`
@@ -4179,45 +1458,45 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const aiScore = latestAiReport ? `${Number(latestAiReport.score)}/10` : "–";
     const aiNote = latestAiReport?.summary || (
       this._monitor.rules?.ai_analysis_enabled
-        ? "Tägliche Analyse aktiviert"
-        : "Noch keine Bewertung"
+        ? t("Tägliche Analyse aktiviert")
+        : t("Noch keine Bewertung")
     );
     const metrics = this.shadowRoot.querySelector(".metrics");
     metrics.classList.toggle("overview-expanded", this._mobileOverviewExpanded);
     metrics.innerHTML = `
-      <article class="metric nav-metric devices ${this._activeTab === "participants" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="participants" aria-current="${this._activeTab === "participants" ? "page" : "false"}">
-        <div class="metric-label-row"><div class="metric-label">Netzwerkgeräte</div><button class="metric-settings" type="button" data-settings-section="devices" data-return-tab="participants" title="Geräteeinstellungen öffnen" aria-label="Geräteeinstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+      <article class="metric devices">
+        <div class="metric-label-row"><div class="metric-label">${t("Netzwerkgeräte")}</div><button class="metric-settings" type="button" data-settings-section="devices" data-return-tab="participants" title="${t("Geräteeinstellungen öffnen")}" aria-label="${t("Geräteeinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="device-counts">
-          <button class="device-count online ${this._columnFilters.state === "on" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="on" title="Nur Online-Geräte anzeigen"><strong>${online}</strong><span>Online</span></button>
-          <button class="device-count offline ${this._columnFilters.state === "off" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="off" title="Nur Offline-Geräte anzeigen"><strong>${entities.length - online}</strong><span>Offline</span></button>
-          <button class="device-count new ${this._columnFilters.onboarding === "onboarding" ? "active" : ""}" type="button" data-quick-filter="onboarding" data-quick-filter-value="onboarding" title="${onboarding} neue Geräte im Einrichtungsbereich"><strong>${onboarding}</strong><span>Neu</span></button>
+          <button class="device-count online ${this._columnFilters.state === "on" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="on" title="${t("Nur Online-Geräte anzeigen")}"><strong>${online}</strong><span>Online</span></button>
+          <button class="device-count offline ${this._columnFilters.state === "off" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="off" title="${t("Nur Offline-Geräte anzeigen")}"><strong>${entities.length - online}</strong><span>Offline</span></button>
+          <button class="device-count new ${this._columnFilters.onboarding === "onboarding" ? "active" : ""}" type="button" data-quick-filter="onboarding" data-quick-filter-value="onboarding" title="${t("{0} neue Geräte im Einrichtungsbereich", onboarding)}"><strong>${onboarding}</strong><span>${t("Neu")}</span></button>
         </div>
-        ${guestMonitoring ? `<button class="guest-inline" type="button" title="Gastzugang anzeigen"><ha-icon icon="mdi:wifi-star"></ha-icon><span>${guestInfo.enabled ? "Gastnetz an" : "Gastnetz aus"}</span><span aria-hidden="true">·</span><span>${guestClients} ${guestClients === 1 ? "Gast" : "Gäste"}</span></button>` : ""}
-        <button class="mobile-overview-toggle" type="button" aria-label="Übersicht ein- oder ausklappen" title="Übersicht ein- oder ausklappen" aria-expanded="${this._mobileOverviewExpanded}" aria-controls="mobile-metric-overview"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+        ${guestMonitoring ? `<button class="guest-inline" type="button" title="${t("Gastzugang anzeigen")}"><ha-icon icon="mdi:wifi-star"></ha-icon><span>${guestInfo.enabled ? t("Gastnetz an") : t("Gastnetz aus")}</span><span aria-hidden="true">·</span><span>${guestClients} ${guestClients === 1 ? t("Gast") : t("Gäste")}</span></button>` : ""}
+        <button class="mobile-overview-toggle" type="button" aria-label="${t("Übersicht ein- oder ausklappen")}" title="${t("Übersicht ein- oder ausklappen")}" aria-expanded="${this._mobileOverviewExpanded}" aria-controls="mobile-metric-overview"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
       </article>
-      ${alertCount ? `<div class="mobile-overview-actions"><button class="mobile-alert-summary" type="button" data-nav-tab="watch"><ha-icon icon="mdi:alert-outline"></ha-icon>${alertCount} offene Warnungen</button></div>` : ""}
+      ${alertCount ? `<div class="mobile-overview-actions"><button class="mobile-alert-summary" type="button" data-open-watch><ha-icon icon="mdi:alert-outline"></ha-icon>${t("{0} offene Warnungen", alertCount)}</button></div>` : ""}
       <div class="metric-overview" id="mobile-metric-overview">
-      <article class="metric nav-metric events-metric ${this._activeTab === "log" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="log" aria-current="${this._activeTab === "log" ? "page" : "false"}">
-        <div class="metric-label-row"><div class="metric-label">Ereignisse</div><button class="metric-settings" type="button" data-settings-section="notifications" data-return-tab="log" title="Benachrichtigungen öffnen" aria-label="Benachrichtigungseinstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+      <article class="metric events-metric">
+        <div class="metric-label-row"><div class="metric-label">${t("Ereignisse")}</div><button class="metric-settings" type="button" data-settings-section="notifications" data-return-tab="log" title="${t("Benachrichtigungen öffnen")}" aria-label="${t("Benachrichtigungseinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="metric-status-value"><ha-icon icon="mdi:text-box-search-outline"></ha-icon>${eventCount}</div>
-        <span class="metric-note">${alertCount ? `${alertCount} offene ${alertCount === 1 ? "Warnung" : "Warnungen"}` : "Keine offenen Warnungen"}</span>
+        <span class="metric-note">${alertCount ? `${alertCount} offene ${alertCount === 1 ? t("Warnung") : t("Warnungen")}` : t("Keine offenen Warnungen")}</span>
       </article>
-      <article class="metric nav-metric dns-metric ${this._activeTab === "dns" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="dns" aria-current="${this._activeTab === "dns" ? "page" : "false"}">
-        <div class="metric-label-row"><div class="metric-label">DNS-Schutz</div><button class="metric-settings" type="button" data-settings-section="dns" data-return-tab="dns" title="DNS-Einstellungen öffnen" aria-label="DNS-Einstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+      <article class="metric dns-metric">
+        <div class="metric-label-row"><div class="metric-label">${t("DNS-Schutz")}</div><button class="metric-settings" type="button" data-settings-section="dns" data-return-tab="dns" title="${t("DNS-Einstellungen öffnen")}" aria-label="${t("DNS-Einstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="metric-status-value"><ha-icon icon="mdi:shield-check-outline"></ha-icon>${esc(dnsStatus)}</div>
-        <button class="metric-note metric-entity-link" type="button" data-entity-id="sensor.nodarion_dns_blockquote" title="Home-Assistant-Dialog öffnen">${esc(dnsRatio)}</button>
+        <button class="metric-note metric-entity-link" type="button" data-entity-id="sensor.nodarion_dns_blockquote" title="${t("Home-Assistant-Dialog öffnen")}">${esc(dnsRatio)}</button>
       </article>
-      <article class="metric nav-metric ai-metric ${this._activeTab === "ai" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="ai" aria-current="${this._activeTab === "ai" ? "page" : "false"}" title="${esc(aiNote)}">
-        <div class="metric-label-row"><div class="metric-label">Netzbewertung</div><button class="metric-settings" type="button" data-settings-section="ai-maintenance" data-return-tab="ai" title="KI-Einstellungen öffnen" aria-label="KI-Einstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+      <article class="metric ai-metric" title="${esc(aiNote)}">
+        <div class="metric-label-row"><div class="metric-label">${t("Netzbewertung")}</div><button class="metric-settings" type="button" data-settings-section="ai-maintenance" data-return-tab="ai" title="${t("KI-Einstellungen öffnen")}" aria-label="${t("KI-Einstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="metric-value">${esc(aiScore)}</div>
         <span class="metric-note">${esc(aiNote)}</span>
       </article>
-      <article class="metric nav-metric watch-metric ${this._activeTab === "watch" ? "active" : ""}" role="button" tabindex="0" data-nav-tab="watch" aria-current="${this._activeTab === "watch" ? "page" : "false"}">
-        <div class="metric-label-row"><div class="metric-label">Überwachung ${alertCount ? `<span class="metric-alert-badge">${alertCount}</span>` : ""}</div><button class="metric-settings" type="button" data-settings-section="rules" data-return-tab="watch" title="Überwachungsregeln öffnen" aria-label="Überwachungseinstellungen öffnen"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+      <article class="metric watch-metric">
+        <div class="metric-label-row"><div class="metric-label">${t("Überwachung {0}", alertCount ? `<span class="metric-alert-badge">${alertCount}</span>` : "")}</div><button class="metric-settings" type="button" data-settings-section="rules" data-return-tab="watch" title="${t("Überwachungsregeln öffnen")}" aria-label="${t("Überwachungseinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
         <div class="function-counts">
-          <button class="function-count favorite ${this._columnFilters.watch === "monitored" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="monitored" title="Favoriten: ${important} gesamt, ${importantOnline} online"><strong><ha-icon icon="mdi:star-outline"></ha-icon>${important}/${importantOnline}</strong><span>Favoriten</span></button>
-          <button class="function-count notify ${this._columnFilters.watch === "notify" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="notify" title="Glocke: ${notifications} gesamt, ${notificationsOnline} online"><strong><ha-icon icon="mdi:bell-outline"></ha-icon>${notifications}/${notificationsOnline}</strong><span>Glocke</span></button>
-          <button class="function-count presence ${this._columnFilters.watch === "presence" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="presence" title="Anwesenheit: ${presenceDevices} gesamt, ${presenceOnline} online"><strong><ha-icon icon="mdi:home-outline"></ha-icon>${presenceDevices}/${presenceOnline}</strong><span>Anwesenheit</span></button>
+          <button class="function-count favorite ${this._columnFilters.watch === "monitored" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="monitored" title="${t("Favoriten: {0} gesamt, {1} online", important, importantOnline)}"><strong><ha-icon icon="mdi:star-outline"></ha-icon>${important}/${importantOnline}</strong><span>${t("Favoriten")}</span></button>
+          <button class="function-count notify ${this._columnFilters.watch === "notify" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="notify" title="${t("Glocke: {0} gesamt, {1} online", notifications, notificationsOnline)}"><strong><ha-icon icon="mdi:bell-outline"></ha-icon>${notifications}/${notificationsOnline}</strong><span>${t("Glocke")}</span></button>
+          <button class="function-count presence ${this._columnFilters.watch === "presence" ? "active" : ""}" type="button" data-quick-filter="watch" data-quick-filter-value="presence" title="${t("Anwesenheit: {0} gesamt, {1} online", presenceDevices, presenceOnline)}"><strong><ha-icon icon="mdi:home-outline"></ha-icon>${presenceDevices}/${presenceOnline}</strong><span>${t("Anwesenheit")}</span></button>
         </div>
       </article></div>`;
     const full = !changed;
@@ -4231,7 +1510,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
     if (participantsChanged || lifecycleChanged) {
       this._renderGuest();
       this._renderCards();
-      this._renderMesh();
     } else if (statusChanged && entities.length === 0) {
       this._renderCards();
     }
@@ -4297,7 +1575,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           "[data-notify-target]"
         ).length;
         const count = this.shadowRoot.querySelector(".notify-target-count");
-        if (count) count.textContent = `${selected} von ${total} ausgewählt`;
+        if (count) count.textContent = t("{0} von {1} ausgewählt", selected, total);
       }
       updatedNotifyTargetList.scrollTop = scrollState.notifyTargetTop;
     }
@@ -4312,9 +1590,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
         || this._monitor.known_hosts.includes(key);
     }).length;
     const question = forget
-      ? `${offline.length} Offline-Teilnehmer vollständig vergessen? Bei ${protectedCount} davon werden auch Freigaben oder Überwachungseinstellungen entfernt.`
-      : `${offline.length} Offline-Anzeigen bereinigen? Gespeicherte Gerätefreigaben bleiben erhalten.`;
-    if (!offline.length || !await this._confirm({ title:"Offline-Geräte bereinigen", message:question, confirmLabel:forget ? "Vollständig vergessen" : "Anzeige bereinigen", danger:forget })) return;
+      ? t("{0} Offline-Teilnehmer vollständig vergessen? Bei {1} davon werden auch Freigaben oder Überwachungseinstellungen entfernt.", offline.length, protectedCount)
+      : t("{0} Offline-Anzeigen bereinigen? Gespeicherte Gerätefreigaben bleiben erhalten.", offline.length);
+    if (!offline.length || !await this._confirm({ title:t("Offline-Geräte bereinigen"), message:question, confirmLabel:forget ? t("Vollständig vergessen") : t("Anzeige bereinigen"), danger:forget })) return;
     button.classList.add("busy");
     button.disabled = true;
     try {
@@ -4324,12 +1602,12 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const removed = Number(response.cleanup_result?.removed || 0);
       const result = this.shadowRoot.querySelector(".cleanup-result");
       result.textContent = removed
-        ? `${removed} Offline-${removed === 1 ? "Gerät" : "Geräte"} entfernt.`
-        : "Keine Offline-Geräte gefunden.";
+        ? `${removed} Offline-${removed === 1 ? t("Gerät") : t("Geräte")} entfernt.`
+        : t("Keine Offline-Geräte gefunden.");
       result.classList.add("visible");
     } catch (_error) {
       const result = this.shadowRoot.querySelector(".cleanup-result");
-      result.textContent = "Bereinigung konnte nicht ausgeführt werden.";
+      result.textContent = t("Bereinigung konnte nicht ausgeführt werden.");
       result.classList.add("visible");
     } finally {
       this.shadowRoot.querySelectorAll(".danger-zone .cleanup").forEach((currentButton) => {
@@ -4342,19 +1620,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
   async _approveInternet(button) {
     if (button.classList.contains("block-internet")) {
       const name = button.dataset.name || button.dataset.key;
-      if (!await this._confirm({ title:"Internetzugang sperren", message:`Internetzugang für „${name}“ sperren? Das Gerät bleibt im Heimnetz erreichbar. Die Sperre bleibt auch während der Lernphase bestehen.`, confirmLabel:"Sperren", danger:true })) return;
+      if (!await this._confirm({ title:t("Internetzugang sperren"), message:t("Internetzugang für „{0}“ sperren? Das Gerät bleibt im Heimnetz erreichbar. Die Sperre bleibt auch während der Lernphase bestehen.", name), confirmLabel:t("Sperren"), danger:true })) return;
       button.disabled = true;
       try {
         await this._stateClient.mutate({ action:"block_internet", key:button.dataset.key });
       } catch (error) {
-        await this._confirm({ title:"Sperre fehlgeschlagen", message:error?.body?.message || error?.message || "Internetzugang konnte nicht gesperrt werden.", confirmLabel:"Schließen", danger:true, showCancel:false });
+        await this._confirm({ title:t("Sperre fehlgeschlagen"), message:error?.body?.message || error?.message || t("Internetzugang konnte nicht gesperrt werden."), confirmLabel:t("Schließen"), danger:true, showCancel:false });
       } finally {
         button.disabled = false;
       }
       return;
     }
     const name = button.dataset.name || button.dataset.key;
-    if (!await this._confirm({ title:"Gerät freigeben", message:`Internetzugang für „${name}“ freigeben und das Gerät dauerhaft bestätigen?`, confirmLabel:"Freigeben" })) return;
+    if (!await this._confirm({ title:t("Gerät freigeben"), message:t("Internetzugang für „{0}“ freigeben und das Gerät dauerhaft bestätigen?", name), confirmLabel:t("Freigeben") })) return;
     button.disabled = true;
     const original = button.textContent;
     button.textContent = "Wird freigegeben …";
@@ -4362,10 +1640,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
       await this._stateClient.mutate({
         action: "approve_internet", key: button.dataset.key,
       });
-      button.textContent = "Freigegeben";
+      button.textContent = t("Freigegeben");
     } catch (error) {
       const detail = error?.body?.message || error?.message;
-      await this._confirm({ title:"Freigabe fehlgeschlagen", message:detail ? `Die FRITZ!Box konnte den Internetzugang nicht freigeben: ${detail}` : "Die FRITZ!Box konnte den Internetzugang nicht freigeben. Bitte Benutzerrechte und TR-064-Unterstützung prüfen.", confirmLabel:"Schließen", danger:true, showCancel:false });
+      await this._confirm({ title:t("Freigabe fehlgeschlagen"), message:detail ? t("Die FRITZ!Box konnte den Internetzugang nicht freigeben: {0}", detail) : t("Die FRITZ!Box konnte den Internetzugang nicht freigeben. Bitte Benutzerrechte und TR-064-Unterstützung prüfen."), confirmLabel:t("Schließen"), danger:true, showCancel:false });
       button.disabled = false;
       button.textContent = original;
     }
@@ -4380,7 +1658,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       await this._stateClient.mutate({ action:"set_guest_enabled", enabled });
       this._guestToggleError = "";
     } catch (error) {
-      this._guestToggleError = error?.body?.message || error?.message || "Gast-WLAN konnte nicht umgeschaltet werden.";
+      this._guestToggleError = error?.body?.message || error?.message || t("Gast-WLAN konnte nicht umgeschaltet werden.");
     } finally {
       this._guestToggleBusy = false;
       this._renderGuest();
@@ -4399,34 +1677,34 @@ class EngelsoftNodarionPanel extends HTMLElement {
       info.enabled && entity.state === "on" && entity.attributes.guest_network
     );
     const since = this._monitor.guest_since || {};
-    const detail = (label, value) => `<div class="guest-status-card"><span>${esc(label)}</span><strong>${esc(value ?? "Nicht verfügbar")}</strong></div>`;
+    const detail = (label, value) => `<div class="guest-status-card"><span>${esc(label)}</span><strong>${esc(value ?? t("Nicht verfügbar"))}</strong></div>`;
     const clients = guests.map((entity) => {
       const attr = entity.attributes;
       const key = attr.nodarion_key || `ip_${attr.ip_address}`;
       const name = attr.hostname || attr.friendly_name || attr.ip_address;
       const connected = since[key] ? formatStateChanged(since[key]) : "Online";
-      return `<div class="guest-client"><div><strong>${esc(name)}</strong><small>${esc(attr.ip_address || "Nicht verfügbar")} · ${esc(attr.mac_address || "MAC nicht erkannt")}${attr.mac_vendor ? ` · ${esc(attr.mac_vendor)}` : ""}</small></div><small>${esc(connected)}</small></div>`;
+      return `<div class="guest-client"><div><strong>${esc(name)}</strong><small>${esc(attr.ip_address || t("Nicht verfügbar"))} · ${esc(attr.mac_address || "MAC nicht erkannt")}${attr.mac_vendor ? ` · ${esc(attr.mac_vendor)}` : ""}</small></div><small>${esc(connected)}</small></div>`;
     }).join("");
     const remaining = Number(info.time_remaining_seconds);
     const qrCode = String(info.qr_code || "");
     const qrHtml = qrCode.startsWith("data:image/svg+xml;base64,")
-      ? `<div class="guest-qr"><img src="${esc(qrCode)}" alt="QR-Code für das Gast-WLAN ${esc(info.ssid || "")}"><div class="guest-qr-copy"><h3>Mit dem Gast-WLAN verbinden</h3><p>QR-Code mit der Handykamera scannen und direkt mit <strong>${esc(info.ssid || "dem Gast-WLAN")}</strong> verbinden.</p></div></div>`
-      : `<div class="guest-qr-unavailable">${info.qr_code_restricted ? "Der WLAN-QR-Code ist nur für Home-Assistant-Administratoren sichtbar." : info.enabled ? "Die FRITZ!Box konnte für dieses Gast-WLAN keinen QR-Code bereitstellen." : "Der QR-Code ist verfügbar, sobald der Gastzugang aktiv ist."}</div>`;
+      ? `<div class="guest-qr"><img src="${esc(qrCode)}" alt="${t("QR-Code für das Gast-WLAN {0}", esc(info.ssid || ""))}"><div class="guest-qr-copy"><h3>${t("Mit dem Gast-WLAN verbinden")}</h3><p>${t("QR-Code mit der Handykamera scannen und direkt mit")} <strong>${esc(info.ssid || "dem Gast-WLAN")}</strong> verbinden.</p></div></div>`
+      : `<div class="guest-qr-unavailable">${info.qr_code_restricted ? t("Der WLAN-QR-Code ist nur für Home-Assistant-Administratoren sichtbar.") : info.enabled ? t("Die FRITZ!Box konnte für dieses Gast-WLAN keinen QR-Code bereitstellen.") : t("Der QR-Code ist verfügbar, sobald der Gastzugang aktiv ist.")}</div>`;
     host.innerHTML = `<div class="guest-modal-backdrop"><section class="guest-modal" role="dialog" aria-modal="true" aria-labelledby="guest-modal-title">
-      <div class="guest-modal-head"><div><h2 id="guest-modal-title"><ha-icon icon="mdi:wifi-star"></ha-icon>FRITZ!Box-Gastzugang</h2><p>Gast-WLAN direkt auf der FRITZ!Box ein- oder ausschalten.</p></div><button class="guest-close" type="button" aria-label="Schließen"><ha-icon icon="mdi:close"></ha-icon></button></div>
-      <div class="guest-control"><span>Gast-WLAN</span><button class="guest-toggle" type="button" role="switch" aria-label="Gast-WLAN" aria-checked="${Boolean(info.enabled)}" ${this._guestToggleBusy || !info.available || info.ap_type !== "guest" ? "disabled" : ""}><span class="guest-toggle-track"><span></span></span><strong>${this._guestToggleBusy ? "Wird umgeschaltet …" : info.enabled ? "Ein" : "Aus"}</strong></button></div>
+      <div class="guest-modal-head"><div><h2 id="guest-modal-title"><ha-icon icon="mdi:wifi-star"></ha-icon>${t("FRITZ!Box-Gastzugang")}</h2><p>${t("Gast-WLAN direkt auf der FRITZ!Box ein- oder ausschalten.")}</p></div><button class="guest-close" type="button" aria-label="${t("Schließen")}"><ha-icon icon="mdi:close"></ha-icon></button></div>
+      <div class="guest-control"><span>${t("Gast-WLAN")}</span><button class="guest-toggle" type="button" role="switch" aria-label="${t("Gast-WLAN")}" aria-checked="${Boolean(info.enabled)}" ${this._guestToggleBusy || !info.available || info.ap_type !== "guest" ? "disabled" : ""}><span class="guest-toggle-track"><span></span></span><strong>${this._guestToggleBusy ? t("Wird umgeschaltet …") : info.enabled ? t("Ein") : t("Aus")}</strong></button></div>
       ${this._guestToggleError ? `<p class="guest-toggle-error" role="alert">${esc(this._guestToggleError)}</p>` : ""}
       <div class="guest-status-grid">
-        ${detail("Status", info.available === false ? "Nicht verfügbar" : info.enabled ? "Aktiv" : "Deaktiviert")}
-        ${detail("Gäste online", guests.length)}
-        ${detail("WLAN-Name", info.ssid || "Nicht gemeldet")}
-        ${detail("Verschlüsselung", info.encryption_mode || info.beacontype || "Nicht gemeldet")}
-        ${detail("Frequenz", info.frequency_band || "Nicht gemeldet")}
-        ${detail("Restlaufzeit", Number.isFinite(remaining) ? formatLease(remaining) : info.timeout_active ? "Aktiv" : "Ohne Zeitlimit")}
+        ${detail("Status", info.available === false ? t("Nicht verfügbar") : info.enabled ? t("Aktiv") : t("Deaktiviert"))}
+        ${detail(t("Gäste online"), guests.length)}
+        ${detail(t("WLAN-Name"), info.ssid || t("Nicht gemeldet"))}
+        ${detail(t("Verschlüsselung"), info.encryption_mode || info.beacontype || t("Nicht gemeldet"))}
+        ${detail(t("Frequenz"), info.frequency_band || t("Nicht gemeldet"))}
+        ${detail(t("Restlaufzeit"), Number.isFinite(remaining) ? formatLease(remaining) : info.timeout_active ? t("Aktiv") : t("Ohne Zeitlimit"))}
       </div>
       ${qrHtml}
-      <div class="guest-client-list">${clients || `<div class="empty"><ha-icon icon="mdi:wifi-off"></ha-icon><strong>Keine Gäste online</strong>Der Gastzugang ist gerade angenehm übersichtlich.</div>`}</div>
-      <div class="guest-actions"><button class="guest-show" type="button"><ha-icon icon="mdi:filter-variant"></ha-icon>Gäste in Tabelle anzeigen</button></div>
+      <div class="guest-client-list">${clients || `<div class="empty"><ha-icon icon="mdi:wifi-off"></ha-icon><strong>${t("Keine Gäste online")}</strong>${t("Der Gastzugang ist gerade angenehm übersichtlich.")}</div>`}</div>
+      <div class="guest-actions"><button class="guest-show" type="button"><ha-icon icon="mdi:filter-variant"></ha-icon>${t("Gäste in Tabelle anzeigen")}</button></div>
     </section></div>`;
   }
 
@@ -4451,13 +1729,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
         : `${(milliseconds / 1000).toFixed(1)} s`;
     };
     const checked = (value) => {
-      if (!value) return "Noch nicht geprüft";
+      if (!value) return t("Noch nicht geprüft");
       const date = new Date(value);
       return Number.isNaN(date.getTime())
-        ? "Noch nicht geprüft"
-        : `Geprüft ${new Intl.DateTimeFormat(activeLocale(), {
+        ? t("Noch nicht geprüft")
+        : t("Geprüft {0}", new Intl.DateTimeFormat(activeLocale(), {
             hour: "2-digit", minute: "2-digit", second: "2-digit",
-          }).format(date)}`;
+          }).format(date));
     };
     const interval = (seconds) => {
       const value = Number(seconds);
@@ -4476,8 +1754,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
         ? "disabled"
         : connection.available ? "online" : "offline";
       const stateLabel = !connection.configured
-        ? "Nicht eingerichtet"
-        : connection.available ? "Verbunden" : "Nicht erreichbar";
+        ? t("Nicht eingerichtet")
+        : connection.available ? t("Verbunden") : t("Nicht erreichbar");
       const deviceInfo = key === "fritzbox" && router
         ? [
             router.fritzbox_model,
@@ -4497,16 +1775,16 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const scannerMode = key === "scanner"
         ? recoveryActive
           ? panelLocale === "de"
-            ? `Schnellprüfung aktiv · ${Number(connection.important_offline || 0)} wichtige offline · alle ${Number(connection.effective_interval_seconds || 15)} Sek.`
+            ? t("Schnellprüfung aktiv · {0} wichtige offline · alle {1} Sek.", Number(connection.important_offline || 0), Number(connection.effective_interval_seconds || 15))
             : `Fast recovery active · ${Number(connection.important_offline || 0)} important offline · every ${Number(connection.effective_interval_seconds || 15)} sec.`
           : panelLocale === "de"
-            ? `Normalbetrieb · alle ${Number(connection.effective_interval_seconds || connection.interval_seconds || 60)} Sek.`
+            ? t("Normalbetrieb · alle {0} Sek.", Number(connection.effective_interval_seconds || connection.interval_seconds || 60))
             : `Normal mode · every ${Number(connection.effective_interval_seconds || connection.interval_seconds || 60)} sec.`
         : "";
       return `<article class="connection-card ${stateClass}">
         <i class="connection-dot"></i>
         <div><div class="connection-name">${esc(connection.label)}</div>${scannerMode ? `<span class="connection-device-info">${esc(scannerMode)}</span>` : ""}${deviceInfo ? `<span class="connection-device-info">${esc(deviceInfo)}</span>` : ""}${scanInfo ? `<span class="connection-device-info">${esc(scanInfo)}</span>` : ""}<div class="connection-state">${stateLabel}</div></div>
-        <div class="connection-time">${connection.configured ? duration(connection.duration_ms) : "–"}<span class="connection-checked">${connection.configured ? `${checked(connection.last_checked)} · ${interval(connection.interval_seconds)}` : "In den Optionen deaktiviert"}</span></div>
+        <div class="connection-time">${connection.configured ? duration(connection.duration_ms) : "–"}<span class="connection-checked">${connection.configured ? `${checked(connection.last_checked)} · ${interval(connection.interval_seconds)}` : t("In den Optionen deaktiviert")}</span></div>
       </article>`;
     }).join("");
   }
@@ -4544,1349 +1822,38 @@ class EngelsoftNodarionPanel extends HTMLElement {
         : "<strong>First network scan in progress…</strong>This can take a while, depending on the network size.";
     }
     const title = scanner.available
-      ? (german ? "Keine Geräte gefunden" : "No devices found")
+      ? (german ? t("Keine Geräte gefunden") : "No devices found")
       : (german ? "Netzwerkscan fehlgeschlagen" : "Network scan failed");
     const hint = german
-      ? "Prüfe unter Einstellungen → Allgemein das überwachte IPv4-Netz und ob Home Assistant es erreichen kann. Wähle danach „Jetzt scannen“."
+      ? t("Prüfe unter Einstellungen → Allgemein das überwachte IPv4-Netz und ob Home Assistant es erreichen kann. Wähle danach „Jetzt scannen“.")
       : "Check the monitored IPv4 network under Settings → General and make sure Home Assistant can reach it. Then select Scan now.";
     return `<strong>${title}</strong>${hint}`;
   }
 
   _renderCards() {
-    for (const button of this.shadowRoot.querySelectorAll(".metrics [data-quick-filter]")) {
-      const { quickFilter, quickFilterValue } = button.dataset;
-      button.classList.toggle("active", this._columnFilters[quickFilter] === quickFilterValue);
-    }
-    const activeFilter = this.shadowRoot.activeElement?.closest?.(
-      "[data-column-filter]"
-    );
-    const activeFilterState = activeFilter ? {
-      key: activeFilter.dataset.columnFilter,
-      start: activeFilter.selectionStart,
-      end: activeFilter.selectionEnd,
-      direction: activeFilter.selectionDirection,
-      mobile: Boolean(activeFilter.closest(".mobile-device-controls")),
-    } : null;
-    const matches = (value, pattern) => {
-      const needle = String(pattern || "").toLocaleLowerCase("de-DE");
-      if (!needle) return true;
-      const haystack = String(value || "").toLocaleLowerCase("de-DE");
-      if (!needle.includes("*") && !needle.includes("?")) {
-        return haystack.includes(needle);
-      }
-      const expression = needle
-        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-        .replaceAll("*", ".*")
-        .replaceAll("?", ".");
-      return new RegExp(`^${expression}$`, "i").test(haystack);
-    };
-    const internetPresentation = (entity) => {
-      const attr = entity.attributes;
-      const key = attr.nodarion_key || `ip_${attr.ip_address}`;
-      const name = attr.hostname || attr.friendly_name || attr.ip_address;
-      const isRouter = ["fritz.box", "fritz!box", "fritzbox"].includes(
-        String(attr.hostname || name || "").trim().replace(/\.$/, "").toLocaleLowerCase("de-DE")
-      );
-      const vpn = Boolean(attr.vpn_connection)
-        || /^(vpn|wireguard)/i.test(String(attr.hostname || name));
-      const infrastructure = isNetworkInfrastructure(entity);
-      return internetStatusFor({
-        approvalRequired: !isRouter && !infrastructure && !vpn && !attr.guest_network
-          && Boolean(attr.internet_approval_required),
-        wanAccess: isRouter ? "granted" : attr.wan_access,
-        learningActive: Boolean(this._monitor.learning?.active),
-        knownHost: Boolean(attr.trusted) || this._monitor.known_hosts.includes(key),
-        guestNetwork: Boolean(attr.guest_network),
-        vpnConnection: vpn,
-        networkInfrastructure: infrastructure,
-      });
-    };
-    const connectionValue = (entity) => {
-      const attr = entity.attributes;
-      const name = attr.hostname || attr.friendly_name || "";
-      if (attr.vpn_connection || /^(vpn|wireguard)/i.test(String(name))) return "VPN";
-      return [attr.connection_type, attr.wifi_band].filter(Boolean).join(" · ") || "Nicht verfügbar";
-    };
-    const addressValue = (entity) => entity.attributes.address_source || "Nicht verfügbar";
-    const sourceValues = (entity) => entity.attributes.detection_sources || [];
-    let entities = this._entities().filter((entity) => {
-      const attr = entity.attributes;
-      const filters = this._columnFilters;
-      const key = attr.nodarion_key || `ip_${attr.ip_address}`;
-      if (!this._matchesDeviceSearch(entity, filters.search)) return false;
-      if (filters.state === "guest" && !attr.guest_network) return false;
-      if (["on", "off"].includes(filters.state) && entity.state !== filters.state) return false;
-      if (
-        filters.onboarding
-        && onboardingStatus(attr.ip_address, this._monitor.rules)
-          !== filters.onboarding
-      ) return false;
-      if (
-        filters.watch === "monitored"
-        && !this._monitor.monitored.includes(key)
-      ) return false;
-      if (
-        filters.watch === "notify"
-        && !this._monitor.notifications.includes(key)
-      ) return false;
-      if (
-        filters.watch === "presence"
-        && !this._monitor.presence_devices.includes(key)
-      ) return false;
-      if (
-        filters.watch === "none"
-        && (
-          this._monitor.monitored.includes(key)
-          || this._monitor.notifications.includes(key)
-          || this._monitor.presence_devices.includes(key)
-        )
-      ) return false;
-      if (
-        filters.internet
-        && internetPresentation(entity).cssClass !== filters.internet
-      ) return false;
-      if (filters.connection && connectionValue(entity) !== filters.connection) return false;
-      if (filters.vlan && (attr.segment_id || "unassigned") !== filters.vlan) return false;
-      if (filters.address && addressValue(entity) !== filters.address) return false;
-      if (filters.source && !sourceValues(entity).includes(filters.source)) return false;
-      return (
-        (
-          matches(entity.entity_id, filters.name)
-          || matches(attr.friendly_name, filters.name)
-          || matches(attr.hostname, filters.name)
-        )
-        && matches(attr.ip_address, filters.ip)
-        && matches(
-          [attr.mac_address, attr.mac_vendor, attr.mac_vendor_prefix].join(" "),
-          filters.mac
-        )
-        && matches(attr.access_point, filters.mesh)
-        && matches([attr.link_rate_mbps, attr.link_rate_rx_mbps, attr.link_rate_tx_mbps, attr.signal_strength_percent, attr.signal_strength_dbm].join(" "), filters.rate)
-        && matches([attr.dns_queries, attr.dns_blocked, attr.dns_blocked_ratio, attr.dns_last_domain].join(" "), filters.dns)
-      );
-    });
-    const ipNumber = (ip) => (ip || "0.0.0.0").split(".").reduce((sum, part) => sum * 256 + Number(part), 0);
-    const text = (value) => String(value || "").toLocaleLowerCase("de-DE");
-    const valueFor = (entity) => {
-      const attr = entity.attributes;
-      if (this._sort === "state") return entity.state === "on" ? 0 : 1;
-      if (this._sort === "name") return text(attr.hostname || attr.friendly_name);
-      if (this._sort === "onboarding") {
-        return text(onboardingStatus(attr.ip_address, this._monitor.rules));
-      }
-      if (this._sort === "mac") return text(attr.mac_address);
-      if (this._sort === "vlan") return Number(attr.vlan_id ?? 9999);
-      if (this._sort === "connection") return text(`${attr.connection_type || ""} ${attr.wifi_band || ""} ${attr.access_point || ""}`);
-      if (this._sort === "mesh") return text(attr.access_point);
-      if (this._sort === "rate") return Number(attr.link_rate_mbps ?? attr.link_rate_rx_mbps ?? -1);
-      if (this._sort === "address") return text(attr.address_source);
-      if (this._sort === "dns") return Number(attr.dns_queries ?? -1);
-      if (this._sort === "source") return text((attr.detection_sources || []).join(" "));
-      return ipNumber(attr.ip_address);
-    };
-    entities.sort((a, b) => {
-      const av = valueFor(a);
-      const bv = valueFor(b);
-      const result = typeof av === "number" && typeof bv === "number"
-        ? av - bv
-        : String(av).localeCompare(String(bv), "de", { numeric: true, sensitivity: "base" });
-      return result * (this._sortDirection === "asc" ? 1 : -1);
-    });
-
-    const grid = this.shadowRoot.querySelector(".device-list");
-    const rows = entities.map((entity) => {
-      const attr = entity.attributes;
-      const online = entity.state === "on";
-      const name = attr.hostname || attr.friendly_name || attr.ip_address;
-      const key = attr.nodarion_key || `ip_${attr.ip_address}`;
-      const monitored = this._monitor.monitored.includes(key);
-      const notify = this._monitor.notifications.includes(key);
-      const presence = this._monitor.presence_devices.includes(key);
-      const lifecycle = onboardingStatus(
-        attr.ip_address, this._monitor.rules
-      );
-      const lifecycleLabel = lifecycle === "onboarding"
-        ? "Einrichtungsbereich"
-        : lifecycle === "assigned" ? "Regulärer Bereich" : "Einrichtung deaktiviert";
-      const transitionEvent = (this._monitor.events || []).find(
-        (item) => item.key === key && item.type === (online ? "online" : "offline")
-      );
-      const stateChanged = online
-        ? this._monitor.online_since?.[key] || transitionEvent?.timestamp || entity.last_changed
-        : this._monitor.offline_since?.[key] || transitionEvent?.timestamp || entity.last_changed;
-      const privateMac = isPrivateMac(attr.mac_address);
-      const vendorTitle = attr.mac_vendor ? [
-        `Hersteller: ${attr.mac_vendor}`,
-        `Registrierter Präfix: ${attr.mac_vendor_prefix || "Nicht verfügbar"}`,
-        `Zuteilung: ${attr.mac_vendor_block_type || "Nicht verfügbar"}`,
-        `Registerstand: ${attr.mac_vendor_last_update || "Nicht verfügbar"}`,
-        "Quelle: lokale MAC-Vendor-Datei",
-      ].join("\n") : privateMac
-        ? "Lokale bzw. randomisierte MAC-Adresse – eine Herstellerzuordnung ist nicht zuverlässig möglich."
-        : "Für diesen MAC-Präfix wurde in der lokalen Datei kein Hersteller gefunden.";
-      const isFritzRouter = ["fritz.box", "fritz!box", "fritzbox"].includes(
-        String(attr.hostname || name || "").trim().replace(/\.$/, "").toLocaleLowerCase("de-DE")
-      );
-      const vpnConnection = Boolean(attr.vpn_connection)
-        || /^(vpn|wireguard)/i.test(String(attr.hostname || name));
-      const networkInfrastructure = isNetworkInfrastructure(entity);
-      const approvalRequired = !isFritzRouter
-        && !networkInfrastructure
-        && !vpnConnection
-        && !attr.guest_network
-        && Boolean(attr.internet_approval_required);
-      const wanAccess = isFritzRouter ? "granted" : attr.wan_access;
-      const learningActive = Boolean(this._monitor.learning?.active) && !attr.internet_manually_blocked;
-      const knownHost = Boolean(attr.trusted)
-        || this._monitor.known_hosts.includes(key);
-      const internetStatus = internetStatusFor({
-        approvalRequired,
-        wanAccess,
-        learningActive,
-        knownHost,
-        guestNetwork: Boolean(attr.guest_network),
-        vpnConnection,
-        networkInfrastructure,
-      });
-      const internetLabel = internetStatus.label;
-      const internetClass = internetStatus.cssClass;
-      const internetHint = (!attr.internet_control_available && attr.internet_control_reason) || (networkInfrastructure
-        ? "Router und Mesh-Komponenten werden nicht durch den FRITZ!Box-Hostfilter gesteuert."
-        : vpnConnection
-        ? "VPN-Verbindungen werden nicht durch den FRITZ!Box-Hostfilter gesteuert."
-        : attr.guest_network
-          ? "Der Gastzugang wird durch die FRITZ!Box verwaltet."
-          : internetClass === "error"
-            ? "Die FRITZ!Box konnte die gewünschte Änderung nicht ausführen."
-            : approvalRequired ? "Freigabe durch einen Administrator erforderlich." : "");
-      const specialDeviceClass = vpnConnection
-        ? "vpn"
-        : attr.guest_network ? "guest" : isFritzRouter ? "router" : networkInfrastructure ? "mesh" : "";
-      const sources = (attr.detection_sources || [])
-        .map((source) => ({
-          fritzbox: "FRITZ!Box",
-          ping: "Ping",
-          tcp: "TCP",
-          ping_tcp: "Ping/TCP",
-        })[source] || source)
-        .join(" + ") || "Nicht erkannt";
-      const accessPoint = attr.access_point || "Nicht verfügbar";
-      const connection = vpnConnection
-        ? "VPN"
-        : [attr.connection_type, attr.wifi_band].filter(Boolean).join(" · ") || "Nicht verfügbar";
-      const rates = attr.link_rate_mbps !== null && attr.link_rate_mbps !== undefined
-        ? `${attr.link_rate_mbps} Mbit/s`
-        : [
-            attr.link_rate_rx_mbps !== null && attr.link_rate_rx_mbps !== undefined ? `↓ ${attr.link_rate_rx_mbps} Mbit/s` : null,
-            attr.link_rate_tx_mbps !== null && attr.link_rate_tx_mbps !== undefined ? `↑ ${attr.link_rate_tx_mbps} Mbit/s` : null,
-          ].filter(Boolean).join(" · ");
-      const signal = attr.signal_strength_percent !== null && attr.signal_strength_percent !== undefined
-        ? `${attr.signal_strength_percent} % Signal`
-        : attr.signal_strength_dbm !== null && attr.signal_strength_dbm !== undefined
-          ? `${attr.signal_strength_dbm} dBm`
-          : null;
-      const signalAssessment = signalRating(attr);
-      const sourceKey = String(attr.address_source || "").toUpperCase();
-      const addressSource = sourceKey === "DHCP"
-        ? "DHCP"
-        : sourceKey === "STATIC" ? "Statisch" : attr.address_source;
-      const lease = formatLease(attr.lease_time_remaining);
-      const hasAdGuard = attr.adguard_period_hours !== null && attr.adguard_period_hours !== undefined;
-      const dnsTitle = hasAdGuard ? [
-        `Zeitraum: ${attr.adguard_period_hours} Stunden`,
-        `Daten vollständig: ${attr.adguard_data_complete === false ? "Nein (Abfragelimit erreicht)" : "Ja"}`,
-        `Letzte Aktivität: ${formatDateTime(attr.dns_last_activity)}`,
-        `Letzte Domain: ${attr.dns_last_domain || "Nicht verfügbar"}`,
-        `Zuletzt blockiert: ${attr.dns_last_blocked_domain || "Nicht verfügbar"}`,
-        `Treffergrund: ${blockReason(attr.dns_last_block_reason)}`,
-        `DNS-Protokoll: ${attr.dns_last_protocol || "Nicht verfügbar"}`,
-        `Häufig abgefragt: ${topDomains(attr.dns_top_queried_domains) || "Nicht verfügbar"}`,
-        `Häufig blockiert: ${topDomains(attr.dns_top_blocked_domains) || "Nicht verfügbar"}`,
-      ].join("\n") : "DNS-Anbieter ist in Nodarion nicht aktiviert oder nicht erreichbar";
-      const dnsPrimary = attr.adguard_bypass_suspected
-        ? "Kein AdGuard-DNS"
-        : hasAdGuard ? `${attr.dns_queries || 0} Anfragen` : "–";
-      const dnsSecondary = hasAdGuard
-        ? `${attr.dns_blocked || 0} blockiert · ${attr.dns_blocked_ratio || 0} %`
-        : "";
-      const dnsAssessment = hasAdGuard ? dnsRating(attr.dns_blocked_ratio) : null;
-      const segmentColor = /^#[0-9a-f]{6}$/i.test(String(attr.segment_color || "")) ? attr.segment_color : "#58b9d6";
-      const segmentLabel = attr.segment_name
-        ? `${attr.segment_name}${attr.vlan_id ? ` · VLAN ${attr.vlan_id}` : ""}`
-        : "Nicht zugeordnet";
-      const rowTitle = [
-        attr.guest_network ? "Gerät im Gastnetz" : "",
-        lifecycle === "onboarding" ? "Gerät im DHCP-Einrichtungsbereich" : "",
-      ].filter(Boolean).join(" · ");
-      return `<tr class="${online ? "on" : "off"} ${!online && monitored ? "important-offline" : ""} ${lifecycle === "onboarding" ? "onboarding-row" : ""} ${attr.guest_network ? "guest-row" : ""} ${attr.segment_id ? "vlan-device-row" : ""}" style="--vlan-color:${esc(segmentColor)}" ${rowTitle ? `title="${esc(rowTitle)}"` : ""}>
-        <td data-column="state" data-label="Status"><div class="status-cell"><div class="status"><i class="dot"></i>${online ? "Online" : "Offline"}</div><span class="status-time">${esc(formatStateChanged(stateChanged))}</span></div></td>
-        <td data-column="onboarding" data-label="IP-Bereich"><span class="onboarding-state ${lifecycle}">${esc(lifecycleLabel)}</span></td>
-        <td data-column="vlan" data-label="VLAN"><div class="detail-stack"><strong>${esc(segmentLabel)}</strong><small>${esc(({trusted:"Vertrauenswürdig",restricted:"Eingeschränkt",guest:"Gast",isolated:"Isoliert",infrastructure:"Infrastruktur"})[attr.segment_role] || attr.segment_role || "Keine Rolle")}${attr.segment_monitoring === false ? " · nicht überwacht" : ""}</small></div></td>
-        <td data-column="name" data-label="Teilnehmer"><div class="device-cell">
-          <span class="device-icon ${specialDeviceClass}" title="${esc(deviceIconTitle(entity))}"><ha-icon icon="${deviceIcon(entity)}"></ha-icon></span>
-          <div class="device-label"><button class="entity-link" data-key="${esc(key)}" data-name="${esc(name)}" title="Live-Log dieses Geräts anzeigen">${esc(name)}</button>
-          <button class="entity-id-link" data-entity-id="${esc(entity.entity_id)}" title="Home-Assistant-Dialog öffnen">${esc(entity.entity_id)}</button></div>
-          <button class="watch mobile-details" type="button" aria-expanded="false" aria-label="Weitere Gerätedetails anzeigen" title="Weitere Gerätedetails anzeigen"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
-        </div>
-        </td>
-        <td data-column="ip" data-label="IP-Adresse" class="mono"><div class="device-ip-line"><span>${esc(attr.ip_address || "Nicht verfügbar")}</span>${deviceWebControl(entity)}</div></td>
-        <td data-column="mac" data-label="MAC-Adresse" class="mono" title="${esc(vendorTitle)}">${esc(attr.mac_address || "Nicht erkannt")}${attr.mac_vendor ? `<span class="mac-vendor" title="${esc(vendorTitle)}"><ha-icon icon="mdi:factory"></ha-icon>${esc(attr.mac_vendor)}</span>` : ""}${privateMac ? `<span class="private-mac" title="Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus"><ha-icon icon="mdi:incognito"></ha-icon>Privat / randomisiert</span>` : ""}</td>
-        <td data-column="connection" data-label="Verbindung"><div class="detail-stack"><strong>${esc(connection)}</strong></div></td>
-        <td data-column="mesh" data-label="Mesh-Punkt"><div class="detail-stack"><strong>${esc(accessPoint)}</strong></div></td>
-        <td data-column="rate" data-label="WLAN"><div class="detail-stack"><strong>${esc(rates || "Nicht verfügbar")}</strong>${signal ? `<span class="rating ${signalAssessment?.level || "okay"}" title="WLAN-Empfang: ${esc(signalAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(signal)} · ${esc(signalAssessment?.label || "")}</span></span>` : ""}</div></td>
-        <td data-column="address" data-label="Adressvergabe"><div class="detail-stack"><strong>${esc(addressSource || "Nicht verfügbar")}</strong>${addressSource === "DHCP" && lease ? `<small>Noch ${esc(lease)}</small>` : ""}</div></td>
-        <td data-column="dns" data-label="DNS" title="${esc(dnsTitle)}"><button class="dns-live-link" type="button" data-ip="${esc(attr.ip_address)}" data-name="${esc(name)}" title="DNS-Live-Log für ${esc(name)} öffnen"><span class="detail-stack"><strong class="${attr.adguard_bypass_suspected ? "dns-alert" : ""}">${esc(dnsPrimary)}</strong>${dnsSecondary ? `<span class="rating ${dnsAssessment?.level || "okay"}" title="Anteil blockierter DNS-Anfragen: ${esc(dnsAssessment?.label || "Nicht bewertet")}"><span class="rating-label">${esc(dnsSecondary)} · ${esc(dnsAssessment?.label || "")}</span></span>` : ""}</span></button></td>
-        <td data-column="source" data-label="Erkannt durch">${esc(sources)}</td>
-        <td data-column="internet" data-label="Internetzugang"><div class="internet-state"><span class="internet-label ${esc(internetClass)}">${esc(internetLabel)}</span>${internetHint ? `<small class="internet-hint">${esc(internetHint)}</small>` : ""}${(approvalRequired && attr.internet_control_available) ? `<button class="approve-internet" data-key="${esc(key)}" data-name="${esc(name)}" data-entity-id="${esc(entity.entity_id)}">Freigeben</button>` : attr.internet_control_available ? `<button class="block-internet" data-key="${esc(key)}" data-name="${esc(name)}" title="Internetzugang sperren"><ha-icon icon="mdi:lock-outline"></ha-icon>Sperren</button>` : ""}</div></td>
-        <td data-column="watch" data-label="Überwachung">
-          <div class="card-actions">
-            <button class="watch ${monitored ? "active" : ""}" data-key="${esc(key)}" title="${monitored ? "Überwachung beenden" : "Als wichtig überwachen"}"><ha-icon icon="${monitored ? "mdi:star" : "mdi:star-outline"}"></ha-icon></button>
-            <button class="watch notify ${notify ? "active" : ""}" data-key="${esc(key)}" title="${notify ? "Offline-Meldung deaktivieren" : "Bei Offline melden"}"><ha-icon icon="${notify ? "mdi:bell" : "mdi:bell-outline"}"></ha-icon></button>
-            <button class="watch presence ${presence ? "active" : ""}" data-key="${esc(key)}" title="${presence ? "Aus Anwesenheitssteuerung entfernen" : `Für Anwesenheitssteuerung verwenden · Offline nach ${Number(this._monitor.rules?.presence_timeout_minutes || 5)} Min.`}"><ha-icon icon="mdi:home-account"></ha-icon></button>
-          </div>
-        </td>
-      </tr>`;
-    }).join("");
-    const columns = [
-      ["state", "Status"], ["onboarding", "IP-Bereich"],
-      ["vlan", "VLAN"],
-      ["name", "Teilnehmer"], ["ip", "IP-Adresse"],
-      ["mac", "MAC-Adresse"], ["connection", "Verbindung"], ["mesh", "Mesh-Zugangspunkt"],
-      ["rate", "WLAN-Daten"], ["address", "Adressvergabe"], ["dns", "DNS"],
-      ["source", "Erkannt durch"], ["internet", "Internetzugang"], ["watch", "Überwachung"],
-    ];
-    const heading = (label, key) => {
-      const active = this._sort === key;
-      const icon = active && this._sortDirection === "desc" ? "mdi:arrow-down" : "mdi:arrow-up";
-      const direction = active ? (this._sortDirection === "asc" ? "aufsteigend" : "absteigend") : "sortieren";
-      return `<th data-column="${key}" aria-sort="${active ? (this._sortDirection === "asc" ? "ascending" : "descending") : "none"}"><button class="sort-head ${active ? "active" : ""}" data-sort="${key}" title="${esc(`${label} ${direction}`)}">${esc(label)}<ha-icon icon="${icon}"></ha-icon></button></th>`;
-    };
-    const filterInput = (key, placeholder) =>
-      `<th data-column="${key}"><input class="column-filter ${this._columnFilters[key] ? "has-value" : ""}" data-column-filter="${key}" value="${esc(this._columnFilters[key] || "")}" placeholder="${esc(placeholder)}" title="* und ? als Wildcards möglich"></th>`;
-    const allEntities = this._entities();
-    const countWhere = (predicate) => allEntities.filter(predicate).length;
-    const customFilter = (key, options, minWidth = "") => {
-      const value = this._columnFilters[key] || "";
-      const selected = options.find((option) => option.value === value) || options[0];
-      const buttons = options.map((option) => `<button type="button" role="option" aria-selected="${value === option.value}" class="custom-filter-option ${value === option.value ? "active" : ""}" data-column-filter-key="${key}" data-column-filter-value="${esc(option.value)}"><ha-icon icon="${value === option.value ? "mdi:check" : option.icon}"></ha-icon><span>${esc(option.label)}</span><span class="custom-filter-count">${Number(option.count || 0)}</span></button>`).join("");
-      return `<details class="custom-column-filter ${value ? "has-value" : ""}" data-column-filter-key="${key}" ${minWidth ? `style="min-width:${minWidth}"` : ""}><summary aria-label="${esc(`${selected.label}; Filter ${key}`)}">${esc(selected.label)}</summary><div class="custom-filter-menu" role="listbox">${buttons}</div></details>`;
-    };
-    const stateFilter = customFilter("state", [
-      { value:"", label:"Alle", icon:"mdi:lan", count:allEntities.length },
-      { value:"on", label:"Online", icon:"mdi:check-network-outline", count:countWhere((entity) => entity.state === "on") },
-      { value:"off", label:"Offline", icon:"mdi:lan-disconnect", count:countWhere((entity) => entity.state === "off") },
-      { value:"guest", label:"Gastzugang", icon:"mdi:wifi-star", count:countWhere((entity) => Boolean(entity.attributes.guest_network)) },
-    ], "150px");
-    const onboardingFilter = customFilter("onboarding", [
-      { value:"", label:"Alle IP-Bereiche", icon:"mdi:tag-multiple-outline", count:allEntities.length },
-      { value:"onboarding", label:"Einrichtungsbereich", icon:"mdi:star-four-points-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "onboarding") },
-      { value:"assigned", label:"Regulärer Bereich", icon:"mdi:check-decagram-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "assigned") },
-      { value:"unknown", label:"Einrichtung deaktiviert", icon:"mdi:minus-circle-outline", count:countWhere((entity) => onboardingStatus(entity.attributes.ip_address, this._monitor.rules) === "unknown") },
-    ]);
-    const segmentCounts = new Map();
-    allEntities.forEach((entity) => {
-      const id = entity.attributes.segment_id || "unassigned";
-      const current = segmentCounts.get(id) || {
-        id,
-        name:entity.attributes.segment_name || "Nicht zugeordnet",
-        vlanId:entity.attributes.vlan_id,
-        count:0,
-      };
-      current.count += 1;
-      segmentCounts.set(id, current);
-    });
-    const vlanFilter = customFilter("vlan", [
-      { value:"", label:"Alle VLANs", icon:"mdi:lan", count:allEntities.length },
-      ...[...segmentCounts.values()].sort((a, b) => Number(a.vlanId || 9999) - Number(b.vlanId || 9999)).map((segment) => ({
-        value:segment.id,
-        label:segment.vlanId ? `${segment.name} · VLAN ${segment.vlanId}` : segment.name,
-        icon:"mdi:lan-connect",
-        count:segment.count,
-      })),
-    ], "190px");
-    const watchFilter = customFilter("watch", [
-      { value:"", label:"Alle Funktionen", icon:"mdi:tune-variant", count:allEntities.length },
-      { value:"monitored", label:"Überwacht", icon:"mdi:star-outline", count:countWhere((entity) => this._monitor.monitored.includes(entity.attributes.nodarion_key)) },
-      { value:"notify", label:"Offline-Meldung", icon:"mdi:bell-outline", count:countWhere((entity) => this._monitor.notifications.includes(entity.attributes.nodarion_key)) },
-      { value:"presence", label:"Anwesenheit", icon:"mdi:home-account", count:countWhere((entity) => this._monitor.presence_devices.includes(entity.attributes.nodarion_key)) },
-      { value:"none", label:"Keine Funktion", icon:"mdi:minus-circle-outline", count:countWhere((entity) => { const key = entity.attributes.nodarion_key; return !this._monitor.monitored.includes(key) && !this._monitor.notifications.includes(key) && !this._monitor.presence_devices.includes(key); }) },
-    ], "180px");
-    const internetCounts = new Map();
-    allEntities.forEach((entity) => {
-      const status = internetPresentation(entity);
-      const current = internetCounts.get(status.cssClass) || {
-        value: status.cssClass,
-        label: status.label,
-        count: 0,
-      };
-      current.count += 1;
-      internetCounts.set(status.cssClass, current);
-    });
-    const internetOrder = ["denied", "pending", "error", "unchecked", "unmanaged", "infrastructure", "learning", "trusted", "allowed"];
-    const internetFilter = customFilter("internet", [
-      { value:"", label:"Alle Internetstatus", icon:"mdi:web", count:allEntities.length },
-      ...[...internetCounts.values()]
-        .sort((a, b) => internetOrder.indexOf(a.value) - internetOrder.indexOf(b.value))
-        .map((option) => ({ ...option, icon:"mdi:shield-outline" })),
-    ], "210px");
-    const countedOptions = (values, allLabel, icon) => {
-      const counts = new Map();
-      values.forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
-      return [
-        { value:"", label:allLabel, icon, count:values.length },
-        ...[...counts.entries()].sort(([a], [b]) => a.localeCompare(b, "de"))
-          .map(([value, count]) => ({ value, label:value, icon, count })),
-      ];
-    };
-    const connectionFilter = customFilter("connection", countedOptions(
-      allEntities.map(connectionValue), "Alle Verbindungen", "mdi:lan-connect"
-    ), "180px");
-    const addressFilter = customFilter("address", countedOptions(
-      allEntities.map(addressValue), "Alle Adressvergaben", "mdi:ip-network-outline"
-    ), "185px");
-    const sourceLabels = { fritzbox:"FRITZ!Box", ping:"Ping", tcp:"TCP", ping_tcp:"Ping/TCP" };
-    const sourceOptions = countedOptions(
-      allEntities.flatMap(sourceValues), "Alle Erkennungsquellen", "mdi:radar"
-    ).map((option) => ({ ...option, label:sourceLabels[option.value] || option.label }));
-    const sourceFilter = customFilter("source", sourceOptions, "190px");
-    const meshCounts = new Map();
-    allEntities.filter((entity) => entity.state === "on").forEach((entity) => {
-      const accessPoint = entity.attributes.access_point;
-      if (accessPoint) meshCounts.set(accessPoint, (meshCounts.get(accessPoint) || 0) + 1);
-    });
-    const meshOptions = [...meshCounts.entries()]
-      .sort(([a], [b]) => a.localeCompare(b, "de"))
-      .map(([name, count]) => `<button type="button" class="custom-filter-option ${this._columnFilters.mesh === name ? "active" : ""}" data-column-filter-key="mesh" data-column-filter-value="${esc(name)}"><ha-icon icon="${this._columnFilters.mesh === name ? "mdi:check" : "mdi:access-point"}"></ha-icon><span>${esc(name)}</span><span class="custom-filter-count">${count}</span></button>`)
-      .join("");
-    const selectedMesh = this._columnFilters.mesh || "Alle Mesh-Punkte";
-    const filterNames = { search:"Suche", state:"Status", onboarding:"IP-Bereich", vlan:"VLAN", name:"Teilnehmer", ip:"IP-Adresse", mac:"MAC-Adresse", connection:"Verbindung", mesh:"Mesh", rate:"WLAN", address:"Adressvergabe", dns:"DNS", source:"Erkannt durch", internet:"Internetzugang", watch:"Überwachung" };
-    const filterValueNames = { on:"Online", off:"Offline", guest:"Gastzugang", onboarding:"Einrichtungsbereich", assigned:"Regulärer Bereich", unknown:"Einrichtung deaktiviert", monitored:"Überwacht", notify:"Offline-Meldung", presence:"Anwesenheit", none:"Keine Funktion", denied:"Gesperrt", pending:"Freigabe ausstehend", error:"Freigabe fehlgeschlagen", unchecked:"Noch nicht geprüft", unmanaged:"Nicht verwaltet", infrastructure:"Netzwerkinfrastruktur", learning:"Lernphase", trusted:"Vertrauenswürdig", allowed:"Freigegeben", ...sourceLabels, ...Object.fromEntries([...segmentCounts.values()].map((segment) => [segment.id, segment.vlanId ? `${segment.name} · VLAN ${segment.vlanId}` : segment.name])) };
-    const activeFilters = Object.entries(this._columnFilters).filter(([, value]) => value);
-    const filterChips = activeFilters.length ? `<div class="filter-chips" role="status" aria-label="Aktive Filter">${activeFilters.map(([key, value]) => `<button class="filter-chip" type="button" data-clear-column-filter="${esc(key)}" aria-label="Filter ${esc(filterNames[key] || key)} entfernen"><span>${esc(filterNames[key] || key)}: ${esc(filterValueNames[value] || value)}</span><ha-icon icon="mdi:close"></ha-icon></button>`).join("")}<button class="filter-reset" type="button" data-clear-all-filters>Alle Filter zurücksetzen</button></div>` : "";
-    const emptyRow = `<tr><td colspan="14"><div class="empty" role="status">${allEntities.length
-      ? '<ha-icon icon="mdi:filter-off-outline"></ha-icon><strong>Keine passenden Geräte</strong>Filter ändern oder leeren.'
-      : this._emptyScanMessage()}</div></td></tr>`;
-    const mobileFilterCount = activeFilters.filter(([key]) => key !== "search").length;
-    const mobileFilter = (label, control) => `<div class="mobile-filter-field"><span>${esc(label)}</span>${control}</div>`;
-    const meshFilter = customFilter("mesh", countedOptions(allEntities.map(entity => entity.attributes.access_point).filter(Boolean), "Alle Mesh-Punkte", "mdi:access-point"));
-    const mobileControls = `<div class="mobile-device-controls"><div class="mobile-search-row"><label class="mobile-device-search"><ha-icon icon="mdi:magnify"></ha-icon><input type="search" data-column-filter="search" value="${esc(this._columnFilters.search || "")}" placeholder="Geräte suchen …" aria-label="Geräte suchen" autocomplete="off"></label><button class="mobile-filter-toggle ${mobileFilterCount ? "active" : ""}" type="button" aria-label="Geräte filtern" aria-expanded="${this._mobileFiltersExpanded}" aria-controls="mobile-device-filters"><ha-icon icon="mdi:filter-variant"></ha-icon>${mobileFilterCount ? `<span>${mobileFilterCount}</span>` : ""}</button></div>
-      <div class="mobile-device-filters" id="mobile-device-filters" ${this._mobileFiltersExpanded ? "" : "hidden"}>
-        ${mobileFilter("Status", stateFilter)}${mobileFilter("IP-Bereich", onboardingFilter)}${mobileFilter("VLAN", vlanFilter)}${mobileFilter("Mesh", meshFilter)}${mobileFilter("Funktion", watchFilter)}${mobileFilter("Verbindung", connectionFilter)}${mobileFilter("Internetzugang", internetFilter)}${mobileFilter("Adressvergabe", addressFilter)}${mobileFilter("Erkannt durch", sourceFilter)}
-      </div></div>`;
-    grid.innerHTML = `${mobileControls}${filterChips}<table aria-label="Netzwerkgeräte">
-      <thead>
-        <tr>${heading("Status", "state")}${heading("IP-Bereich", "onboarding")}${heading("VLAN", "vlan")}${heading("Teilnehmer", "name")}${heading("IP-Adresse", "ip")}${heading("MAC-Adresse", "mac")}${heading("Verbindung", "connection")}${heading("Mesh-Zugangspunkt", "mesh")}${heading("WLAN-Daten", "rate")}${heading("Adressvergabe", "address")}${heading("DNS", "dns")}${heading("Erkannt durch", "source")}<th data-column="internet" class="no-sort">Internetzugang</th><th data-column="watch" class="no-sort">Überwachung</th></tr>
-        <tr class="column-filters">
-          <th data-column="state">${stateFilter}</th>
-          <th data-column="onboarding">${onboardingFilter}</th>
-          <th data-column="vlan">${vlanFilter}</th>
-          ${filterInput("name", "Name oder *")}
-          ${filterInput("ip", "IP oder *")}
-          ${filterInput("mac", "MAC oder *")}
-          <th data-column="connection">${connectionFilter}</th>
-          <th data-column="mesh"><details class="custom-column-filter ${this._columnFilters.mesh ? "has-value" : ""}" data-column-filter-key="mesh"><summary>${esc(selectedMesh)}</summary><div class="custom-filter-menu"><button type="button" class="custom-filter-option ${this._columnFilters.mesh ? "" : "active"}" data-column-filter-key="mesh" data-column-filter-value=""><ha-icon icon="${this._columnFilters.mesh ? "mdi:access-point-network" : "mdi:check"}"></ha-icon><span>Alle Mesh-Punkte</span><span class="custom-filter-count">${[...meshCounts.values()].reduce((sum, count) => sum + count, 0)}</span></button>${meshOptions}</div></details></th>
-          ${filterInput("rate", "Rate / Signal")}
-          <th data-column="address">${addressFilter}</th>
-          ${filterInput("dns", "DNS / Domain")}
-          <th data-column="source">${sourceFilter}</th>
-          <th data-column="internet">${internetFilter}</th>
-          <th data-column="watch">${watchFilter}</th>
-        </tr>
-      </thead>
-      <tbody>${rows || emptyRow}</tbody>
-    </table>`;
-    grid.querySelectorAll("[data-column]").forEach((cell) => {
-      cell.toggleAttribute("hidden", this._columnVisibility[cell.dataset.column] === false);
-    });
-    if (activeFilterState) {
-      const replacement = grid.querySelector(
-        `${activeFilterState.mobile ? ".mobile-device-controls " : "table "}[data-column-filter="${activeFilterState.key}"]`
-      );
-      replacement?.focus({ preventScroll: true });
-      if (
-        replacement?.setSelectionRange
-        && activeFilterState.start !== null
-        && activeFilterState.end !== null
-      ) {
-        replacement.setSelectionRange(
-          activeFilterState.start,
-          activeFilterState.end,
-          activeFilterState.direction || "none"
-        );
-      }
-    }
-    this.shadowRoot.querySelector(".column-picker").innerHTML = `
-      <div class="column-picker-head"><span>Spalten auswählen</span><button class="column-picker-close" type="button" title="Schließen" aria-label="Spaltenauswahl schließen"><ha-icon icon="mdi:close"></ha-icon></button></div>
-      ${columns.map(([key, label]) =>
-        `<label><input type="checkbox" data-column-toggle="${key}" ${this._columnVisibility[key] === false ? "" : "checked"}>${esc(label)}</label>`
-      ).join("")}`;
+    renderCards.call(this);
   }
 
   _renderLog(resetVerticalScroll = false) {
-    const list = this.shadowRoot.querySelector(".log-list");
-    const previousScrollLeft = list.scrollLeft;
-    const previousScrollTop = list.scrollTop;
-    const filterSummary = this.shadowRoot.querySelector(".log-filter-summary");
-    const filterName = this.shadowRoot.querySelector(".log-filter-name");
-    filterSummary.toggleAttribute("hidden", !this._logDeviceFilter);
-    filterName.textContent = this._logDeviceFilter
-      ? `Gerät: ${this._logDeviceFilter.name}`
-      : "";
-    const icons = {
-      online: "mdi:lan-connect",
-      offline: "mdi:lan-disconnect",
-      renamed: "mdi:rename-box",
-      internet_approval_revoked: "mdi:shield-lock-outline",
-      internet_approval_granted: "mdi:shield-check-outline",
-      inventory_pruned: "mdi:archive-arrow-down-outline",
-      device_forgotten: "mdi:delete-forever-outline",
-      internet_blocked: "mdi:shield-lock-outline",
-      internet_enforcement_failed: "mdi:shield-alert-outline",
-      discovered: "mdi:radar",
-      mesh_changed: "mdi:access-point-network",
-      guest_joined: "mdi:wifi-star",
-      guest_left: "mdi:wifi-off",
-    };
-    const labels = {
-      online: "Online",
-      offline: "Offline",
-      renamed: "Umbenannt",
-      internet_approval_revoked: "Freigabe entzogen",
-      internet_approval_granted: "Freigabe gespeichert",
-      inventory_pruned: "Archiv bereinigt",
-      device_forgotten: "Gerät vergessen",
-      internet_blocked: "Internetzugang gesperrt",
-      internet_enforcement_failed: "Freigabe fehlgeschlagen",
-      discovered: "Neu erkannt",
-      mesh_changed: "Mesh-Wechsel",
-      guest_joined: "Gast verbunden",
-      guest_left: "Gast getrennt",
-    };
-    const logText = (value) => String(value || "").toLocaleLowerCase("de-DE");
-    const contains = (value, needle) => !needle
-      || logText(value).includes(logText(needle));
-    const guestMonitoring = this._monitor.rules?.guest_monitoring_enabled !== false;
-    const guestKeys = new Set((this._monitor.participants || [])
-      .filter((participant) => participant.attributes?.guest_network)
-      .map((participant) => participant.attributes?.nodarion_key || `ip_${participant.attributes?.ip_address}`));
-    const allEvents = [...(this._monitor.events || [])].filter((item) =>
-      guestMonitoring || (!guestKeys.has(item.key) && !["guest_joined", "guest_left"].includes(item.type))
-    );
-    const events = allEvents
-      .filter((item) => {
-        if (this._logDeviceFilter && item.key !== this._logDeviceFilter.key) return false;
-        const stamp = new Date(item.timestamp);
-        const formattedStamp = Number.isNaN(stamp.getTime()) ? item.timestamp : new Intl.DateTimeFormat(activeLocale(), {
-          day:"2-digit", month:"2-digit", year:"numeric",
-          hour:"2-digit", minute:"2-digit", second:"2-digit",
-        }).format(stamp);
-        return contains(`${formattedStamp} ${item.timestamp}`, this._logFilters.time)
-          && contains(`${item.name || ""} ${item.ip || ""}`, this._logFilters.device)
-          && (!this._logFilters.type || item.type === this._logFilters.type)
-          && contains(item.service, this._logFilters.service)
-          && contains(`${item.message || ""} ${item.from_access_point || ""} ${item.to_access_point || ""}`, this._logFilters.details);
-      })
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    const rows = events.map((item) => {
-      const timestamp = new Date(item.timestamp);
-      const time = new Intl.DateTimeFormat(activeLocale(), {
-        hour: "2-digit", minute: "2-digit", second: "2-digit",
-      }).format(timestamp);
-      const date = new Intl.DateTimeFormat(activeLocale(), {
-        day: "2-digit", month: "2-digit", year: "numeric",
-      }).format(timestamp);
-      const message = item.type === "mesh_changed" && item.from_access_point && item.to_access_point
-        ? `<div class="log-route"><span>${esc(item.from_access_point)}</span><ha-icon icon="mdi:arrow-right"></ha-icon><span>${esc(item.to_access_point)}</span></div>`
-        : esc(item.message);
-      return `<tr class="log-entry ${esc(item.type)}">
-        <td data-label="Zeit"><span class="log-time">${esc(time)}</span><span class="log-date">${esc(date)}</span></td>
-        <td data-label="Gerät"><button class="log-device-filter" type="button" data-key="${esc(item.key)}" data-name="${esc(item.name || item.ip)}" title="Live-Log nach ${esc(item.name || item.ip)} filtern"><ha-icon icon="mdi:filter-variant"></ha-icon><span>${esc(item.name || item.ip)}</span></button><div class="log-ip">${esc(item.ip)}</div></td>
-        <td data-label="Ereignis"><div class="log-event"><span class="log-icon"><ha-icon icon="${icons[item.type] || "mdi:information-outline"}"></ha-icon></span>${esc(labels[item.type] || item.type)}</div></td>
-        <td data-label="Dienst"><div class="log-device">${esc(item.service || "Nicht protokolliert")}</div></td>
-        <td data-label="Details"><div class="log-message">${message}</div></td>
-      </tr>`;
-    }).join("");
-    const eventTypes = [...new Set(allEvents.map((item) => item.type).filter(Boolean))]
-      .sort((a, b) => String(labels[a] || a).localeCompare(String(labels[b] || b), "de"));
-    const typeOptions = ["", ...eventTypes].map((type) => {
-      const active = this._logFilters.type === type;
-      const label = type ? (labels[type] || type) : "Alle Ereignisse";
-      const count = type ? allEvents.filter((item) => item.type === type).length : allEvents.length;
-      return `<button type="button" class="custom-filter-option ${active ? "active" : ""}" data-log-filter-key="type" data-log-filter-value="${esc(type)}"><ha-icon icon="${active ? "mdi:check" : (icons[type] || "mdi:format-list-bulleted")}"></ha-icon><span>${esc(label)}</span><span class="custom-filter-count">${count}</span></button>`;
-    }).join("");
-    const selectedType = this._logFilters.type
-      ? (labels[this._logFilters.type] || this._logFilters.type)
-      : "Alle Ereignisse";
-    const filterInput = (key, placeholder) => `<input class="column-filter ${this._logFilters[key] ? "has-value" : ""}" data-log-filter="${key}" value="${esc(this._logFilters[key])}" placeholder="${esc(placeholder)}">`;
-    const emptyRow = `<tr><td colspan="5"><div class="empty"><ha-icon icon="mdi:text-box-search-outline"></ha-icon><strong>Keine Ereignisse gefunden</strong>Filter ändern oder leeren.</div></td></tr>`;
-    list.innerHTML = `<table class="log-table">
-      <thead><tr><th>Zeit ↓</th><th>Gerät</th><th>Ereignis</th><th>Dienst</th><th>Details</th></tr>
-      <tr class="log-filters"><th>${filterInput("time", "Datum / Uhrzeit")}</th><th>${filterInput("device", "Name / IP")}</th><th><details class="custom-column-filter ${this._logFilters.type ? "has-value" : ""}" data-log-filter-key="type"><summary>${esc(selectedType)}</summary><div class="custom-filter-menu">${typeOptions}</div></details></th><th>${filterInput("service", "Dienst")}</th><th>${filterInput("details", "Meldung")}</th></tr></thead>
-      <tbody>${rows || emptyRow}</tbody>
-    </table>`;
-    list.scrollLeft = previousScrollLeft;
-    list.scrollTop = resetVerticalScroll ? 0 : previousScrollTop;
+    renderLog.call(this, resetVerticalScroll);
   }
 
   _renderDnsLive() {
-    const content = this.shadowRoot.querySelector(".dns-live-content");
-    if (!content) return;
-    const hostnameEntries = this._entities().map((entity) => [
-      String(entity.attributes.ip_address || ""),
-      entity.attributes.hostname
-        || entity.attributes.friendly_name
-        || entity.attributes.ip_address,
-    ]);
-    const hostnames = new Map(hostnameEntries);
-    const renderSignature = JSON.stringify({
-      entries: this._dnsLive.entries,
-      series: this._dnsLive.series,
-      client: this._dnsLive.client,
-      name: this._dnsLive.name,
-      updated_at: this._dnsLive.updated_at,
-      error: this._dnsLive.error,
-      filters: this._dnsLiveFilters,
-      paused: this._dnsLivePaused,
-      chart_visible: this._dnsChartVisible,
-      initial_loading: !this._dnsLive.entries.length && this._dnsLiveLoading,
-      hostnames: hostnameEntries,
-      adguard_config: this._adguardConfig,
-      policy_prompt: this._dnsPolicyPrompt,
-      dns_provider: this._dnsProvider(),
-      is_admin: Boolean(this._hass?.user?.is_admin),
-    });
-    if (renderSignature === this._dnsRenderedSignature) return;
-    this._dnsRenderedSignature = renderSignature;
-    const domainNeedle = this._dnsLiveFilters.domain.toLocaleLowerCase("de-DE");
-    const entries = (this._dnsLive.entries || []).filter((item) => {
-      if (
-        domainNeedle
-        && !String(item.domain || "").toLocaleLowerCase("de-DE").includes(domainNeedle)
-      ) return false;
-      if (this._dnsLiveFilters.status === "blocked" && !item.blocked) return false;
-      if (this._dnsLiveFilters.status === "allowed" && item.blocked) return false;
-      return true;
-    });
-    const rows = entries.map((item) => {
-      const timestamp = new Date(item.time);
-      const time = Number.isNaN(timestamp.getTime()) ? "–" : new Intl.DateTimeFormat(
-        activeLocale(),
-        {
-          day: "2-digit", month: "2-digit", hour: "2-digit",
-          minute: "2-digit", second: "2-digit",
-        }
-      ).format(timestamp);
-      const resultLabel = item.blocked ? "Blockiert" : "Erlaubt";
-      const resultIcon = item.blocked
-        ? "mdi:shield-lock-outline"
-        : "mdi:shield-check-outline";
-      const rawStatus = String(item.status || "");
-      const reason = item.blocked
-        ? blockReason(item.reason)
-        : rawStatus.toUpperCase() === "NOERROR" ? "OK" : (rawStatus || "Verarbeitet");
-      const dnsServer = item.dns_server || (item.cached ? "Cache" : item.upstream) || this._dnsProvider().name;
-      const answer = (item.answer || []).join(", ") || "–";
-      const elapsed = Number(item.elapsed_ms);
-      const elapsedFormatted = Number.isFinite(elapsed)
-        ? new Intl.NumberFormat(activeLocale(), {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }).format(elapsed)
-        : null;
-      const hostname = hostnames.get(String(item.client || "")) || "Nicht erkannt";
-      const domain = String(item.domain || "");
-      const policyActions = this._hass?.user?.is_admin && domain
-        ? item.blocked
-          ? `<div class="dns-policy-actions"><button class="dns-policy allow" type="button" data-domain="${esc(domain)}" data-client="${esc(item.client || "")}" data-policy="allow">Freigeben</button></div>`
-          : `<div class="dns-policy-actions"><button class="dns-policy block" type="button" data-domain="${esc(domain)}" data-policy="block">Blockieren</button></div>`
-        : "–";
-      return `<tr class="dns-row ${item.blocked ? "blocked" : "allowed"}">
-        <td data-label="Zeit" class="mono">${esc(time)}</td>
-        <td data-label="Ergebnis"><div class="dns-result"><ha-icon icon="${resultIcon}"></ha-icon>${resultLabel}</div></td>
-        <td data-label="Domain / Antwort"><div class="dns-domain">${esc(item.domain || "–")}</div><div class="dns-answer" title="${esc(answer)}">${esc(answer)}</div></td>
-        <td data-label="Typ"><span class="dns-chip">${esc(item.query_type || "–")}</span></td>
-        <td data-label="Client-IP" class="mono">${esc(item.client || "–")}</td>
-        <td data-label="Hostname">${item.client ? `<button class="dns-host-link" type="button" data-client="${esc(item.client)}" data-name="${esc(hostname)}" title="DNS-Live nach ${esc(hostname)} filtern"><ha-icon icon="mdi:filter-variant"></ha-icon><span>${esc(hostname)}</span></button><div class="log-ip">${esc(item.client)}</div>` : esc(hostname)}</td>
-        <td data-label="DNS-Server"><span class="dns-chip" title="Für diese Anfrage verwendete DNS-Quelle">${esc(dnsServer)}</span></td>
-        <td data-label="Grund">${esc(reason)}</td>
-        <td data-label="Dauer" class="mono">${elapsedFormatted ? `${esc(elapsedFormatted)} ms` : "–"}</td>
-        <td data-label="Aktion">${policyActions}</td>
-      </tr>`;
-    }).join("");
-    const updated = this._dnsLive.updated_at
-      ? new Intl.DateTimeFormat(activeLocale(), {
-          hour: "2-digit", minute: "2-digit", second: "2-digit",
-        }).format(new Date(this._dnsLive.updated_at))
-      : "–";
-    const clientLabel = this._dnsLive.name
-      ? `${this._dnsLive.name} · ${this._dnsLive.client}`
-      : this._dnsLive.client;
-    const series = this._dnsLive.series || [];
-    const chartMax = Math.max(
-      1,
-      ...series.flatMap((bucket) => [
-        Number(bucket.allowed || 0),
-        Number(bucket.blocked || 0),
-      ])
-    );
-    const allowedTotal = series.reduce(
-      (sum, bucket) => sum + Number(bucket.allowed || 0), 0
-    );
-    const blockedTotal = series.reduce(
-      (sum, bucket) => sum + Number(bucket.blocked || 0), 0
-    );
-    const adguardStats = [
-      ["sensor.nodarion_dns_anfragen", "DNS-Anfragen"],
-      ["sensor.nodarion_dns_blockiert", "Blockiert"],
-      ["sensor.nodarion_dns_blockquote", "Blockquote"],
-      ["sensor.nodarion_dns_verarbeitungszeit", "Verarbeitungszeit"],
-    ].filter(([entityId]) => this._dnsProvider().id !== "pihole" || entityId !== "sensor.nodarion_dns_verarbeitungszeit").map(([entityId, label]) => {
-      const entity = this._hass.states[entityId];
-      const value = entity && !["unknown", "unavailable"].includes(entity.state)
-        ? `${entity.state}${entity.attributes.unit_of_measurement ? ` ${entity.attributes.unit_of_measurement}` : ""}`
-        : "–";
-      return `<button class="adguard-stat metric-entity-link" type="button" data-entity-id="${entityId}" title="Home-Assistant-Dialog öffnen"><span>${label}</span><strong>${esc(value)}</strong></button>`;
-    }).join("");
-    const chartBars = series.map((bucket, index) => {
-      const allowed = Number(bucket.allowed || 0);
-      const blocked = Number(bucket.blocked || 0);
-      const stamp = new Date(bucket.time);
-      const hour = Number.isNaN(stamp.getTime())
-        ? "–"
-        : new Intl.DateTimeFormat(activeLocale(), { hour: "2-digit" }).format(stamp);
-      const fullTime = Number.isNaN(stamp.getTime())
-        ? "–"
-        : new Intl.DateTimeFormat(activeLocale(), {
-            day: "2-digit", month: "2-digit", hour: "2-digit",
-            minute: "2-digit",
-          }).format(stamp);
-      const allowedHeight = allowed ? Math.max(2, allowed * 100 / chartMax) : 0;
-      const blockedHeight = blocked ? Math.max(2, blocked * 100 / chartMax) : 0;
-      return `<div class="dns-chart-bucket" title="${esc(fullTime)} · ${allowed} erlaubt · ${blocked} blockiert">
-        <div class="dns-chart-columns">
-          <i class="dns-chart-bar allowed" style="height:${allowedHeight}%"></i>
-          <i class="dns-chart-bar blocked" style="height:${blockedHeight}%"></i>
-        </div>
-        <span class="dns-chart-label">${index % 4 === 0 || index === series.length - 1 ? esc(hour) : ""}</span>
-      </div>`;
-    }).join("");
-    const policyPrompt = this._dnsPolicyPrompt;
-    const policyModal = policyPrompt ? `
-      <div class="dns-policy-modal-backdrop" role="presentation">
-        <section class="dns-policy-modal" role="dialog" aria-modal="true" aria-labelledby="dns-policy-title">
-          <h3 id="dns-policy-title"><ha-icon icon="mdi:shield-check-outline"></ha-icon>Domain freigeben</h3>
-          <p>Soll <strong>${esc(policyPrompt.domain)}</strong> ${this._dnsProvider().id === "pihole" ? "für alle derzeit konfigurierten Pi-hole-Gruppen freigegeben werden?" : "nur für diesen Client oder für alle Geräte freigegeben werden?"}</p>
-          <div class="dns-policy-scope-actions">
-            <button class="dns-policy-scope" type="button" data-dns-policy-scope="client" ${this._dnsProvider().id === "pihole" ? "hidden" : ""} ${policyPrompt.client ? "" : "disabled"}><ha-icon icon="mdi:laptop"></ha-icon>Nur dieser Client · ${esc(policyPrompt.client || "unbekannt")}</button>
-            <button class="dns-policy-scope" type="button" data-dns-policy-scope="all"><ha-icon icon="mdi:lan"></ha-icon>Für alle Clients</button>
-            <button class="dns-policy-scope cancel" type="button" data-dns-policy-scope="cancel">Abbrechen</button>
-          </div>
-        </section>
-      </div>` : "";
-    content.innerHTML = `
-      <div class="dns-head">
-        <div><h2><ha-icon icon="mdi:dns-outline"></ha-icon>${esc(this._dnsProvider().name)} DNS-Live</h2><p>Neueste DNS-Anfragen · zuletzt aktualisiert ${esc(updated)} · automatisch alle 3 Sekunden</p></div>
-        <div class="dns-head-tools">
-          <section class="dns-live-stats dns-quick-stats"><h3>Letzte 24 Stunden</h3><div class="adguard-stat-grid">${adguardStats}</div></section>
-          <div class="dns-actions">
-            <button class="dns-action dns-chart-toggle" type="button" title="Stundendiagramm ${this._dnsChartVisible ? "ausblenden" : "einblenden"}"><ha-icon icon="${this._dnsChartVisible ? "mdi:chart-box-outline" : "mdi:chart-box-plus-outline"}"></ha-icon>Diagramm ${this._dnsChartVisible ? "aus" : "an"}</button>
-            <button class="dns-action dns-pause" type="button"><ha-icon icon="${this._dnsLivePaused ? "mdi:play" : "mdi:pause"}"></ha-icon>${this._dnsLivePaused ? "Fortsetzen" : "Pause"}</button>
-            <button class="dns-action dns-refresh ${this._dnsLiveLoading ? "busy" : ""}" type="button" ${this._dnsLiveLoading ? "disabled" : ""}><ha-icon icon="mdi:refresh"></ha-icon>Aktualisieren</button>
-          </div>
-        </div>
-      </div>
-      ${this._dnsLive.error ? `<div class="dns-error"><strong>DNS-Log nicht verfügbar:</strong> ${esc(this._dnsLive.error)}</div>` : ""}
-      ${this._dnsChartVisible ? `<div class="dns-chart">
-        <div class="dns-chart-head">
-          <span class="dns-chart-title">DNS-Anfragen der letzten ${series.length || 24} Stunden${this._dnsLive.client ? ` · ${esc(clientLabel)}` : ""}</span>
-          <div class="dns-chart-legend">
-            <span style="--legend-color:var(--ns-green)"><i></i>${allowedTotal} erlaubt</span>
-            <span style="--legend-color:var(--ns-red)"><i></i>${blockedTotal} blockiert</span>
-          </div>
-        </div>
-        <div class="dns-chart-bars">${chartBars}</div>
-      </div>` : ""}
-      <div class="dns-toolbar">
-        <input data-dns-filter="domain" value="${esc(this._dnsLiveFilters.domain)}" placeholder="Domain durchsuchen …">
-        <details class="custom-column-filter dns-status-select">
-          <summary>${this._dnsLiveFilters.status === "allowed" ? "Nur erlaubt" : this._dnsLiveFilters.status === "blocked" ? "Nur blockiert" : "Alle Ergebnisse"}</summary>
-          <div class="custom-filter-menu">
-            <button type="button" class="custom-filter-option ${this._dnsLiveFilters.status === "all" ? "active" : ""}" data-dns-status="all"><ha-icon icon="${this._dnsLiveFilters.status === "all" ? "mdi:check" : "mdi:format-list-bulleted"}"></ha-icon><span>Alle Ergebnisse</span></button>
-            <button type="button" class="custom-filter-option ${this._dnsLiveFilters.status === "allowed" ? "active" : ""}" data-dns-status="allowed"><ha-icon icon="${this._dnsLiveFilters.status === "allowed" ? "mdi:check" : "mdi:shield-check-outline"}"></ha-icon><span>Nur erlaubt</span></button>
-            <button type="button" class="custom-filter-option ${this._dnsLiveFilters.status === "blocked" ? "active" : ""}" data-dns-status="blocked"><ha-icon icon="${this._dnsLiveFilters.status === "blocked" ? "mdi:check" : "mdi:shield-off-outline"}"></ha-icon><span>Nur blockiert</span></button>
-          </div>
-        </details>
-        ${this._dnsLive.client ? `<div class="dns-client-filter"><ha-icon icon="mdi:filter-outline"></ha-icon>${esc(clientLabel)}<button class="dns-client-clear" type="button" title="IP-Filter aufheben"><ha-icon icon="mdi:close"></ha-icon></button></div>` : `<div class="dns-client-filter"><ha-icon icon="mdi:earth"></ha-icon>Alle Clients</div>`}
-      </div>
-      <div class="dns-list">
-        ${rows ? `<table class="dns-table">
-          <thead><tr><th>Zeit</th><th>Ergebnis</th><th>Domain / Antwort</th><th>Typ</th><th>Client-IP</th><th>Hostname</th><th>DNS-Server</th><th>Grund</th><th>Dauer</th><th>Aktion</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>` : `<div class="empty"><ha-icon icon="${this._dnsLiveLoading ? "mdi:progress-clock" : "mdi:dns-outline"}"></ha-icon><strong>${this._dnsLiveLoading ? "DNS-Anfragen werden geladen" : "Keine passenden DNS-Anfragen"}</strong>${this._dnsLiveLoading ? "Einen kleinen Moment …" : "Filter ändern oder auf neue Anfragen warten."}</div>`}
-      </div>
-      ${policyModal}`;
+    renderDnsLive.call(this);
   }
 
   _renderAi() {
-    const panel = this.shadowRoot.querySelector(".ai-view");
-    if (!panel) return;
-    const ai = this._monitor.ai_analysis || {};
-    const reports = ai.reports || [];
-    const latestReport = reports[0];
-    const previousReport = reports[1];
-    const score = Number(latestReport?.score || 0);
-    const scoreDelta = latestReport && previousReport
-      ? score - Number(previousReport.score || 0)
-      : null;
-    const scoreClass = score <= 3 ? "bad" : score <= 6 ? "warn" : "";
-    const reportTime = latestReport?.timestamp
-      ? new Intl.DateTimeFormat(activeLocale(), {
-          dateStyle: "medium", timeStyle: "short",
-        }).format(new Date(latestReport.timestamp))
-      : "–";
-    const history = reports.slice(0, 14).reverse().map((report) => {
-      const stamp = new Intl.DateTimeFormat(activeLocale(), {
-        dateStyle: "short",
-      }).format(new Date(report.timestamp));
-      return `<i class="ai-history-bar" style="--score:${Number(report.score || 1)}" title="${esc(stamp)} · ${Number(report.score || 0)}/10"></i>`;
-    }).join("");
-    const aiReportHtml = latestReport ? `
-      <div class="ai-report">
-        <div class="ai-score ${scoreClass}">
-          <strong>${score}</strong><span>von 10</span>
-          <small>${scoreDelta === null ? "Erste Bewertung" : scoreDelta > 0 ? `▲ ${scoreDelta} zum Vortag` : scoreDelta < 0 ? `▼ ${Math.abs(scoreDelta)} zum Vortag` : "● unverändert"}</small>
-        </div>
-        <div class="ai-copy">
-          <article class="summary"><h3>Zusammenfassung</h3><p>${esc(latestReport.summary)}</p></article>
-          <article><h3>Auffälligkeiten</h3><p>${esc(latestReport.risks)}</p></article>
-          <article><h3>Änderungen</h3><p>${esc(latestReport.changes)}</p></article>
-          <article><h3>Empfehlungen</h3><p>${esc(latestReport.recommendations)}</p></article>
-          <article><h3>Vertrauen und Datenlage</h3><p>${esc(latestReport.confidence)}</p></article>
-        </div>
-      </div>
-      ${history ? `<div class="ai-history" aria-label="Bewertungsverlauf">${history}</div>` : ""}`
-      : `<div class="ai-empty">Noch keine KI-Auswertung vorhanden. Aktiviere den täglichen Bericht oder starte die erste Analyse manuell.</div>`;
-    panel.innerHTML = `
-      <section class="ai-panel">
-        <div class="ai-head">
-          <div><h2><ha-icon icon="mdi:creation-outline"></ha-icon>KI-Netzwerkanalyse</h2><p>24-Stunden-Bewertung mit Tagesvergleich · letzter Bericht ${esc(reportTime)}</p></div>
-          <div class="ai-actions">
-            <button class="ai-prompt-toggle" type="button" ${latestReport?.prompt ? "" : "disabled"}><ha-icon icon="mdi:code-json"></ha-icon>Prompt anzeigen</button>
-            <button class="ai-run ${ai.running ? "busy" : ""}" type="button" ${ai.running ? "disabled" : ""}><ha-icon icon="mdi:creation-outline"></ha-icon>${ai.running ? "Analyse läuft …" : "Jetzt analysieren"}</button>
-          </div>
-        </div>
-        ${ai.last_error ? `<div class="ai-error"><strong>Letzte Analyse fehlgeschlagen:</strong> ${esc(ai.last_error)}</div>` : ""}
-        ${latestReport?.prompt ? `<pre class="ai-prompt" hidden>${esc(latestReport.prompt)}</pre>` : ""}
-        ${aiReportHtml}
-      </section>`;
+    renderAi.call(this);
   }
 
   _renderWatch() {
-    const panel = this.shadowRoot.querySelector(".watch-view");
-    const summary = this._monitor.summary || {};
-    const rules = {
-      enabled: true,
-      learning_days: 7,
-      presence_timeout_minutes: 5,
-      presence_sensor_enabled: false,
-      onboarding_enabled: true,
-      onboarding_auto_range: true,
-      onboarding_start: "192.168.178.200",
-      onboarding_end: "192.168.178.250",
-      onboarding_auto_monitor: false,
-      onboarding_notify: false,
-      new_device_minutes: 5,
-      quiet_hours_enabled: true,
-      guest_monitoring_enabled: true,
-      guest_new_enabled: true,
-      guest_quiet_enabled: true,
-      guest_max_hours: 8,
-      quiet_start: "23:00",
-      quiet_end: "06:00",
-      flap_limit: 6,
-      offline_minutes: 10,
-      identity_changes: true,
-      notify_alerts: false,
-      notify_targets: [],
-      notify_warning: true,
-      notify_critical: true,
-      ai_analysis_enabled: false,
-      ai_analysis_time: "03:15",
-      ai_privacy: "anonymized",
-      ...(this._monitor.rules || {}),
-      ...(this._settingsDraft || {}),
-    };
-    const selectedNotifyTargets = new Set(rules.notify_targets || []);
-    const notifyEntities = Object.values(this._hass?.states || {})
-      .filter((state) => state.entity_id.startsWith("notify."))
-      .sort((a, b) => String(a.attributes?.friendly_name || a.entity_id)
-        .localeCompare(String(b.attributes?.friendly_name || b.entity_id), "de"));
-    const notifyQuery = this._notifyTargetQuery.trim().toLocaleLowerCase("de-DE");
-    const selectedNotifyCount = notifyEntities.filter((state) =>
-      selectedNotifyTargets.has(state.entity_id)
-    ).length;
-    const notifyTargetHtml = notifyEntities.length
-      ? notifyEntities.map((state) => {
-        const name = state.attributes?.friendly_name || state.entity_id;
-        const telegram = state.entity_id.includes("telegram_bot");
-        const companion = state.entity_id.includes("mobile_app");
-        const channel = telegram ? "Telegram" : companion ? "Companion App" : "Home Assistant";
-        const icon = telegram ? "mdi:send" : companion ? "mdi:cellphone-message" : "mdi:bell-outline";
-        const hidden = notifyQuery
-          && !`${name} ${state.entity_id} ${channel}`.toLocaleLowerCase("de-DE").includes(notifyQuery);
-        return `<label class="notify-target" title="${esc(state.entity_id)}" ${hidden ? "hidden" : ""}><input type="checkbox" data-notify-target="${esc(state.entity_id)}" ${selectedNotifyTargets.has(state.entity_id) ? "checked" : ""}><span class="notify-target-icon ${telegram ? "telegram" : ""}"><ha-icon icon="${icon}"></ha-icon></span><span class="notify-target-copy"><strong>${esc(name)}</strong><small>${channel}</small></span><span class="notify-target-check"><ha-icon icon="mdi:check"></ha-icon></span></label>`;
-      }).join("")
-      : `<div class="notify-target-empty">Noch kein <code>notify.*</code>-Ziel in Home Assistant vorhanden.</div>`;
-    const learning = this._monitor.learning || {};
-    const learningEnd = learning.ends_at
-      ? new Intl.DateTimeFormat(activeLocale(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(learning.ends_at))
-      : "–";
-    const learningRemainingMs = learning.ends_at
-      ? Math.max(0, new Date(learning.ends_at).getTime() - Date.now())
-      : 0;
-    const learningRemaining = formatRemainingDuration(learningRemainingMs);
-    const icons = {
-      new_device: "mdi:account-question-outline",
-      quiet_activity: "mdi:weather-night",
-      flapping: "mdi:pulse",
-      identity_changed: "mdi:swap-horizontal-bold",
-      vlan_changed: "mdi:lan-disconnect",
-      important_offline: "mdi:lan-disconnect",
-      guest_new: "mdi:wifi-star",
-      guest_quiet: "mdi:weather-night-partly-cloudy",
-      guest_long: "mdi:timer-alert-outline",
-    };
-    const labels = {
-      new_device: "Unbekanntes Gerät",
-      quiet_activity: "Aktivität zur Ruhezeit",
-      flapping: "Instabile Verbindung",
-      identity_changed: "Identität geändert",
-      vlan_changed: "VLAN gewechselt",
-      important_offline: "Wichtiges Gerät offline",
-      guest_new: "Neuer Gast",
-      guest_quiet: "Gast zur Ruhezeit",
-      guest_long: "Gast lange verbunden",
-    };
-    const participantEntities = this._entities();
-    const entityIdByKey = new Map(participantEntities.map((entity) => [
-      entity.attributes.nodarion_key || `ip_${entity.attributes.ip_address}`,
-      entity.entity_id,
-    ]));
-    const entityByKey = new Map(participantEntities.map((entity) => [
-      entity.attributes.nodarion_key || `ip_${entity.attributes.ip_address}`,
-      entity,
-    ]));
-    const guestKeys = new Set((this._monitor.participants || [])
-      .filter((participant) => participant.attributes?.guest_network)
-      .map((participant) => participant.attributes?.nodarion_key || `ip_${participant.attributes?.ip_address}`));
-    const guestAlertTypes = new Set(["guest_new", "guest_quiet", "guest_long"]);
-    const alerts = [...(this._monitor.alerts || [])]
-      .filter((alert) => rules.guest_monitoring_enabled || (!guestKeys.has(alert.key) && !guestAlertTypes.has(alert.type)))
-      .sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)) || new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, 30);
-    const alertHtml = alerts.length ? alerts.map((alert) => {
-      const active = alert.active && !alert.acknowledged;
-      const alertEntityId = entityIdByKey.get(alert.key);
-      const alertEntity = entityByKey.get(alert.key);
-      const canApprove = active
-        && alert.type === "new_device"
-        && Boolean(alertEntity?.attributes?.internet_approval_required)
-        && !alertEntity?.attributes?.guest_network
-        && !alertEntity?.attributes?.vpn_connection;
-      const time = new Intl.DateTimeFormat(activeLocale(), {
-        dateStyle: "short", timeStyle: "short",
-      }).format(new Date(alert.timestamp));
-      return `<article class="alert-item ${esc(alert.severity)} ${active ? "" : "resolved"}">
-        <div class="alert-symbol"><ha-icon icon="${icons[alert.type] || "mdi:alert-circle-outline"}"></ha-icon></div>
-        <div>
-          <div class="alert-name">${esc(labels[alert.type] || "Netzwerkhinweis")} · ${alertEntityId ? `<button class="watch-entity-link" type="button" data-entity-id="${esc(alertEntityId)}" title="Home-Assistant-Dialog öffnen">${esc(alert.name || alert.ip)}</button>` : esc(alert.name || alert.ip)}</div>
-          <div class="alert-message">${esc(alert.message)}</div>
-          <div class="alert-time">${esc(time)} · ${esc(alert.ip)}${active ? "" : " · Erledigt"}</div>
-        </div>
-        ${active ? `<div class="alert-actions">${canApprove ? `<button class="alert-action alert-approve" data-key="${esc(alert.key)}" data-name="${esc(alert.name || alert.ip)}">Freigeben</button>` : ""}${alertEntityId ? `<button class="alert-action watch-entity-link" data-entity-id="${esc(alertEntityId)}">Details</button>` : ""}${alert.key && !this._monitor.monitored.includes(alert.key) ? `<button class="alert-action alert-monitor" data-key="${esc(alert.key)}">Überwachen</button>` : ""}<button class="ack" data-alert-id="${esc(alert.id)}">Erledigen</button></div>` : ""}
-      </article>`;
-    }).join("") : `<div class="empty"><ha-icon icon="mdi:shield-check-outline"></ha-icon><strong>Alles ruhig im Netz</strong>Erkannte Auffälligkeiten erscheinen automatisch hier.</div>`;
-
-    const presenceKeys = new Set(this._monitor.presence_devices || []);
-    const presenceEntities = participantEntities.filter((entity) =>
-      presenceKeys.has(entity.attributes.nodarion_key)
-    );
-    const timelineEnd = Date.now();
-    const timelineStart = timelineEnd - 24 * 60 * 60 * 1000;
-    const presenceRows = presenceEntities
-      .sort((a, b) => String(a.attributes.hostname || a.attributes.friendly_name || "")
-        .localeCompare(String(b.attributes.hostname || b.attributes.friendly_name || "")))
-      .map((entity) => {
-        const key = entity.attributes.nodarion_key;
-        const name = entity.attributes.hostname || entity.attributes.friendly_name
-          || entity.attributes.ip_address || key;
-        const currentHome = entity.state === "on";
-        const changes = (this._monitor.events || [])
-          .filter((item) => item.key === key && ["online", "offline"].includes(item.type))
-          .map((item) => ({ time: new Date(item.timestamp).getTime(), home: item.type === "online" }))
-          .filter((item) => Number.isFinite(item.time) && item.time <= timelineEnd)
-          .sort((a, b) => a.time - b.time);
-        const before = changes.filter((item) => item.time <= timelineStart).at(-1);
-        const within = changes.filter((item) => item.time > timelineStart);
-        let home = before ? before.home : within.length ? !within[0].home : currentHome;
-        let cursor = timelineStart;
-        const segments = [];
-        [...within, { time: timelineEnd, home: currentHome }].forEach((change) => {
-          const end = Math.min(timelineEnd, Math.max(cursor, change.time));
-          if (home && end > cursor) segments.push([cursor, end]);
-          cursor = end;
-          home = change.home;
-        });
-        if (home && cursor < timelineEnd) segments.push([cursor, timelineEnd]);
-        const bars = segments.map(([start, end]) => {
-          const left = ((start - timelineStart) / (timelineEnd - timelineStart)) * 100;
-          const width = ((end - start) / (timelineEnd - timelineStart)) * 100;
-          return `<i class="presence-segment" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"></i>`;
-        }).join("");
-        const lastChange = changes.at(-1)?.time;
-        const changed = lastChange ? new Intl.DateTimeFormat(activeLocale(), {
-          hour: "2-digit", minute: "2-digit",
-        }).format(new Date(lastChange)) : null;
-        return `<div class="presence-row ${currentHome ? "home" : "away"}">
-          <div class="presence-person"><i class="presence-dot"></i><button class="presence-name watch-entity-link" type="button" data-entity-id="${esc(entity.entity_id)}" title="Home-Assistant-Dialog öffnen">${esc(name)}</button><small class="presence-state">${currentHome ? "Zuhause" : "Abwesend"}${changed ? ` · seit ${esc(changed)} Uhr` : ""}</small></div>
-          <div><div class="presence-timeline" title="Anwesenheit in den letzten 24 Stunden">${bars}</div><div class="presence-axis"><span>vor 24 Std.</span><span>vor 18 Std.</span><span>vor 12 Std.</span><span>vor 6 Std.</span><span>jetzt</span></div></div>
-        </div>`;
-      }).join("");
-    const homeCount = presenceEntities.filter((entity) => entity.state === "on").length;
-    const presenceSensorEntity = Object.values(this._hass?.states || {}).find(
-      (state) => state.attributes?.nodarion_presence_summary
-    ) || this._hass?.states?.["binary_sensor.nodarion_anwesenheit"];
-    const presenceSensorOn = presenceSensorEntity
-      ? presenceSensorEntity.state === "on"
-      : homeCount > 0;
-    const presenceSensorButton = rules.presence_sensor_enabled ? `<button class="presence-sensor-link ${presenceSensorOn ? "on" : "off"}" type="button" data-entity-id="${esc(presenceSensorEntity?.entity_id || "binary_sensor.nodarion_anwesenheit")}" title="Home-Assistant-Dialog des Anwesenheitssensors öffnen"><ha-icon icon="${presenceSensorOn ? "mdi:home-account" : "mdi:home-outline"}"></ha-icon><span>Anwesenheit: ${presenceSensorOn ? "Anwesend" : "Abwesend"}</span></button>` : "";
-    const presenceHtml = presenceRows ? `
-      <section class="watch-panel presence-overview">
-        <div class="watch-heading"><div><h2>Anwesenheit</h2><p>Aktueller Zustand und Verlauf der letzten 24 Stunden.</p></div>${presenceSensorButton}</div>
-        <div class="presence-summary"><ha-icon icon="${homeCount ? "mdi:home-account" : "mdi:home-export-outline"}"></ha-icon><strong>${homeCount ? `${homeCount} von ${presenceEntities.length} zuhause` : "Niemand zuhause"}</strong><span>· basiert auf den markierten Home-Geräten</span></div>
-        <div class="presence-list">${presenceRows}</div>
-      </section>` : `
-      <section class="watch-panel presence-overview">
-        ${presenceSensorButton ? `<div class="watch-heading"><div><h2>Anwesenheit</h2><p>Der Anwesenheitssensor ist aktiviert.</p></div>${presenceSensorButton}</div>` : ""}<div class="empty"><ha-icon icon="mdi:home-plus-outline"></ha-icon><strong>Noch keine Anwesenheitsgeräte</strong>Markiere Teilnehmer in der Tabelle mit dem Haus-Symbol.</div>
-      </section>`;
-
-    const offlineEntities = participantEntities.filter((entity) => entity.state !== "on");
-    const offlineKeys = new Set(offlineEntities.map((entity) => entity.attributes.nodarion_key));
-    const protectedOffline = [...offlineKeys].filter((key) =>
-      this._monitor.monitored.includes(key)
-      || this._monitor.presence_devices.includes(key)
-      || this._monitor.known_hosts.includes(key)
-    ).length;
-    const checked = (value) => value ? "checked" : "";
-    const segmentRoleLabels = {
-      trusted:"Vertrauenswürdig",
-      restricted:"Eingeschränkt",
-      guest:"Gast",
-      isolated:"Isoliert",
-      infrastructure:"Infrastruktur",
-    };
-    const networkSegments = Array.isArray(rules.network_segments)
-      ? rules.network_segments : [];
-    const networkSegmentRows = networkSegments.map((segment, index) => {
-      const roleOptions = Object.entries(segmentRoleLabels).map(([value, label]) =>
-        `<option value="${value}" ${segment.role === value ? "selected" : ""}>${label}</option>`
-      ).join("");
-      const color = /^#[0-9a-f]{6}$/i.test(String(segment.color || ""))
-        ? segment.color : "#58b9d6";
-      return `<div class="vlan-row" data-vlan-row data-segment-id="${esc(segment.id || `segment-${index + 1}`)}" style="--vlan-color:${esc(color)}">
-        <label class="vlan-field name"><span>Name</span><input type="text" maxlength="48" data-segment-field="name" value="${esc(segment.name || "")}" required></label>
-        <label class="vlan-field"><span>VLAN-ID</span><input type="number" min="1" max="4094" data-segment-field="vlan_id" value="${Number(segment.vlan_id || 1)}" required></label>
-        <label class="vlan-field network"><span>Subnetz</span><input type="text" data-segment-field="network" value="${esc(segment.network || "")}" placeholder="192.168.20.0/24" required></label>
-        <label class="vlan-field"><span>Rolle</span><select data-segment-field="role">${roleOptions}</select></label>
-        <label class="vlan-field"><span>Farbe</span><input type="color" data-segment-field="color" value="${esc(color)}"></label>
-        <label class="vlan-field monitoring"><span>Überwachung</span><input type="checkbox" data-segment-field="monitoring" ${checked(segment.monitoring)}></label>
-        <button class="vlan-remove" type="button" data-segment-index="${index}" title="VLAN entfernen" aria-label="VLAN ${esc(segment.name || String(segment.vlan_id))} entfernen" ${networkSegments.length <= 1 ? "disabled" : ""}><ha-icon icon="mdi:delete-outline"></ha-icon></button>
-      </div>`;
-    }).join("");
-    const settingsTitles = {
-      general: ["Allgemeine Einstellungen", "Grundlagen, Lernphase und VLANs"],
-      devices: ["Geräteeinstellungen", "Neue Geräte, Gastzugang und Bereinigung"],
-      rules: ["Überwachungseinstellungen", "Regeln, Ruhezeiten und weitere Prüfungen"],
-      notifications: ["Benachrichtigungen", "Home-Assistant-Meldungen und Benachrichtigungsziele"],
-      dns: ["DNS-Einstellungen", "Schutzfunktionen, Statistiken und Filterverwaltung"],
-      "ai-maintenance": ["KI-Einstellungen", "Tägliche Netzbewertung und DNS-Datenschutz"],
-    };
-    const settingsTitle = settingsTitles[this._settingsTab] || settingsTitles.general;
-    const adguardSwitches = (this._dnsProvider().id === "pihole" ? [["switch.nodarion_pihole_gesamtschutz", "Pi-hole DNS-Schutz", "DNS-Blockierung ein- oder ausschalten"]] : [
-      ["switch.nodarion_adguard_gesamtschutz", "Gesamtschutz", "Master-Schalter für sämtliche Schutzfunktionen"],
-      ["switch.nodarion_adguard_dns_filterung", "DNS-Filterung", "Blocklisten und eigene Filterregeln anwenden"],
-      ["switch.nodarion_adguard_safe_browsing", "Safe Browsing", "Phishing- und Malware-Domains blockieren"],
-      ["switch.nodarion_adguard_jugendschutz", "Jugendschutz", "Nicht jugendfreie Inhalte blockieren"],
-      ["switch.nodarion_adguard_safe_search", "Safe Search", "Sichere Suche bei Suchmaschinen erzwingen"],
-      ["switch.nodarion_adguard_query_log", "Query-Log", "Für DNS-Live, Gerätezuordnung und KI erforderlich"],
-    ]).map(([entityId, label, note]) => {
-      const state = this._hass.states[entityId]?.state;
-      return `<button class="adguard-feature ${state === "on" ? "active" : ""}" type="button" data-adguard-switch data-entity-id="${entityId}"><span><strong>${label}</strong><small>${note}</small></span><span class="adguard-feature-state">${state === "on" ? "An" : state === "off" ? "Aus" : "–"}</span></button>`;
-    }).join("");
-    const piHoleRules = this._dnsProvider().id === "pihole" ? `
-      <section class="rule-group pihole-domain-settings">
-        <h3>Pi-hole · Domains</h3>
-        <p>Exakte Domains für alle derzeit konfigurierten Pi-hole-Gruppen freigeben oder sperren. Regex-Regeln und Gruppenzuordnungen bleiben in Pi-hole verwaltbar.</p>
-        <form class="pihole-domain-form"><label>Domain<input name="domain" type="text" required placeholder="example.com" autocomplete="off"></label><label>Aktion<select name="policy"><option value="allow">Freigeben</option><option value="block">Sperren</option></select></label><button type="submit" class="dns-action">Speichern</button></form>
-        ${this._adguardConfig.error ? `<p role="alert">${esc(this._adguardConfig.error)}</p>` : ""}
-        ${this._adguardConfig.loading ? `<p>Domain-Regeln werden geladen …</p>` : ""}
-        <div class="pihole-domain-list">${(this._adguardConfig.rules || []).map(rule => `<div><span>${rule.startsWith("@@") ? "Freigegeben" : "Gesperrt"} · ${esc(rule.replace(/^@@\|\||^\|\|/g, "").replace(/\^$/, ""))}</span><button type="button" class="dns-action" data-pihole-remove="${esc(rule)}" aria-label="Domain-Regel entfernen">×</button></div>`).join("")}</div>
-        <p>Die Anfragen müssen in Pi-hole einzelnen Clients zugeordnet sein. Datenschutz oder deaktivierte Protokollierung können Details ausblenden. Nicht verfügbare AdGuard-Funktionen werden hier nicht angeboten.</p>
-      </section>` : "";
-    panel.innerHTML = `
-      <div class="security-metrics">
-        <article class="security-card"><span>Aktive Warnungen</span><strong>${Number(summary.active || 0)}</strong></article>
-        <article class="security-card"><span>Kritisch</span><strong>${Number(summary.critical || 0)}</strong></article>
-        <article class="security-card"><span>Unbekannte Geräte</span><strong>${Number(summary.unknown || 0)}</strong></article>
-        <article class="security-card"><span>Instabile Geräte</span><strong>${Number(summary.unstable || 0)}</strong></article>
-      </div>
-      <div class="watch-overview-grid">
-      <div class="watch-layout alerts-only">
-        <section class="watch-panel alerts-panel">
-          <div class="watch-heading">
-            <div><h2>Warnungen und Auffälligkeiten</h2><p>Aktive Hinweise stehen oben, erledigte bleiben als Verlauf erhalten.</p></div>
-            <div class="learning-actions">
-              ${learning.active ? `<span class="learning" title="Endet am ${esc(learningEnd)}"><ha-icon icon="mdi:school-outline"></ha-icon>Lernphase · noch ${esc(learningRemaining)}</span>` : `<span class="learning"><ha-icon icon="mdi:school-outline"></ha-icon>Lernphase beendet</span>`}
-            </div>
-          </div>
-          <div class="alert-list">${alertHtml}</div>
-        </section>
-        <section class="watch-panel watch-settings-panel">
-          <div class="watch-heading"><div class="settings-context-title"><button class="settings-back" type="button" title="Zurück" aria-label="Zurück zur vorherigen Ansicht"><ha-icon icon="mdi:arrow-left"></ha-icon></button><div><h2>${esc(settingsTitle[0])}</h2><p>${esc(settingsTitle[1])} · ${this._settingsTab === "dns" ? "DNS-Änderungen werden direkt gespeichert." : "Änderungen gelten ab dem nächsten Netzwerkscan."}</p></div></div><div class="settings-save-area" ${this._settingsTab === "dns" ? 'style="display:none"' : ""}><div class="settings-dirty" role="status" aria-live="polite" ${this._dirtyRules.size ? "" : "hidden"}><span>${this._dirtyRules.size} ungespeicherte ${this._dirtyRules.size === 1 ? "Änderung" : "Änderungen"}</span><button class="discard-settings" type="button">Verwerfen</button></div><button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>Alle Einstellungen speichern</button></div></div>
-          <div class="rule-list">
-            <div class="settings-tab-panel general-panel" role="tabpanel" data-settings-panel="general" ${this._settingsTab === "general" ? "" : "hidden"}>
-            <section class="rule-group basics">
-              <h3>Grundlagen<button class="settings-help-button" type="button" data-settings-help="basics" title="Grundlagen erklären" aria-label="Hilfe zu Grundlagen">?</button></h3>
-              <div class="rule"><label>Überwachung aktiv<small>Alle Regeln gemeinsam ein- oder ausschalten</small></label><input type="checkbox" data-rule="enabled" ${checked(rules.enabled)}></div>
-              <div class="learning-card"><strong>${learning.active ? `Lernphase läuft bis ${esc(learningEnd)}` : "Lernphase ist beendet"}</strong><p>${learning.active ? "Aktuell erkannte Geräte werden automatisch übernommen. Danach müssen neue Geräte wieder geprüft werden." : "Neue Geräte werden geprüft und bei aktiviertem Internetschutz zunächst gesperrt."}</p><div class="learning-actions"><button class="learning-action restart-learning" type="button">Neu beginnen</button><button class="learning-action extend-learning" type="button">7 Tage verlängern</button>${learning.active ? `<button class="learning-action end-learning" type="button">Jetzt beenden</button>` : ""}</div><label class="rule"><span>Dauer bei Neustart<small>Maximal 30 Tage</small></span><span class="unit-input"><input type="number" min="0" max="30" data-rule="learning_days" value="${Number(rules.learning_days)}"><span>Tage</span></span></label></div>
-            </section>
-            <section class="rule-group vlan-settings">
-              <div class="vlan-settings-head"><h3>VLANs und Netzwerksegmente</h3><div class="settings-heading-actions"><button class="settings-help-button" type="button" data-settings-help="vlans" title="VLANs und Rollen erklären" aria-label="Hilfe zu VLANs und Netzwerksegmenten">?</button><button class="vlan-add" type="button"><ha-icon icon="mdi:plus"></ha-icon>VLAN hinzufügen</button></div></div>
-              <div class="vlan-list">${networkSegmentRows}</div>
-              <p class="vlan-empty-note">Subnetze dürfen sich nicht überschneiden. Überwachung aktiviert den Ping/TCP-Scanner und VLAN-Wechselwarnungen für das Segment.</p>
-            </section>
-            </div>
-            <div class="settings-tab-panel devices-panel" role="tabpanel" data-settings-panel="devices" ${this._settingsTab === "devices" ? "" : "hidden"}>
-            <section class="rule-group onboarding-settings">
-              <h3>Neue Geräte<button class="settings-help-button" type="button" data-settings-help="onboarding" title="Erkennung neuer Geräte erklären" aria-label="Hilfe zur Erkennung neuer Geräte">?</button></h3>
-              <div class="rule"><label>Neue Geräte automatisch erkennen<small>Teilnehmer in einem festgelegten IP-Bereich als neu kennzeichnen</small></label><input type="checkbox" data-rule="onboarding_enabled" ${checked(rules.onboarding_enabled)}></div>
-              <div class="dependent-settings" data-depends-on="onboarding_enabled" ${rules.onboarding_enabled ? "" : "hidden"}><div class="rule"><label>IP-Bereich aus FRITZ!Box übernehmen<small>DHCP-Start und -Ende automatisch abfragen</small></label><input type="checkbox" data-rule="onboarding_auto_range" ${checked(rules.onboarding_auto_range)}></div>
-              <details class="advanced-settings dependent-settings" data-manual-range ${rules.onboarding_auto_range ? "hidden" : ""}><summary>IP-Bereich manuell festlegen</summary><div><div class="rule"><label>Erste IP-Adresse</label><input type="text" data-rule="onboarding_start" value="${esc(rules.onboarding_start)}" placeholder="192.168.178.200"></div><div class="rule"><label>Letzte IP-Adresse</label><input type="text" data-rule="onboarding_end" value="${esc(rules.onboarding_end)}" placeholder="192.168.178.250"></div></div></details>
-              <div class="rule"><label>Automatisch überwachen<small>Neue Geräte direkt mit Stern markieren</small></label><input type="checkbox" data-rule="onboarding_auto_monitor" ${checked(rules.onboarding_auto_monitor)}></div>
-              <div class="rule"><label>Benachrichtigung<small>Neue Geräte in Home Assistant melden</small></label><input type="checkbox" data-rule="onboarding_notify" ${checked(rules.onboarding_notify)}></div></div>
-            </section>
-            <section class="rule-group guest-settings">
-              <h3>Gastzugang<button class="settings-help-button" type="button" data-settings-help="guest" title="Gastzugang erklären" aria-label="Hilfe zum Gastzugang">?</button></h3>
-              <div class="rule"><label>Gastnetz anzeigen und überwachen<small>Gastgeräte in Nodarion erfassen, anzeigen und protokollieren</small></label><input type="checkbox" data-rule="guest_monitoring_enabled" ${checked(rules.guest_monitoring_enabled)}></div><div class="dependent-settings" data-depends-on="guest_monitoring_enabled" ${rules.guest_monitoring_enabled ? "" : "hidden"}>
-              <div class="rule"><label>Neue Gäste melden<small>Beim erstmaligen Verbinden mit dem FRITZ!Box-Gastzugang warnen</small></label><input type="checkbox" data-rule="guest_new_enabled" ${checked(rules.guest_new_enabled)}></div>
-              <div class="rule"><label>Gäste zur Ruhezeit melden<small>Verbindungen im eingestellten Ruhezeitraum hervorheben</small></label><input type="checkbox" data-rule="guest_quiet_enabled" ${checked(rules.guest_quiet_enabled)}></div>
-              <div class="rule"><label>Maximale Gastdauer<small>Danach eine Warnung anzeigen</small></label><span class="unit-input"><input type="number" min="1" max="168" data-rule="guest_max_hours" value="${Number(rules.guest_max_hours)}"><span>Stunden</span></span></div></div>
-            </section>
-            <section class="rule-group danger-zone cleanup-settings">
-              <h3>Bereinigung<button class="settings-help-button" type="button" data-settings-help="cleanup" title="Bereinigung erklären" aria-label="Hilfe zur Bereinigung">?</button></h3>
-              <div class="rule">
-                <label>Offline-Teilnehmer bereinigen<small>Aktuell ${offlineEntities.length} offline, davon ${protectedOffline} mit Freigabe oder Überwachung.</small></label><div class="cleanup-summary">„Anzeige bereinigen“ behält Freigaben. „Vollständig vergessen“ entfernt zusätzlich Freigaben und Markierungen.</div><div class="cleanup-actions"><button class="cleanup preserve" data-forget="false" type="button"><ha-icon icon="mdi:broom"></ha-icon>Anzeige bereinigen</button><button class="cleanup" data-forget="true" type="button"><ha-icon icon="mdi:delete-forever-outline"></ha-icon>Vollständig vergessen</button></div>
-              </div>
-              <div class="cleanup-result" role="status"></div>
-            </section>
-            </div>
-            <div class="settings-tab-panel rules-panel" role="tabpanel" data-settings-panel="rules" ${this._settingsTab === "rules" ? "" : "hidden"}>
-            <section class="rule-group device-settings">
-              <h3>Geräteüberwachung<button class="settings-help-button" type="button" data-settings-help="devices" title="Geräteüberwachung erklären" aria-label="Hilfe zu Geräteüberwachung">?</button></h3>
-              <div class="rule"><label>Neue Geräte bestätigen<small>Erst nach dieser Online-Zeit warnen</small></label><span class="unit-input"><input type="number" min="1" max="1440" data-rule="new_device_minutes" value="${Number(rules.new_device_minutes)}"><span>Minuten</span></span></div>
-              <div class="rule"><label>Wichtiges Gerät offline<small>Danach eine Warnung anzeigen</small></label><span class="unit-input"><input type="number" min="1" max="10080" data-rule="offline_minutes" value="${Number(rules.offline_minutes)}"><span>Minuten</span></span></div>
-            </section>
-            <section class="rule-group presence-settings">
-              <h3>Anwesenheit<button class="settings-help-button" type="button" data-settings-help="presence" title="Anwesenheit erklären" aria-label="Hilfe zu Anwesenheit">?</button></h3>
-              <div class="rule"><label>Anwesenheits-Timeout<small>Markierte Geräte gehen sofort online und erst danach offline</small></label><span class="unit-input"><input type="number" min="1" max="1440" data-rule="presence_timeout_minutes" value="${Number(rules.presence_timeout_minutes)}"><span>Minuten</span></span></div>
-              <div class="rule"><label>Anwesenheitssensor<small>Binary Sensor &bdquo;Anwesenheit&ldquo; f&uuml;r Automationen aktivieren</small></label><input type="checkbox" data-rule="presence_sensor_enabled" ${checked(rules.presence_sensor_enabled)}></div>
-            </section>
-            <section class="rule-group detection-settings">
-              <h3>Ruhezeiten<button class="settings-help-button" type="button" data-settings-help="quiet" title="Ruhezeiten erklären" aria-label="Hilfe zu Ruhezeiten">?</button></h3>
-              <div class="rule"><label>Ruhezeit überwachen<small>Aktivierungen in diesem Zeitraum melden</small></label><input type="checkbox" data-rule="quiet_hours_enabled" ${checked(rules.quiet_hours_enabled)}></div><div class="dependent-settings" data-depends-on="quiet_hours_enabled" ${rules.quiet_hours_enabled ? "" : "hidden"}>
-              <div class="rule"><label>Ruhezeit beginnt</label><input type="time" data-rule="quiet_start" value="${esc(rules.quiet_start)}"></div>
-              <div class="rule"><label>Ruhezeit endet</label><input type="time" data-rule="quiet_end" value="${esc(rules.quiet_end)}"></div></div>
-            </section>
-            <details class="advanced-settings"><summary>Erweiterte Prüfungen</summary><section class="rule-group alert-rule-settings">
-              <h3>Weitere Prüfungen<button class="settings-help-button" type="button" data-settings-help="checks" title="Prüfungen erklären" aria-label="Hilfe zu weiteren Prüfungen">?</button></h3>
-              <div class="rule"><label>Statuswechsel pro Stunde<small>Ab dieser Anzahl als instabil melden</small></label><span class="unit-input"><input type="number" min="2" max="100" data-rule="flap_limit" value="${Number(rules.flap_limit)}"><span>Wechsel/Std.</span></span></div>
-              <div class="rule"><label>Identitätswechsel melden<small>Andere MAC-Adresse am gleichen IP-Platz</small></label><input type="checkbox" data-rule="identity_changes" ${checked(rules.identity_changes)}></div>
-            </section></details>
-            </div>
-            <div class="settings-tab-panel notifications-panel" role="tabpanel" data-settings-panel="notifications" ${this._settingsTab === "notifications" ? "" : "hidden"}>
-            <section class="rule-group notification-settings">
-              <h3>Benachrichtigungen<button class="settings-help-button" type="button" data-settings-help="notifications" title="Benachrichtigungen erklären" aria-label="Hilfe zu Benachrichtigungen">?</button></h3>
-              <div class="rule"><label>HA-Glocke<small>Neue Auffälligkeiten als dauerhafte Meldung in Home Assistant anzeigen</small></label><input type="checkbox" data-rule="notify_alerts" ${checked(rules.notify_alerts)}></div>
-              <div class="rule"><label>Warnungen senden<small>Normale Warnungen an die ausgewählten Ziele senden</small></label><input type="checkbox" data-rule="notify_warning" ${checked(rules.notify_warning)}></div>
-              <div class="rule"><label>Kritische Meldungen senden<small>Kritische Ausfälle an die ausgewählten Ziele senden</small></label><input type="checkbox" data-rule="notify_critical" ${checked(rules.notify_critical)}></div>
-              <div class="notify-event-hint"><ha-icon icon="mdi:transit-connection-variant"></ha-icon><span>Für eigene Automationen wird immer das Ereignis <code>nodarion_alert</code> ausgelöst.</span></div>
-            </section>
-            <section class="rule-group notification-target-settings">
-              <h3><span>Benachrichtigungsziele</span><span class="settings-heading-actions"><span class="notify-target-count">${selectedNotifyCount} von ${notifyEntities.length} ausgewählt</span><button class="settings-help-button" type="button" data-settings-help="targets" title="Benachrichtigungsziele erklären" aria-label="Hilfe zu Benachrichtigungszielen">?</button></span></h3>
-              <p class="notification-target-description">Companion App, Telegram und andere in Home Assistant eingerichtete Ziele</p>
-              <div class="notify-target-section"><div class="notify-target-toolbar"><span class="notify-search-wrap"><ha-icon icon="mdi:magnify"></ha-icon><input class="notify-target-search" type="search" value="${esc(this._notifyTargetQuery)}" placeholder="Ziel durchsuchen …" aria-label="Benachrichtigungsziel durchsuchen"></span><button class="notify-target-action" type="button" data-notify-target-action="all">Alle</button><button class="notify-target-action" type="button" data-notify-target-action="none">Keine</button></div><div class="notify-target-list">${notifyTargetHtml}</div></div>
-            </section>
-            </div>
-            <div class="settings-tab-panel dns-settings-panel" role="tabpanel" data-settings-panel="dns" ${this._settingsTab === "dns" ? "" : "hidden"}>
-              <section class="rule-group adguard-control-settings"><h3>Schutzfunktionen<button class="settings-help-button" type="button" data-settings-help="adguard" title="Schutzfunktionen erklären" aria-label="Hilfe zu den DNS-Schutzfunktionen">?</button></h3><div class="adguard-feature-list">${adguardSwitches}</div><div class="query-log-warning"><ha-icon icon="mdi:alert-outline"></ha-icon>${this._dnsProvider().id === "pihole" ? "Protokollierung und Datenschutzstufe werden in Pi-hole eingestellt." : "Das Ausschalten des Query-Logs unterbricht DNS-Live und reduziert die Auswertung."}</div></section>${piHoleRules}
-            </div>
-            <div class="settings-tab-panel ai-maintenance-panel" role="tabpanel" data-settings-panel="ai-maintenance" ${this._settingsTab === "ai-maintenance" ? "" : "hidden"}>
-            <section class="rule-group ai-config-settings">
-              <h3>KI-Analyse<button class="settings-help-button" type="button" data-settings-help="ai" title="KI-Analyse erklären" aria-label="Hilfe zur KI-Analyse">?</button></h3>
-              <div class="rule"><label>Tägliche KI-Auswertung<small>Automatisch einmal täglich einen Bericht erstellen</small></label><input type="checkbox" data-rule="ai_analysis_enabled" ${checked(rules.ai_analysis_enabled)}></div><div class="dependent-settings" data-depends-on="ai_analysis_enabled" ${rules.ai_analysis_enabled ? "" : "hidden"}>
-              <div class="rule"><label>KI-Auswertung um<small>Erster Netzwerkscan nach diesem Zeitpunkt</small></label><input type="time" data-rule="ai_analysis_time" value="${esc(rules.ai_analysis_time)}"></div>
-              <details class="advanced-settings"><summary>Erweiterter Datenschutz</summary><div class="rule"><label>DNS-Datenschutz<small>Anonymisiert überträgt nur Zähler und stabile, neutrale Domain-IDs</small></label><input type="hidden" data-rule="ai_privacy" value="${esc(rules.ai_privacy)}"><details class="custom-column-filter settings-select"><summary>${rules.ai_privacy === "domains" ? "Domainnamen mitsenden" : "Domains anonymisieren"}</summary><div class="custom-filter-menu"><button type="button" class="custom-filter-option ${rules.ai_privacy === "anonymized" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="anonymized"><ha-icon icon="${rules.ai_privacy === "anonymized" ? "mdi:check" : "mdi:incognito"}"></ha-icon><span>Domains anonymisieren</span></button><button type="button" class="custom-filter-option ${rules.ai_privacy === "domains" ? "active" : ""}" data-setting-rule="ai_privacy" data-setting-value="domains"><ha-icon icon="${rules.ai_privacy === "domains" ? "mdi:check" : "mdi:web"}"></ha-icon><span>Domainnamen mitsenden</span></button></div></details></div></details></div>
-            </section>
-            </div>
-          </div>
-          <div class="settings-help-backdrop" hidden><section class="settings-help-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-help-title"><div class="settings-help-head"><h2 id="settings-help-title">Hilfe</h2><button class="settings-help-close" type="button" title="Hilfe schließen" aria-label="Hilfe schließen"><ha-icon icon="mdi:close"></ha-icon></button></div><div class="settings-help-copy"></div></section></div>
-        </section>
-      </div>
-      ${presenceHtml}
-      </div>`;
+    renderWatch.call(this);
   }
 
   _renderSettings() {
-    const panel = this.shadowRoot.querySelector(".settings-view");
-    if (!panel) return;
-    const watchSettings = this.shadowRoot.querySelector(
-      ".watch-view .watch-settings-panel"
-    ) || this.shadowRoot.querySelector(
-      ".settings-view .watch-settings-panel"
-    );
-    panel.replaceChildren(...[watchSettings].filter(Boolean));
-    if (this._settingsHelp) {
-      const modal = panel.querySelector(".settings-help-backdrop");
-      if (modal) {
-        modal.querySelector("h2").textContent = this._settingsHelp[0];
-        modal.querySelector(".settings-help-copy").innerHTML = this._settingsHelp
-          .slice(1).map((paragraph) => `<p>${esc(paragraph)}</p>`).join("");
-        modal.hidden = false;
-      }
-    }
+    renderSettings.call(this);
   }
 
-  _renderMesh() {
-    const panel = this.shadowRoot.querySelector(".mesh-panel");
-    // The topology view is optional. State updates must not turn a missing
-    // view into an apparent failure of the action that triggered the update.
-    if (!panel) return;
-    const entities = this._entities().filter((entity) => entity.state === "on");
-    const groups = new Map();
-    entities.forEach((entity) => {
-      const accessPoint = entity.attributes.access_point || "Direkt am Router";
-      if (!groups.has(accessPoint)) groups.set(accessPoint, []);
-      groups.get(accessPoint).push(entity);
-    });
-    if (!entities.length) {
-      panel.innerHTML = `<div class="empty"><ha-icon icon="mdi:access-point-network-off"></ha-icon><strong>Noch keine Mesh-Daten</strong>Nach dem nächsten Scan erscheint hier deine Netzwerktopologie.</div>`;
-      return;
-    }
-    const groupHtml = [...groups.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([accessPoint, clients]) => {
-        const clientHtml = clients
-          .sort((a, b) => (a.attributes.hostname || a.attributes.friendly_name || "").localeCompare(b.attributes.hostname || b.attributes.friendly_name || ""))
-          .map((entity) => {
-            const attr = entity.attributes;
-            const name = attr.hostname || attr.friendly_name || attr.ip_address;
-            const connection = [attr.connection_type, attr.wifi_band].filter(Boolean).join(" · ");
-            const rateValue = attr.link_rate_mbps ?? attr.link_rate_rx_mbps;
-            const rate = rateValue !== null && rateValue !== undefined
-              ? `${rateValue} Mbit/s`
-              : null;
-            const signal = attr.signal_strength_percent !== null && attr.signal_strength_percent !== undefined
-              ? `${attr.signal_strength_percent} % Signal`
-              : attr.signal_strength_dbm !== null && attr.signal_strength_dbm !== undefined
-                ? `${attr.signal_strength_dbm} dBm`
-                : null;
-            return `<div class="client on" title="${esc(attr.mac_address || "")}">
-              <i class="dot"></i><ha-icon icon="${deviceIcon(entity)}"></ha-icon>
-              <div class="client-info">
-                <div class="client-name">${esc(name)}</div>
-                <div class="client-ip">${esc(attr.ip_address || "Nicht verfügbar")}</div>
-                <div class="client-details">
-                  ${connection ? `<span class="client-detail">${esc(connection)}</span>` : ""}
-                  ${rate ? `<span class="client-detail">${esc(rate)}</span>` : ""}
-                  ${signal ? `<span class="client-detail signal">${esc(signal)}</span>` : ""}
-                </div>
-              </div>
-            </div>`;
-          }).join("");
-        return `<section class="mesh-group" data-access-point="${esc(accessPoint)}">
-          <div class="ap-node"><ha-icon icon="mdi:${accessPoint === "Direkt am Router" ? "router-wireless" : "access-point"}"></ha-icon>
-            <div><span class="ap-name">${esc(accessPoint)}</span><span class="ap-count">${clients.length} Teilnehmer online</span></div>
-          </div>
-          <div class="clients">${clientHtml}</div>
-        </section>`;
-      }).join("");
-    panel.innerHTML = `<div class="mesh-head">
-      <div><h2>Mesh-Topologie</h2><p>Live-Zuordnung der aktuell erreichbaren Teilnehmer zu Router und Repeatern</p></div>
-      <div class="mesh-actions">
-        <div class="mesh-legend"><span class="legend-item"><i class="dot"></i> Online</span></div>
-        <button class="simulate-mesh" type="button" ${groups.size < 2 ? "disabled" : ""} title="${groups.size < 2 ? "Mindestens zwei Zugangspunkte erforderlich" : "Rein visuelle Demonstration ohne Änderung am Netzwerk"}"><ha-icon icon="mdi:swap-horizontal-bold"></ha-icon>Repeater-Wechsel simulieren</button>
-      </div>
-    </div>
-    <div class="simulation-status"><ha-icon icon="mdi:access-point-sync"></ha-icon><span></span></div>
-    <div class="mesh-canvas">
-      <div class="internet"><ha-icon icon="mdi:web"></ha-icon> Internet / Heimnetz</div>
-      <div class="mesh-groups">${groupHtml}</div>
-    </div>`;
-  }
-
-  async _simulateMeshHandover(button) {
-    const panel = this.shadowRoot.querySelector(".mesh-panel");
-    const groups = [...panel.querySelectorAll(".mesh-group")];
-    const sourceGroup = groups.find((group) => group.querySelector(".client"));
-    const targetGroup = groups.find((group) => group !== sourceGroup);
-    const source = sourceGroup?.querySelector(".client");
-    const target = targetGroup?.querySelector(".ap-node");
-    if (!source || !target) return;
-
-    button.disabled = true;
-    const status = panel.querySelector(".simulation-status");
-    const deviceName = source.querySelector(".client-name")?.textContent || "Gerät";
-    const from = sourceGroup.dataset.accessPoint;
-    const to = targetGroup.dataset.accessPoint;
-    status.querySelector("span").textContent =
-      `${deviceName}: Verbindung wird von „${from}“ zu „${to}“ übergeben …`;
-    status.classList.add("visible");
-    targetGroup.classList.add("handover-target");
-
-    const panelRect = panel.getBoundingClientRect();
-    const sourceRect = source.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    const ghost = source.cloneNode(true);
-    ghost.classList.add("simulation-ghost");
-    ghost.style.left = `${sourceRect.left - panelRect.left + panel.scrollLeft}px`;
-    ghost.style.top = `${sourceRect.top - panelRect.top + panel.scrollTop}px`;
-    ghost.style.width = `${sourceRect.width}px`;
-    panel.appendChild(ghost);
-    source.style.opacity = ".25";
-
-    const moveX = targetRect.left + targetRect.width / 2
-      - (sourceRect.left + sourceRect.width / 2);
-    const moveY = targetRect.bottom - sourceRect.top + 18;
-    const animation = ghost.animate([
-      { transform: "translate(0, 0) scale(1)", opacity: .96 },
-      { transform: `translate(${moveX * .48}px, ${moveY * .35}px) scale(.88)`, opacity: .82, offset: .48 },
-      { transform: `translate(${moveX}px, ${moveY}px) scale(.72)`, opacity: 0 },
-    ], { duration: 2400, easing: "cubic-bezier(.4,0,.2,1)", fill: "forwards" });
-    try {
-      await animation.finished;
-    } catch (_error) {
-      // A panel refresh may cancel the purely visual demonstration.
-    }
-    ghost.remove();
-    source.style.opacity = "";
-    targetGroup.classList.remove("handover-target");
-    status.querySelector("span").textContent =
-      `Simulation abgeschlossen: ${deviceName} ist jetzt mit „${to}“ verbunden.`;
-    window.setTimeout(() => {
-      status.classList.remove("visible");
-      button.disabled = false;
-    }, 2200);
-  }
 }
 
 if (!customElements.get("engelsoft-nodarion-panel")) {

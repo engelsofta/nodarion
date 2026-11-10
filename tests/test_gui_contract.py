@@ -5,9 +5,14 @@ import unittest
 
 
 ROOT = Path(__file__).parents[1]
-PANEL = (
-    ROOT / "custom_components" / "nodarion" / "frontend" / "nodarion-panel.js"
-).read_text(encoding="utf-8")
+FRONTEND = ROOT / "custom_components" / "nodarion" / "frontend"
+PANEL = "\n".join(
+    (FRONTEND / name).read_text(encoding="utf-8")
+    for name in (
+        "nodarion-panel.js", "panel-devices.mjs", "panel-activity.mjs",
+        "panel-settings.mjs", "panel-formatters.mjs", "panel-styles.mjs",
+    )
+)
 
 
 class GuiContractTests(unittest.TestCase):
@@ -69,7 +74,7 @@ class GuiContractTests(unittest.TestCase):
         self.assertNotIn("window.alert", PANEL)
         self.assertIn('role="alertdialog"', PANEL)
         self.assertIn('aria-live="polite"', PANEL)
-        self.assertIn('aria-label="Zurück zur vorherigen Ansicht"', PANEL)
+        self.assertIn('aria-label="${t("Zurück zur vorherigen Ansicht")}"', PANEL)
 
     def test_every_settings_group_has_contextual_modal_help(self) -> None:
         for help_key in (
@@ -94,10 +99,10 @@ class GuiContractTests(unittest.TestCase):
         self.assertLess(head.index("dns-quick-stats"), head.index('class="dns-actions"'))
         self.assertIn("border-right:1px solid var(--ns-line)", PANEL)
 
-    def test_optional_mesh_view_cannot_break_other_actions(self) -> None:
-        mesh_render = PANEL[PANEL.index("  _renderMesh() {"):]
-        self.assertIn('const panel = this.shadowRoot.querySelector(".mesh-panel")', mesh_render)
-        self.assertIn("if (!panel) return;", mesh_render[:300])
+    def test_mesh_data_is_still_available_without_the_old_topology_view(self) -> None:
+        for obsolete in ("_renderMesh", "_simulateMeshHandover", ".mesh-panel"):
+            self.assertNotIn(obsolete, PANEL)
+        self.assertIn('data-column="mesh"', PANEL)
 
     def test_mobile_panel_exposes_home_assistant_navigation(self) -> None:
         self.assertIn('class="ha-menu"', PANEL)
@@ -137,10 +142,9 @@ class GuiContractTests(unittest.TestCase):
         ):
             self.assertIn(f':host([data-theme="light"]) {selector}', PANEL)
 
-    def test_header_logo_links_safely_to_github(self) -> None:
-        self.assertIn('class="logo" href="https://github.com/engelsofta/nodarion"', PANEL)
-        self.assertIn('target="_blank" rel="noopener noreferrer"', PANEL)
-        self.assertIn('.logo:focus-visible', PANEL)
+    def test_header_keeps_the_logo_without_github_actions(self) -> None:
+        self.assertIn('<span class="logo"><img', PANEL)
+        self.assertNotIn("https://github.com/engelsofta/nodarion", PANEL)
 
     def test_light_theme_uses_readable_status_and_action_colours(self) -> None:
         self.assertIn(':host([data-theme="light"]) .guest-inline {', PANEL)
@@ -186,8 +190,8 @@ class GuiContractTests(unittest.TestCase):
         self.assertIn("tbody tr.onboarding-row td:first-child", PANEL)
         self.assertIn("tbody tr.vlan-device-row td:last-child", PANEL)
         self.assertNotIn("tbody tr.vlan-device-row td:first-child", PANEL)
-        self.assertIn('attr.guest_network ? "Gerät im Gastnetz"', PANEL)
-        self.assertIn('lifecycle === "onboarding" ? "Gerät im DHCP-Einrichtungsbereich"', PANEL)
+        self.assertIn('attr.guest_network ? t("Gerät im Gastnetz")', PANEL)
+        self.assertIn('lifecycle === "onboarding" ? t("Gerät im DHCP-Einrichtungsbereich")', PANEL)
 
     def test_adguard_management_is_not_exposed_in_dns_settings(self) -> None:
         self.assertIn('this._activeTab === "settings" && this._settingsTab === "dns"', PANEL)
