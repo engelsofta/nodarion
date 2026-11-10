@@ -53,7 +53,18 @@ async function main() {
     await page.locator("#adguard").click();
     assert.equal(await settings.locator("[data-adguard-switch]").count(), 6);
     assert.equal(await policy.count(), 0);
+    const general = nav.getByRole("button", { name: "Allgemeine Einstellungen öffnen" });
+    await general.click();
+    assert.equal(await general.getAttribute("aria-current"), "page");
+    assert.equal(await settings.locator('[data-settings-panel="general"]').isVisible(), true);
+    assert.equal(await panel.locator("header .header-settings").count(), 0);
+    assert.equal(await panel.locator("header .scan, header .version-info").count(), 0);
     await nav.getByRole("button", { name: "Geräte", exact: true }).click();
+    const guest = panel.locator(".device-counts .guest-inline");
+    await guest.click();
+    assert.equal(await panel.locator(".guest-modal").isVisible(), true);
+    await panel.locator(".guest-close").click();
+    assert.equal(await panel.locator(".guest-modal").count(), 0);
     const row = panel.locator(".device-list tbody tr").first();
     const disclosure = row.locator(".mobile-details");
     const watch = row.locator('[data-column="watch"]');
@@ -99,6 +110,13 @@ async function main() {
       await page.screenshot({ path: path.join(process.env.NODARION_PREVIEW_DIR, "panel-mobile.png") });
     }
     await page.setViewportSize({ width: 1440, height: 900 });
+    const rail = await nav.boundingBox();
+    const content = await panel.locator(".panel-content").boundingBox();
+    assert.ok(rail.x + rail.width < content.x && rail.height > rail.width);
+    const readings = await panel.locator(".metric-reading > div, .device-count strong, .function-count strong")
+      .evaluateAll(elements => elements.map(el => [el.getBoundingClientRect().top, getComputedStyle(el).fontSize]));
+    assert.equal(new Set(readings.map(([, font]) => font)).size, 1);
+    assert.ok(Math.max(...readings.map(([top]) => top)) - Math.min(...readings.map(([top]) => top)) < 2);
     assert.equal(await ip.isVisible(), true);
     assert.equal(await watch.isVisible(), true);
     assert.equal(await status.isVisible(), false);

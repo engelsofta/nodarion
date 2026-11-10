@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.30.0-beta.2 — The tabs took the side door. 🧭
+
+- Devices, Events, DNS, Analysis, Monitoring and General Settings now share a compact icon rail on the left.
+- Overview cards align their values and labels. Guest network status and guest count sit beside Online, Offline and New, and open guest controls when clicked.
+- Removed the manual scan button and version text from the header. Scheduled scans continue as configured.
+
+Integration **1.30.0-beta.2** · Frontend **1.30.2**
+
 ## 1.30.0-beta.1 — Less Scroll, More Control. 🧭
 
 *The cards went on a diet. The buttons got a map.*

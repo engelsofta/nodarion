@@ -147,7 +147,7 @@ class GuiContractTests(unittest.TestCase):
         self.assertNotIn("https://github.com/engelsofta/nodarion", PANEL)
 
     def test_light_theme_uses_readable_status_and_action_colours(self) -> None:
-        self.assertIn(':host([data-theme="light"]) .guest-inline {', PANEL)
+        self.assertIn('.guest-inline strong { color:var(--ns-cyan); }', PANEL)
         self.assertIn(':host([data-theme="light"]) .rating.warn {', PANEL)
         self.assertIn('--rating-color:#8a6200', PANEL)
         self.assertIn(':host([data-theme="light"]) .metric-settings {', PANEL)

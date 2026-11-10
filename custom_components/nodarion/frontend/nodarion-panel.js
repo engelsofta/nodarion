@@ -1,10 +1,10 @@
-import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.1";
-import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.1";
-import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.1";
-import { renderCards } from "./panel-devices.mjs?v=1.30.1";
-import { panelStyles } from "./panel-styles.mjs?v=1.30.1";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.1";
-import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.1";
+import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.2";
+import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.2";
+import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.2";
+import { renderCards } from "./panel-devices.mjs?v=1.30.2";
+import { panelStyles } from "./panel-styles.mjs?v=1.30.2";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.2";
+import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.2";
 
 class EngelsoftNodarionPanel extends HTMLElement {
   constructor() {
@@ -370,9 +370,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
       item.classList.toggle("active", active);
       item.setAttribute("aria-current", active ? "page" : "false");
     });
-    const settingsButton = this.shadowRoot.querySelector(".header-settings");
-    settingsButton?.classList.toggle("active", tab === "settings");
-    settingsButton?.setAttribute("aria-current", tab === "settings" ? "page" : "false");
     this.shadowRoot.querySelectorAll(".tab-view").forEach((view) =>
       view.toggleAttribute("hidden", view.dataset.view !== tab));
   }
@@ -550,76 +547,70 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   _build() {
     this._built = true;
+    const navigation = [
+      ["participants", "mdi:devices", t("Geräte")],
+      ["log", "mdi:text-box-search-outline", t("Ereignisse")],
+      ["dns", "mdi:shield-check-outline", "DNS"],
+      ["ai", "mdi:chart-line", t("Analyse")],
+      ["watch", "mdi:shield-eye-outline", t("Überwachung")],
+      ["settings", "mdi:cog-outline", t("Allgemeine Einstellungen öffnen")],
+    ];
     this.shadowRoot.innerHTML = `
       <style>${panelStyles}</style>
       <div class="shell">
-        <header>
-          <div class="brand">
-            <button class="ha-menu" type="button" title="${t("Home-Assistant-Menü öffnen")}" aria-label="${t("Home-Assistant-Menü öffnen")}"><ha-icon icon="mdi:menu"></ha-icon></button>
-            <span class="logo"><img src="/engelsoft_nodarion_icon.png" alt=""></span>
-            <div>
-              <div class="eyebrow">Engelsoft</div>
-              <h1>Nodarion</h1>
-              <div class="version-info"></div>
-            </div>
-          </div>
-          <div class="header-actions">
-            <button class="header-action connection-status" type="button" title="${t("Verbindungsdetails anzeigen")}"><ha-icon icon="mdi:lan-connect"></ha-icon><span>${t("Verbindungen werden geladen")}</span><ha-icon icon="mdi:chevron-down"></ha-icon></button>
-            <button class="header-action header-settings" type="button" title="${t("Allgemeine Einstellungen öffnen")}" aria-label="${t("Allgemeine Einstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button>
-            <button class="scan"><ha-icon icon="mdi:radar"></ha-icon><span>${t("Jetzt scannen")}</span></button>
-          </div>
-        </header>
-        <section class="connection-panel" hidden></section>
         <nav class="panel-navigation" aria-label="${t("Nodarion-Ansichten")}">
-          <button type="button" data-nav-tab="participants"><ha-icon icon="mdi:devices"></ha-icon>${t("Geräte")}</button>
-          <button type="button" data-nav-tab="log"><ha-icon icon="mdi:text-box-search-outline"></ha-icon>${t("Ereignisse")}</button>
-          <button type="button" data-nav-tab="dns"><ha-icon icon="mdi:shield-check-outline"></ha-icon>DNS</button>
-          <button type="button" data-nav-tab="ai"><ha-icon icon="mdi:chart-line"></ha-icon>${t("Analyse")}</button>
-          <button type="button" data-nav-tab="watch"><ha-icon icon="mdi:shield-eye-outline"></ha-icon>${t("Überwachung")}</button>
+          ${navigation.map(([tab, icon, label]) => `
+            <button type="button" data-nav-tab="${tab}" title="${esc(label)}" aria-label="${esc(label)}">
+              <ha-icon icon="${icon}" aria-hidden="true"></ha-icon>
+            </button>`).join("")}
         </nav>
-        <section class="metrics"></section>
-        <section class="tab-view" data-view="participants">
-          <button class="column-picker-button table-column-picker" type="button" title="Tabellenspalten auswählen" aria-label="Tabellenspalten auswählen"><ha-icon icon="mdi:cog-outline"></ha-icon></button>
-          <div class="column-picker" hidden></div>
-          <section class="table-panel device-list"></section>
-        </section>
-        <section class="tab-view" data-view="log" hidden>
-          <section class="log-panel">
-            <div class="log-title">
-              <div class="log-heading"><strong>${t("Live-Log")}</strong><span class="log-filter-summary" hidden><span class="log-filter-name"></span><button class="log-clear" title="Gerätefilter aufheben"><ha-icon icon="mdi:close"></ha-icon></button></span></div>
-              <span class="live"><i class="dot"></i> LIVE</span>
+        <div class="panel-content">
+          <header>
+            <div class="brand">
+              <button class="ha-menu" type="button" title="${t("Home-Assistant-Menü öffnen")}" aria-label="${t("Home-Assistant-Menü öffnen")}"><ha-icon icon="mdi:menu"></ha-icon></button>
+              <span class="logo"><img src="/engelsoft_nodarion_icon.png" alt=""></span>
+              <div>
+                <div class="eyebrow">Engelsoft</div>
+                <h1>Nodarion</h1>
+              </div>
             </div>
-            <div class="log-list"></div>
+            <div class="header-actions">
+              <button class="header-action connection-status" type="button" title="${t("Verbindungsdetails anzeigen")}"><ha-icon icon="mdi:lan-connect"></ha-icon><span>${t("Verbindungen werden geladen")}</span><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+            </div>
+          </header>
+          <section class="connection-panel" hidden></section>
+          <section class="metrics"></section>
+          <section class="tab-view" data-view="participants">
+            <button class="column-picker-button table-column-picker" type="button" title="Tabellenspalten auswählen" aria-label="Tabellenspalten auswählen"><ha-icon icon="mdi:cog-outline"></ha-icon></button>
+            <div class="column-picker" hidden></div>
+            <section class="table-panel device-list"></section>
           </section>
-        </section>
-        <section class="tab-view" data-view="dns" hidden>
-          <section class="dns-panel">
-            <div class="dns-live-content"></div>
+          <section class="tab-view" data-view="log" hidden>
+            <section class="log-panel">
+              <div class="log-title">
+                <div class="log-heading"><strong>${t("Live-Log")}</strong><span class="log-filter-summary" hidden><span class="log-filter-name"></span><button class="log-clear" title="Gerätefilter aufheben"><ha-icon icon="mdi:close"></ha-icon></button></span></div>
+                <span class="live"><i class="dot"></i> LIVE</span>
+              </div>
+              <div class="log-list"></div>
+            </section>
           </section>
-        </section>
-        <section class="tab-view" data-view="ai" hidden>
-          <section class="ai-view"></section>
-        </section>
-        <section class="tab-view" data-view="settings" hidden>
-          <section class="settings-view"></section>
-        </section>
-        <section class="tab-view" data-view="watch" hidden>
-          <section class="watch-view"></section>
-        </section>
+          <section class="tab-view" data-view="dns" hidden>
+            <section class="dns-panel">
+              <div class="dns-live-content"></div>
+            </section>
+          </section>
+          <section class="tab-view" data-view="ai" hidden>
+            <section class="ai-view"></section>
+          </section>
+          <section class="tab-view" data-view="settings" hidden>
+            <section class="settings-view"></section>
+          </section>
+          <section class="tab-view" data-view="watch" hidden>
+            <section class="watch-view"></section>
+          </section>
+        </div>
       </div><div class="guest-modal-host"></div><div class="confirm-host"></div>`;
 
-    this.shadowRoot.querySelector(".scan").addEventListener("click", async () => {
-      const button = this.shadowRoot.querySelector(".scan");
-      button.classList.add("busy");
-      try {
-        await this._stateClient.mutate({ action: "scan_now" });
-      } finally {
-        button.classList.remove("busy");
-      }
-    });
-    this.shadowRoot.querySelector(".header-settings").addEventListener("click", () =>
-      this._openSettings("general")
-    );
     this.shadowRoot.querySelector(".ha-menu").addEventListener("click", () =>
       this._toggleHomeAssistantMenu()
     );
@@ -667,7 +658,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
     });
     this.shadowRoot.querySelector(".panel-navigation").addEventListener("click", (event) => {
       const button = event.target.closest("[data-nav-tab]");
-      if (button) this._navigateTo(button.dataset.navTab);
+      if (!button) return;
+      const tab = button.dataset.navTab;
+      if (tab === "settings") this._openSettings("general");
+      else this._navigateTo(tab);
     });
     this._showTab(this._activeTab);
     this.shadowRoot.querySelector(".device-list").addEventListener("click", (event) => {
@@ -1423,11 +1417,6 @@ class EngelsoftNodarionPanel extends HTMLElement {
       onlineKeys.has(key)
     ).length;
     const alertCount = Number(this._monitor.summary?.active || 0);
-    const versions = this._monitor.versions || {};
-    this.shadowRoot.querySelector(".version-info").textContent = [
-      versions.integration ? `Version ${versions.integration}` : null,
-      versions.frontend ? `Frontend ${versions.frontend}` : null,
-    ].filter(Boolean).join(" · ");
     const latest = entities.reduce((date, entity) => entity.last_updated > date ? entity.last_updated : date, "");
     const age = latest ? new Intl.DateTimeFormat(activeLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(latest)) : "–";
     const connections = this._monitor.connection_status || {};
@@ -1452,8 +1441,10 @@ class EngelsoftNodarionPanel extends HTMLElement {
       : adguardConnection.available ? protection === "on" ? t("Schutz aktiv") : protection === "off" ? t("Schutz aus") : t("Verbunden") : t("Nicht erreichbar");
     const dnsRatioEntity = this._hass.states["sensor.nodarion_dns_blockquote"];
     const dnsRatio = dnsRatioEntity && !["unknown", "unavailable"].includes(dnsRatioEntity.state)
-      ? `${Number(dnsRatioEntity.state).toLocaleString(activeLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} % blockiert`
-      : "Blockquote nicht verfügbar";
+      ? t("{0} % blockiert", Number(dnsRatioEntity.state).toLocaleString(activeLocale(), {
+        minimumFractionDigits: 1, maximumFractionDigits: 1,
+      }))
+      : t("Blockquote nicht verfügbar");
     const latestAiReport = this._monitor.ai_analysis?.reports?.[0];
     const aiScore = latestAiReport ? `${Number(latestAiReport.score)}/10` : "–";
     const aiNote = latestAiReport?.summary || (
@@ -1465,31 +1456,38 @@ class EngelsoftNodarionPanel extends HTMLElement {
     metrics.classList.toggle("overview-expanded", this._mobileOverviewExpanded);
     metrics.innerHTML = `
       <article class="metric devices">
-        <div class="metric-label-row"><div class="metric-label">${t("Netzwerkgeräte")}</div><button class="metric-settings" type="button" data-settings-section="devices" data-return-tab="participants" title="${t("Geräteeinstellungen öffnen")}" aria-label="${t("Geräteeinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
+        <div class="metric-label-row"><div class="metric-label">${t("Netzwerkgeräte")}</div><div class="metric-header-actions">
+            <button class="mobile-overview-toggle" type="button" aria-label="${t("Übersicht ein- oder ausklappen")}" title="${t("Übersicht ein- oder ausklappen")}" aria-expanded="${this._mobileOverviewExpanded}" aria-controls="mobile-metric-overview"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+            <button class="metric-settings" type="button" data-settings-section="devices" data-return-tab="participants" title="${t("Geräteeinstellungen öffnen")}" aria-label="${t("Geräteeinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div></div>
         <div class="device-counts">
           <button class="device-count online ${this._columnFilters.state === "on" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="on" title="${t("Nur Online-Geräte anzeigen")}"><strong>${online}</strong><span>Online</span></button>
           <button class="device-count offline ${this._columnFilters.state === "off" ? "active" : ""}" type="button" data-quick-filter="state" data-quick-filter-value="off" title="${t("Nur Offline-Geräte anzeigen")}"><strong>${entities.length - online}</strong><span>Offline</span></button>
           <button class="device-count new ${this._columnFilters.onboarding === "onboarding" ? "active" : ""}" type="button" data-quick-filter="onboarding" data-quick-filter-value="onboarding" title="${t("{0} neue Geräte im Einrichtungsbereich", onboarding)}"><strong>${onboarding}</strong><span>${t("Neu")}</span></button>
+          ${guestMonitoring ? `<button class="device-count guest-inline" type="button" title="${t("Gastzugang anzeigen")}"><strong>${guestClients}</strong><span>${guestInfo.enabled ? t("Gastnetz an") : t("Gastnetz aus")}</span></button>` : ""}
         </div>
-        ${guestMonitoring ? `<button class="guest-inline" type="button" title="${t("Gastzugang anzeigen")}"><ha-icon icon="mdi:wifi-star"></ha-icon><span>${guestInfo.enabled ? t("Gastnetz an") : t("Gastnetz aus")}</span><span aria-hidden="true">·</span><span>${guestClients} ${guestClients === 1 ? t("Gast") : t("Gäste")}</span></button>` : ""}
-        <button class="mobile-overview-toggle" type="button" aria-label="${t("Übersicht ein- oder ausklappen")}" title="${t("Übersicht ein- oder ausklappen")}" aria-expanded="${this._mobileOverviewExpanded}" aria-controls="mobile-metric-overview"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
       </article>
       ${alertCount ? `<div class="mobile-overview-actions"><button class="mobile-alert-summary" type="button" data-open-watch><ha-icon icon="mdi:alert-outline"></ha-icon>${t("{0} offene Warnungen", alertCount)}</button></div>` : ""}
       <div class="metric-overview" id="mobile-metric-overview">
       <article class="metric events-metric">
         <div class="metric-label-row"><div class="metric-label">${t("Ereignisse")}</div><button class="metric-settings" type="button" data-settings-section="notifications" data-return-tab="log" title="${t("Benachrichtigungen öffnen")}" aria-label="${t("Benachrichtigungseinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
-        <div class="metric-status-value"><ha-icon icon="mdi:text-box-search-outline"></ha-icon>${eventCount}</div>
-        <span class="metric-note">${alertCount ? `${alertCount} offene ${alertCount === 1 ? t("Warnung") : t("Warnungen")}` : t("Keine offenen Warnungen")}</span>
+        <div class="metric-reading">
+          <div class="metric-status-value">${eventCount}</div>
+          <span class="metric-note">${alertCount ? `${alertCount} offene ${alertCount === 1 ? t("Warnung") : t("Warnungen")}` : t("Keine offenen Warnungen")}</span>
+        </div>
       </article>
       <article class="metric dns-metric">
         <div class="metric-label-row"><div class="metric-label">${t("DNS-Schutz")}</div><button class="metric-settings" type="button" data-settings-section="dns" data-return-tab="dns" title="${t("DNS-Einstellungen öffnen")}" aria-label="${t("DNS-Einstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
-        <div class="metric-status-value"><ha-icon icon="mdi:shield-check-outline"></ha-icon>${esc(dnsStatus)}</div>
-        <button class="metric-note metric-entity-link" type="button" data-entity-id="sensor.nodarion_dns_blockquote" title="${t("Home-Assistant-Dialog öffnen")}">${esc(dnsRatio)}</button>
+        <div class="metric-reading">
+          <div class="metric-status-value" title="${esc(dnsStatus)}">${esc(dnsStatus)}</div>
+          <button class="metric-note metric-entity-link" type="button" data-entity-id="sensor.nodarion_dns_blockquote" title="${t("Home-Assistant-Dialog öffnen")}">${esc(dnsRatio)}</button>
+        </div>
       </article>
       <article class="metric ai-metric" title="${esc(aiNote)}">
         <div class="metric-label-row"><div class="metric-label">${t("Netzbewertung")}</div><button class="metric-settings" type="button" data-settings-section="ai-maintenance" data-return-tab="ai" title="${t("KI-Einstellungen öffnen")}" aria-label="${t("KI-Einstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
-        <div class="metric-value">${esc(aiScore)}</div>
-        <span class="metric-note">${esc(aiNote)}</span>
+        <div class="metric-reading">
+          <div class="metric-value">${esc(aiScore)}</div>
+          <span class="metric-note">${esc(aiNote)}</span>
+        </div>
       </article>
       <article class="metric watch-metric">
         <div class="metric-label-row"><div class="metric-label">${t("Überwachung {0}", alertCount ? `<span class="metric-alert-badge">${alertCount}</span>` : "")}</div><button class="metric-settings" type="button" data-settings-section="rules" data-return-tab="watch" title="${t("Überwachungsregeln öffnen")}" aria-label="${t("Überwachungseinstellungen öffnen")}"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div>
@@ -1825,7 +1823,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ? (german ? t("Keine Geräte gefunden") : "No devices found")
       : (german ? "Netzwerkscan fehlgeschlagen" : "Network scan failed");
     const hint = german
-      ? t("Prüfe unter Einstellungen → Allgemein das überwachte IPv4-Netz und ob Home Assistant es erreichen kann. Wähle danach „Jetzt scannen“.")
+      ? t("Prüfe unter Einstellungen → Allgemein das überwachte IPv4-Netz und ob Home Assistant es erreichen kann. Warte anschließend auf den nächsten automatischen Scan.")
       : "Check the monitored IPv4 network under Settings → General and make sure Home Assistant can reach it. Then select Scan now.";
     return `<strong>${title}</strong>${hint}`;
   }
