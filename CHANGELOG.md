@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.30.0 — Less scroll. More patrol. 🧭
+
+*Even the tabs know their way around now.*
+
+- **Navigation:** The left sidebar brings Devices, Events, DNS, Analysis, Monitoring and General Settings together. An eye icon identifies Monitoring, and the device table uses a checkbox icon for column selection.
+- **Mobile devices:** Online or Offline appears beside each device name. Expand a row for its IP address, monitoring actions and other details. Open rows stay expanded during live updates.
+- **Overview:** Counts and status labels share a lighter type style. Guest network status and guest count sit beside Online, Offline and New, with direct access to guest controls.
+- **Monitoring:** Active alerts, critical alerts, unknown devices and unstable devices share one glass strip with fine gold dividers.
+- **Cleanup:** Removed the GitHub buttons, manual scan button and version text from the header, plus the old mesh topology view and handover demo. Scheduled scans and mesh details in the device table remain available.
+- **Frontend:** Split views, styles, formatting and translations into separate modules. Interface labels are translated as they render.
+
+Integration **1.30.0** · Frontend **1.30.3**
+
 ## 1.30.0-beta.2 — The tabs took the side door. 🧭
 
 - Devices, Events, DNS, Analysis, Monitoring and General Settings now share a compact icon rail on the left.

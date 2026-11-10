@@ -1,5 +1,5 @@
-import { esc, formatRemainingDuration } from "./panel-formatters.mjs?v=1.30.2";
-import { activeLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.2";
+import { esc, formatRemainingDuration } from "./panel-formatters.mjs?v=1.30.3";
+import { activeLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.3";
 
 export function renderWatch() {
   const panel = this.shadowRoot.querySelector(".watch-view");
@@ -254,12 +254,12 @@ export function renderWatch() {
       <p>${t("Die Anfragen müssen in Pi-hole einzelnen Clients zugeordnet sein. Datenschutz oder deaktivierte Protokollierung können Details ausblenden. Nicht verfügbare AdGuard-Funktionen werden hier nicht angeboten.")}</p>
     </section>` : "";
   panel.innerHTML = `
-    <div class="security-metrics">
-      <article class="security-card"><span>${t("Aktive Warnungen")}</span><strong>${Number(summary.active || 0)}</strong></article>
-      <article class="security-card"><span>${t("Kritisch")}</span><strong>${Number(summary.critical || 0)}</strong></article>
-      <article class="security-card"><span>${t("Unbekannte Geräte")}</span><strong>${Number(summary.unknown || 0)}</strong></article>
-      <article class="security-card"><span>${t("Instabile Geräte")}</span><strong>${Number(summary.unstable || 0)}</strong></article>
-    </div>
+    <dl class="security-metrics">
+      <div><dt>${t("Aktive Warnungen")}</dt><dd>${Number(summary.active || 0)}</dd></div>
+      <div><dt>${t("Kritisch")}</dt><dd>${Number(summary.critical || 0)}</dd></div>
+      <div><dt>${t("Unbekannte Geräte")}</dt><dd>${Number(summary.unknown || 0)}</dd></div>
+      <div><dt>${t("Instabile Geräte")}</dt><dd>${Number(summary.unstable || 0)}</dd></div>
+    </dl>
     <div class="watch-overview-grid">
     <div class="watch-layout alerts-only">
       <section class="watch-panel alerts-panel">

@@ -1,10 +1,10 @@
-import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.2";
-import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.2";
-import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.2";
-import { renderCards } from "./panel-devices.mjs?v=1.30.2";
-import { panelStyles } from "./panel-styles.mjs?v=1.30.2";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.2";
-import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.2";
+import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.3";
+import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.3";
+import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.3";
+import { renderCards } from "./panel-devices.mjs?v=1.30.3";
+import { panelStyles } from "./panel-styles.mjs?v=1.30.3";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.3";
+import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.3";
 
 class EngelsoftNodarionPanel extends HTMLElement {
   constructor() {
@@ -552,7 +552,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ["log", "mdi:text-box-search-outline", t("Ereignisse")],
       ["dns", "mdi:shield-check-outline", "DNS"],
       ["ai", "mdi:chart-line", t("Analyse")],
-      ["watch", "mdi:shield-eye-outline", t("Überwachung")],
+      ["watch", "mdi:eye-outline", t("Überwachung")],
       ["settings", "mdi:cog-outline", t("Allgemeine Einstellungen öffnen")],
     ];
     this.shadowRoot.innerHTML = `
@@ -581,7 +581,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
           <section class="connection-panel" hidden></section>
           <section class="metrics"></section>
           <section class="tab-view" data-view="participants">
-            <button class="column-picker-button table-column-picker" type="button" title="Tabellenspalten auswählen" aria-label="Tabellenspalten auswählen"><ha-icon icon="mdi:cog-outline"></ha-icon></button>
+            <button class="column-picker-button table-column-picker" type="button" title="Tabellenspalten auswählen" aria-label="Tabellenspalten auswählen"><ha-icon icon="mdi:checkbox-multiple-marked-outline"></ha-icon></button>
             <div class="column-picker" hidden></div>
             <section class="table-panel device-list"></section>
           </section>
