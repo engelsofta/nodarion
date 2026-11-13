@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.30.3 — Less clutter. More packets. 📡
+
+- **Settings:** Five sections share consistent controls and spacing. Network and device settings are now together, with maintenance actions below. The save area shows pending changes or confirms that DNS changes apply immediately.
+- **AI analysis:** A score ring and four illustrated report cards make the results easier to scan. The analysis icon pulses while a report is running and respects reduced-motion preferences.
+- **Guest Wi-Fi:** A more compact dialog keeps the switch, QR code and guest status close together.
+- **Device table:** On desktop, the table uses the available height down to the bottom of the viewport and scrolls internally.
+- **Navigation:** Inactive sidebar icons keep their category colors on transparent backgrounds.
+
+Integration **1.30.3** · Frontend **1.30.7**
+
 ## 1.30.2 — Less menu hopping. More network watching. 🎛️
 
 - **AI analysis:** Score, summary and recent ratings share a compact overview. Report details adapt to the available width, and the prompt can still be opened when available.

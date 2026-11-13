@@ -1,10 +1,10 @@
-import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.5";
-import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.5";
-import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.5";
-import { renderCards } from "./panel-devices.mjs?v=1.30.5";
-import { panelStyles } from "./panel-styles.mjs?v=1.30.5";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.5";
-import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.5";
+import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.7";
+import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.7";
+import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.7";
+import { renderCards } from "./panel-devices.mjs?v=1.30.7";
+import { panelStyles } from "./panel-styles.mjs?v=1.30.7";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.7";
+import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.7";
 
 class EngelsoftNodarionPanel extends HTMLElement {
   constructor() {
@@ -124,7 +124,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     try {
       const tab = localStorage.getItem("nodarion-settings-tab");
       return ["general", "devices", "rules", "notifications", "dns", "ai-maintenance"].includes(tab)
-        ? tab : "general";
+        ? (tab === "devices" ? "general" : tab) : "general";
     } catch (_error) {
       return "general";
     }
@@ -269,6 +269,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
       if (label) label.textContent = unsavedChanges(this._dirtyRules.size);
     }
     if (save) save.disabled = this._dirtyRules.size === 0;
+    const status = settingsView.querySelector(".settings-save-status");
+    if (status) status.textContent = this._dirtyRules.size ? unsavedChanges(this._dirtyRules.size)
+      : this._settingsTab === "dns" ? t("DNS wird sofort gespeichert") : t("Alles gespeichert");
   }
 
   _confirm({ title, message, confirmLabel = t("Bestätigen"), danger = false, showCancel = true }) {
@@ -303,7 +306,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   async _saveRuleSettings(button, rules, kind) {
     const selector = ".save-watch-rules";
-    const defaultLabel = t("Alle Einstellungen speichern");
+    const defaultLabel = t("Speichern");
     const defaultContent = `<ha-icon icon="mdi:content-save-outline"></ha-icon>${defaultLabel}`;
     button.disabled = true;
     button.classList.remove("saved", "failed");
@@ -314,6 +317,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this._notifyTargetsDirty = false;
       this._settingsDraft = null;
       this._dirtyRules.clear();
+      this._updateSettingsDirtyUi(this.shadowRoot.querySelector(".settings-view"));
       const savedButton = this.shadowRoot.querySelector(selector);
       if (!savedButton) return;
       savedButton.disabled = true;
@@ -322,7 +326,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       window.setTimeout(() => {
         const currentButton = this.shadowRoot.querySelector(selector);
         if (!currentButton?.classList.contains("saved")) return;
-        currentButton.disabled = false;
+        currentButton.disabled = this._dirtyRules.size === 0;
         currentButton.classList.remove("saved");
         currentButton.innerHTML = defaultContent;
       }, 1800);
@@ -388,7 +392,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   _openSettings(section = "general") {
     const allowed = ["general", "devices", "rules", "notifications", "dns", "ai-maintenance"];
-    this._settingsTab = allowed.includes(section) ? section : "general";
+    this._settingsTab = allowed.includes(section) ? (section === "devices" ? "general" : section) : "general";
     this._saveSettingsTab();
     this._renderWatch();
     this._navigateTo("settings");
@@ -1680,8 +1684,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ? `<div class="guest-qr"><img src="${esc(qrCode)}" alt="${t("QR-Code für das Gast-WLAN {0}", esc(info.ssid || ""))}"><div class="guest-qr-copy"><h3>${t("Mit dem Gast-WLAN verbinden")}</h3><p>${t("QR-Code mit der Handykamera scannen und direkt mit")} <strong>${esc(info.ssid || "dem Gast-WLAN")}</strong> verbinden.</p></div></div>`
       : `<div class="guest-qr-unavailable">${info.qr_code_restricted ? t("Der WLAN-QR-Code ist nur für Home-Assistant-Administratoren sichtbar.") : info.enabled ? t("Die FRITZ!Box konnte für dieses Gast-WLAN keinen QR-Code bereitstellen.") : t("Der QR-Code ist verfügbar, sobald der Gastzugang aktiv ist.")}</div>`;
     host.innerHTML = `<div class="guest-modal-backdrop"><section class="guest-modal" role="dialog" aria-modal="true" aria-labelledby="guest-modal-title">
-      <div class="guest-modal-head"><div><h2 id="guest-modal-title"><ha-icon icon="mdi:wifi-star"></ha-icon>${t("FRITZ!Box-Gastzugang")}</h2><p>${t("Gast-WLAN direkt auf der FRITZ!Box ein- oder ausschalten.")}</p></div><button class="guest-close" type="button" aria-label="${t("Schließen")}"><ha-icon icon="mdi:close"></ha-icon></button></div>
-      <div class="guest-control"><span>${t("Gast-WLAN")}</span><button class="guest-toggle" type="button" role="switch" aria-label="${t("Gast-WLAN")}" aria-checked="${Boolean(info.enabled)}" ${this._guestToggleBusy || !info.available || info.ap_type !== "guest" ? "disabled" : ""}><span class="guest-toggle-track"><span></span></span><strong>${this._guestToggleBusy ? t("Wird umgeschaltet …") : info.enabled ? t("Ein") : t("Aus")}</strong></button></div>
+      <div class="guest-modal-head">
+        <h2 id="guest-modal-title"><ha-icon icon="mdi:wifi-star"></ha-icon>${t("FRITZ!Box-Gastzugang")}</h2>
+        <div class="guest-header-actions">
+          <button class="guest-toggle" type="button" role="switch" aria-label="${t("Gast-WLAN")}" aria-checked="${Boolean(info.enabled)}" ${this._guestToggleBusy || !info.available || info.ap_type !== "guest" ? "disabled" : ""}><span class="guest-toggle-track"><span></span></span><strong>${this._guestToggleBusy ? t("Wird umgeschaltet …") : info.enabled ? t("Ein") : t("Aus")}</strong></button>
+          <button class="guest-close" type="button" aria-label="${t("Schließen")}"><ha-icon icon="mdi:close"></ha-icon></button>
+        </div>
+      </div>
       ${this._guestToggleError ? `<p class="guest-toggle-error" role="alert">${esc(this._guestToggleError)}</p>` : ""}
       <div class="guest-status-grid">
         ${detail("Status", info.available === false ? t("Nicht verfügbar") : info.enabled ? t("Aktiv") : t("Deaktiviert"))}
@@ -1692,8 +1701,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
         ${detail(t("Restlaufzeit"), Number.isFinite(remaining) ? formatLease(remaining) : info.timeout_active ? t("Aktiv") : t("Ohne Zeitlimit"))}
       </div>
       ${qrHtml}
-      <div class="guest-client-list">${clients || `<div class="empty"><ha-icon icon="mdi:wifi-off"></ha-icon><strong>${t("Keine Gäste online")}</strong>${t("Der Gastzugang ist gerade angenehm übersichtlich.")}</div>`}</div>
-      <div class="guest-actions"><button class="guest-show" type="button"><ha-icon icon="mdi:filter-variant"></ha-icon>${t("Gäste in Tabelle anzeigen")}</button></div>
+      ${clients ? `<div class="guest-client-list">${clients}</div>` : ""}
+      <div class="guest-actions">
+        ${clients ? "" : `<span class="guest-empty"><ha-icon icon="mdi:wifi-off"></ha-icon>${t("Keine Gäste online")}</span>`}
+        <button class="guest-show" type="button"><ha-icon icon="mdi:filter-variant"></ha-icon>${t("Gäste in Tabelle anzeigen")}</button>
+      </div>
     </section></div>`;
   }
 

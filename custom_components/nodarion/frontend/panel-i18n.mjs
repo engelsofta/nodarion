@@ -1,6 +1,10 @@
 // The German source message is the key. Numbered placeholders keep device
 // names, addresses and other data separate from translation.
 const english = new Map(Object.entries({
+  "Netzwerk & Geräte": "Network & devices",
+  "Wartung": "Maintenance",
+  "Alles gespeichert": "All changes saved",
+  "DNS wird sofort gespeichert": "DNS changes are saved immediately",
   " · nicht überwacht": " · not monitored",
   "-Ziel in Home Assistant vorhanden.": "target exists in Home Assistant.",
   "24-Stunden-Bewertung mit Tagesvergleich · letzter Bericht {0}": "24-hour rating with day-to-day comparison · latest report {0}",

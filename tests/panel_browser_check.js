@@ -24,6 +24,7 @@ async function main() {
             { entity_id:"binary_sensor.office", state:"on", attributes:{ nodarion_key:"office", ip_address:"192.0.2.2", hostname:"Überwachung" } },
             { entity_id:"binary_sensor.lamp", state:"off", attributes:{ nodarion_key:"lamp", ip_address:"192.0.2.3", hostname:"A very long sample device name that should not push the status offscreen" } }
           ];
+          monitor.rules = {...monitor.rules, network_segments:[{name:"Home", vlan_id:1, network:"192.0.2.0/24", role:"trusted",color:"#7788aa",monitoring:true}]};
           panel._render();
           document.body.dataset.ready='true';`
         );
@@ -65,7 +66,7 @@ async function main() {
     assert.ok((await panel.boundingBox()).height >= 1080);
     await page.setViewportSize({ width: 390, height: 844 });
     const settingsMenu = settings.locator(".settings-menu");
-    assert.equal(await settingsMenu.getByRole("button").count(), 6);
+    assert.equal(await settingsMenu.getByRole("button").count(), 5);
     const saveSettings = settings.locator(".settings-toolbar .save-watch-rules");
     assert.equal(await saveSettings.isEnabled(), false);
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -76,7 +77,7 @@ async function main() {
     const learningDays = settings.locator('[data-rule="learning_days"]');
     await learningDays.fill("12");
     assert.equal(await saveSettings.isEnabled(), true);
-    for (const section of ["devices", "rules", "notifications", "dns", "ai-maintenance", "general"]) {
+    for (const section of ["rules", "notifications", "dns", "ai-maintenance", "general"]) {
       const entry = settingsMenu.locator(`[data-settings-section="${section}"]`);
       await entry.click();
       assert.equal(await entry.getAttribute("aria-current"), "true");
@@ -89,14 +90,50 @@ async function main() {
       }
     }
     assert.equal(await learningDays.inputValue(), "12");
+    assert.equal(await settings.locator('.onboarding-settings').isVisible(), true);
+    assert.equal(await settings.locator('.guest-settings').isVisible(), true);
+    assert.equal(await settings.locator('[data-rule="enabled"]').getAttribute('role'), 'switch');
+    await panel.evaluate(element => {
+      element._originalStateClient = element._stateClient;
+      element._stateClient = { mutate: async payload => { element._testSavedRules = payload.rules; } };
+    });
+    await saveSettings.click();
+    assert.equal(await panel.evaluate(el => el._testSavedRules.learning_days), 12);
+    assert.equal(await settings.locator('.settings-save-status').textContent(), 'Alles gespeichert');
+    await page.waitForTimeout(1900);
+    assert.equal(await saveSettings.isEnabled(), false);
+    await panel.evaluate(element => { element._stateClient = element._originalStateClient; });
+    for (const viewport of [{ width:390, height:844 }, { width:1440, height:900 }]) {
+      await page.setViewportSize(viewport);
+      for (const section of ['general', 'rules', 'notifications', 'dns', 'ai-maintenance']) {
+        await settingsMenu.locator('[data-settings-section="' + section + '"]').click();
+        assert.ok(await settings.evaluate(el => el.scrollWidth <= el.clientWidth + 1), section + ' overflow');
+        if (section === 'dns') assert.equal(await settings.locator('.settings-save-status').textContent(), 'DNS wird sofort gespeichert');
+        if (process.env.NODARION_PREVIEW_DIR) await settings.screenshot({path:path.join(process.env.NODARION_PREVIEW_DIR, 'settings-' + section + '-' + viewport.width + '.png')});
+      }
+    }
+    await page.setViewportSize({ width:390, height:844 });
+
     assert.equal(await settings.locator(".settings-context-title, .settings-back").count(), 0);
     assert.equal(await panel.locator(".metrics .metric-settings").count(), 0);
     assert.equal(await panel.locator("header .header-settings").count(), 0);
     assert.equal(await panel.locator("header .scan, header .version-info").count(), 0);
     await nav.getByRole("button", { name: "Geräte", exact: true }).click();
     const guest = panel.locator(".device-counts .guest-inline");
+    await panel.evaluate((element, qrCode) => {
+      Object.assign(element._monitor.guest_access, {
+        available: true, enabled: true, ap_type: "guest", ssid: "Test Guest Wi-Fi", qr_code: qrCode,
+      });
+    }, "data:image/svg+xml;base64," + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" /></svg>').toString("base64"));
     await guest.click();
-    assert.equal(await panel.locator(".guest-modal").isVisible(), true);
+    const guestDialog = panel.locator(".guest-modal");
+    assert.equal(await guestDialog.isVisible(), true);
+    assert.equal(await guestDialog.locator(".guest-qr img").isVisible(), true);
+    for (const viewport of [{ width: 390, height: 640 }, { width: 1440, height: 720 }]) {
+      await page.setViewportSize(viewport);
+      assert.equal(await guestDialog.evaluate(el => el.scrollHeight <= el.clientHeight + 1), true);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     await panel.locator(".guest-close").click();
     assert.equal(await panel.locator(".guest-modal").count(), 0);
     const row = panel.locator(".device-list tbody tr").first();
@@ -161,8 +198,8 @@ async function main() {
     await promptToggle.click();
     assert.equal(await report.locator(".ai-prompt").isVisible(), false);
     await page.setViewportSize({ width: 1800, height: 900 });
-    assert.equal(await report.locator(".ai-copy").evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length), 4);
-    assert.ok((await report.boundingBox()).height < 290);
+    assert.equal(await report.locator(".ai-copy").evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length), 2);
+    assert.ok((await report.boundingBox()).height < 380);
     if (process.env.NODARION_PREVIEW_DIR) {
       await report.screenshot({ path: path.join(process.env.NODARION_PREVIEW_DIR, "panel-ai-desktop.png") });
     }
@@ -186,6 +223,9 @@ async function main() {
     const rail = await nav.boundingBox();
     const content = await panel.locator(".panel-content").boundingBox();
     assert.ok(rail.x + rail.width < content.x && rail.height > rail.width);
+    const shell = await panel.locator(".shell").boundingBox();
+    const devices = await panel.locator(".device-list").boundingBox();
+    assert.ok(Math.abs((shell.y + shell.height) - (devices.y + devices.height) - 14) < 2);
     const readings = await panel.locator(".metric-reading > div, .device-count strong, .function-count strong")
       .evaluateAll(elements => elements.map(el => [el.getBoundingClientRect().top, getComputedStyle(el).fontSize]));
     assert.equal(new Set(readings.map(([, font]) => font)).size, 1);

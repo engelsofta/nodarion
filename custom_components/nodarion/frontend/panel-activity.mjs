@@ -1,5 +1,5 @@
-import { esc, blockReason } from "./panel-formatters.mjs?v=1.30.5";
-import { activeLocale, t } from "./panel-i18n.mjs?v=1.30.5";
+import { esc, blockReason } from "./panel-formatters.mjs?v=1.30.7";
+import { activeLocale, t } from "./panel-i18n.mjs?v=1.30.7";
 
 export function renderLog(resetVerticalScroll = false) {
   const list = this.shadowRoot.querySelector(".log-list");
@@ -334,7 +334,7 @@ export function renderAi() {
     <div class="ai-report">
       <div class="ai-overview">
         <div class="ai-score ${scoreClass}">
-          <div class="ai-score-value"><strong>${score}</strong> <span>${t("von 10")}</span></div>
+          <div class="ai-score-value" style="--score-progress:${Math.max(0, Math.min(10, score || 0)) * 10}%"><strong>${score}</strong><span>${t("von 10")}</span></div>
           <small>${scoreDelta === null ? t("Erste Bewertung") : scoreDelta > 0 ? t("▲ {0} zum Vortag", scoreDelta) : scoreDelta < 0 ? t("▼ {0} zum Vortag", Math.abs(scoreDelta)) : t("● unverändert")}</small>
         </div>
         <div class="ai-summary"><h3>${t("Zusammenfassung")}</h3><p>${esc(latestReport.summary)}</p></div>
@@ -344,17 +344,17 @@ export function renderAi() {
         </figure>
       </div>
       <div class="ai-copy">
-        <article><h3>${t("Auffälligkeiten")}</h3><p>${esc(latestReport.risks)}</p></article>
-        <article><h3>${t("Änderungen")}</h3><p>${esc(latestReport.changes)}</p></article>
-        <article><h3>${t("Empfehlungen")}</h3><p>${esc(latestReport.recommendations)}</p></article>
-        <article><h3>${t("Vertrauen und Datenlage")}</h3><p>${esc(latestReport.confidence)}</p></article>
+        <article class="ai-insight ai-insight-risks"><ha-icon class="ai-insight-icon" icon="mdi:radar" aria-hidden="true"></ha-icon><div><h3>${t("Auffälligkeiten")}</h3><p>${esc(latestReport.risks)}</p></div></article>
+        <article class="ai-insight ai-insight-changes"><ha-icon class="ai-insight-icon" icon="mdi:chart-line" aria-hidden="true"></ha-icon><div><h3>${t("Änderungen")}</h3><p>${esc(latestReport.changes)}</p></div></article>
+        <article class="ai-insight ai-insight-recommendations"><ha-icon class="ai-insight-icon" icon="mdi:lightbulb-outline" aria-hidden="true"></ha-icon><div><h3>${t("Empfehlungen")}</h3><p>${esc(latestReport.recommendations)}</p></div></article>
+        <article class="ai-insight ai-insight-confidence"><ha-icon class="ai-insight-icon" icon="mdi:shield-check-outline" aria-hidden="true"></ha-icon><div><h3>${t("Vertrauen und Datenlage")}</h3><p>${esc(latestReport.confidence)}</p></div></article>
       </div>
     </div>`
     : `<div class="ai-empty">${t("Noch keine KI-Auswertung vorhanden. Aktiviere den täglichen Bericht oder starte die erste Analyse manuell.")}</div>`;
   panel.innerHTML = `
-    <section class="ai-panel">
+    <section class="ai-panel${ai.running ? " ai-running" : ""}">
       <div class="ai-head">
-        <div><h2><ha-icon icon="mdi:creation-outline"></ha-icon>${t("KI-Netzwerkanalyse")}</h2><p>${t("24-Stunden-Bewertung mit Tagesvergleich · letzter Bericht {0}", esc(reportTime))}</p></div>
+        <div class="ai-heading"><ha-icon class="ai-heading-icon" icon="mdi:creation-outline" aria-hidden="true"></ha-icon><div><h2>${t("KI-Netzwerkanalyse")}</h2><p>${t("24-Stunden-Bewertung mit Tagesvergleich · letzter Bericht {0}", esc(reportTime))}</p></div></div>
         <div class="ai-actions">
           ${latestReport?.prompt ? `<button class="ai-prompt-toggle" type="button" aria-expanded="false" aria-controls="ai-report-prompt"><ha-icon icon="mdi:code-json"></ha-icon>${t("Prompt anzeigen")}</button>` : ""}
           <button class="ai-run ${ai.running ? "busy" : ""}" type="button" ${ai.running ? "disabled" : ""}><ha-icon icon="mdi:creation-outline"></ha-icon>${ai.running ? t("Analyse läuft …") : t("Jetzt analysieren")}</button>

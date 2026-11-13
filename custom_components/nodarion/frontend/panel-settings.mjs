@@ -1,5 +1,5 @@
-import { esc, formatRemainingDuration } from "./panel-formatters.mjs?v=1.30.5";
-import { activeLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.5";
+import { esc, formatRemainingDuration } from "./panel-formatters.mjs?v=1.30.7";
+import { activeLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.7";
 
 export function renderWatch() {
   const panel = this.shadowRoot.querySelector(".watch-view");
@@ -224,12 +224,11 @@ export function renderWatch() {
     </div>`;
   }).join("");
   const settingsSections = [
-    ["general", t("Allgemein")],
-    ["devices", t("Geräte")],
-    ["rules", t("Überwachung")],
-    ["notifications", t("Benachrichtigungen")],
-    ["dns", "DNS"],
-    ["ai-maintenance", t("KI-Analyse")],
+    ["general", t("Netzwerk & Geräte"), "mdi:lan"],
+    ["rules", t("Überwachung"), "mdi:eye-outline"],
+    ["notifications", t("Benachrichtigungen"), "mdi:bell-outline"],
+    ["dns", t("DNS-Schutz"), "mdi:shield-check-outline"],
+    ["ai-maintenance", t("KI-Analyse"), "mdi:auto-fix"],
   ];
   const adguardSwitches = (this._dnsProvider().id === "pihole" ? [["switch.nodarion_pihole_gesamtschutz", t("Pi-hole DNS-Schutz"), t("DNS-Blockierung ein- oder ausschalten")]] : [
     ["switch.nodarion_adguard_gesamtschutz", "Gesamtschutz", t("Master-Schalter für sämtliche Schutzfunktionen")],
@@ -273,10 +272,10 @@ export function renderWatch() {
       <section class="watch-panel watch-settings-panel">
         <div class="settings-toolbar">
           <nav class="settings-menu" aria-label="${t("Einstellungsbereiche")}">
-            ${settingsSections.map(([key, label]) => `<button type="button" id="settings-menu-${key}" data-settings-section="${key}" aria-controls="settings-panel-${key}" aria-current="${this._settingsTab === key}">${esc(label)}</button>`).join("")}
+            ${settingsSections.map(([key, label, icon]) => `<button type="button" id="settings-menu-${key}" data-settings-section="${key}" aria-controls="settings-panel-${key}" aria-current="${this._settingsTab === key}"><ha-icon icon="${icon}"></ha-icon><span>${esc(label)}</span></button>`).join("")}
           </nav>
-          <div class="settings-save-area">
-            <button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>${t("Alle Einstellungen speichern")}</button>
+          <div class="settings-save-area"><span class="settings-save-status" role="status" aria-live="polite">${this._dirtyRules.size ? unsavedChanges(this._dirtyRules.size) : this._settingsTab === "dns" ? t("DNS wird sofort gespeichert") : t("Alles gespeichert")}</span>
+            <button class="save-rules save-watch-rules" type="button" ${this._dirtyRules.size ? "" : "disabled"}><ha-icon icon="mdi:content-save-outline"></ha-icon>${t("Speichern")}</button>
           </div>
         </div>
         <div class="settings-dirty" role="status" aria-live="polite" ${this._dirtyRules.size ? "" : "hidden"}>
@@ -295,8 +294,6 @@ export function renderWatch() {
             <div class="vlan-list">${networkSegmentRows}</div>
             <p class="vlan-empty-note">${t("Subnetze dürfen sich nicht überschneiden. Überwachung aktiviert den Ping/TCP-Scanner und VLAN-Wechselwarnungen für das Segment.")}</p>
           </section>
-          </div>
-          <div class="settings-tab-panel devices-panel" id="settings-panel-devices" role="region" aria-labelledby="settings-menu-devices" data-settings-panel="devices" ${this._settingsTab === "devices" ? "" : "hidden"}>
           <section class="rule-group onboarding-settings">
             <h3>${t("Neue Geräte")}<button class="settings-help-button" type="button" data-settings-help="onboarding" title="${t("Erkennung neuer Geräte erklären")}" aria-label="${t("Hilfe zur Erkennung neuer Geräte")}">?</button></h3>
             <div class="rule"><label>${t("Neue Geräte automatisch erkennen")}<small>${t("Teilnehmer in einem festgelegten IP-Bereich als neu kennzeichnen")}</small></label><input type="checkbox" data-rule="onboarding_enabled" ${checked(rules.onboarding_enabled)}></div>
@@ -313,7 +310,7 @@ export function renderWatch() {
             <div class="rule"><label>${t("Maximale Gastdauer")}<small>${t("Danach eine Warnung anzeigen")}</small></label><span class="unit-input"><input type="number" min="1" max="168" data-rule="guest_max_hours" value="${Number(rules.guest_max_hours)}"><span>${t("Stunden")}</span></span></div></div>
           </section>
           <section class="rule-group danger-zone cleanup-settings">
-            <h3>${t("Bereinigung")}<button class="settings-help-button" type="button" data-settings-help="cleanup" title="${t("Bereinigung erklären")}" aria-label="${t("Hilfe zur Bereinigung")}">?</button></h3>
+            <h3>${t("Wartung")}<button class="settings-help-button" type="button" data-settings-help="cleanup" title="${t("Bereinigung erklären")}" aria-label="${t("Hilfe zur Bereinigung")}">?</button></h3>
             <div class="rule">
               <label>${t("Offline-Teilnehmer bereinigen")}<small>${t("Aktuell {0} offline, davon {1} mit Freigabe oder Überwachung.", offlineEntities.length, protectedOffline)}</small></label><div class="cleanup-summary">${t("„Anzeige bereinigen“ behält Freigaben. „Vollständig vergessen“ entfernt zusätzlich Freigaben und Markierungen.")}</div><div class="cleanup-actions"><button class="cleanup preserve" data-forget="false" type="button"><ha-icon icon="mdi:broom"></ha-icon>${t("Anzeige bereinigen")}</button><button class="cleanup" data-forget="true" type="button"><ha-icon icon="mdi:delete-forever-outline"></ha-icon>${t("Vollständig vergessen")}</button></div>
             </div>
@@ -337,11 +334,11 @@ export function renderWatch() {
             <div class="rule"><label>${t("Ruhezeit beginnt")}</label><input type="time" data-rule="quiet_start" value="${esc(rules.quiet_start)}"></div>
             <div class="rule"><label>${t("Ruhezeit endet")}</label><input type="time" data-rule="quiet_end" value="${esc(rules.quiet_end)}"></div></div>
           </section>
-          <details class="advanced-settings"><summary>${t("Erweiterte Prüfungen")}</summary><section class="rule-group alert-rule-settings">
+          <section class="rule-group alert-rule-settings">
             <h3>${t("Weitere Prüfungen")}<button class="settings-help-button" type="button" data-settings-help="checks" title="${t("Prüfungen erklären")}" aria-label="${t("Hilfe zu weiteren Prüfungen")}">?</button></h3>
             <div class="rule"><label>${t("Statuswechsel pro Stunde")}<small>${t("Ab dieser Anzahl als instabil melden")}</small></label><span class="unit-input"><input type="number" min="2" max="100" data-rule="flap_limit" value="${Number(rules.flap_limit)}"><span>${t("Wechsel/Std.")}</span></span></div>
             <div class="rule"><label>${t("Identitätswechsel melden")}<small>${t("Andere MAC-Adresse am gleichen IP-Platz")}</small></label><input type="checkbox" data-rule="identity_changes" ${checked(rules.identity_changes)}></div>
-          </section></details>
+          </section>
           </div>
           <div class="settings-tab-panel notifications-panel" id="settings-panel-notifications" role="region" aria-labelledby="settings-menu-notifications" data-settings-panel="notifications" ${this._settingsTab === "notifications" ? "" : "hidden"}>
           <section class="rule-group notification-settings">
@@ -387,6 +384,19 @@ export function renderSettings() {
     ".settings-view .watch-settings-panel"
   );
   panel.replaceChildren(...[watchSettings].filter(Boolean));
+  panel.querySelectorAll(".rule input, .rule select").forEach((input) => {
+    const label = input.closest(".rule")?.querySelector("label, :scope > span:first-child");
+    if (label && !input.getAttribute("aria-label")) input.setAttribute("aria-label", label.childNodes[0]?.textContent?.trim() || label.textContent.trim());
+    if (input.type === "checkbox") input.setAttribute("role", "switch");
+  });
+  const menu = panel.querySelector(".settings-menu");
+  const selected = menu?.querySelector('[aria-current="true"]');
+  if (selected && menu.scrollWidth > menu.clientWidth) {
+    const itemBox = selected.getBoundingClientRect();
+    const menuBox = menu.getBoundingClientRect();
+    if (itemBox.left < menuBox.left) menu.scrollLeft -= menuBox.left - itemBox.left;
+    else if (itemBox.right > menuBox.right) menu.scrollLeft += itemBox.right - menuBox.right;
+  }
   if (focusedSection) {
     panel.querySelector('[data-settings-section][aria-current="true"]')?.focus({ preventScroll: true });
   }
