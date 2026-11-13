@@ -1,5 +1,5 @@
-import { esc, blockReason } from "./panel-formatters.mjs?v=1.30.7";
-import { activeLocale, t } from "./panel-i18n.mjs?v=1.30.7";
+import { esc, blockReason } from "./panel-formatters.mjs?v=1.30.14";
+import { activeLocale, t } from "./panel-i18n.mjs?v=1.30.14";
 
 export function renderLog(resetVerticalScroll = false) {
   const list = this.shadowRoot.querySelector(".log-list");
@@ -164,6 +164,10 @@ export function renderDnsLive() {
       ? blockReason(item.reason)
       : rawStatus.toUpperCase() === "NOERROR" ? "OK" : (rawStatus || t("Verarbeitet"));
     const dnsServer = item.dns_server || (item.cached ? "Cache" : item.upstream) || this._dnsProvider().name;
+    const sourceType = dnsServer === "Cache" ? "cache"
+      : dnsServer === "AdGuard-Filter" ? "filter"
+      : dnsServer === "Lokale Antwort" ? "local"
+      : item.upstream ? "upstream" : "provider";
     const answer = (item.answer || []).join(", ") || "–";
     const elapsed = Number(item.elapsed_ms);
     const elapsedFormatted = Number.isFinite(elapsed)
@@ -172,22 +176,23 @@ export function renderDnsLive() {
           maximumFractionDigits: 2,
         }).format(elapsed)
       : null;
-    const hostname = hostnames.get(String(item.client || "")) || t("Nicht erkannt");
+    const resolvedHostname = hostnames.get(String(item.client || ""));
+    const hostname = resolvedHostname && resolvedHostname !== item.client ? resolvedHostname : t("Nicht erkannt");
     const domain = String(item.domain || "");
     const policyActions = this._hass?.user?.is_admin && domain
       ? item.blocked
         ? `<div class="dns-policy-actions"><button class="dns-policy allow" type="button" data-domain="${esc(domain)}" data-client="${esc(item.client || "")}" data-policy="allow">${t("Freigeben")}</button></div>`
         : `<div class="dns-policy-actions"><button class="dns-policy block" type="button" data-domain="${esc(domain)}" data-policy="block">${t("Blockieren")}</button></div>`
       : "–";
+    const safeSearch = item.reason === "FilteredSafeSearch";
     return `<tr class="dns-row ${item.blocked ? "blocked" : "allowed"}">
       <td data-label="${t("Zeit")}" class="mono">${esc(time)}</td>
-      <td data-label="${t("Ergebnis")}"><div class="dns-result"><ha-icon icon="${resultIcon}"></ha-icon>${resultLabel}</div></td>
+      <td data-label="${t("Ergebnis")}"><div class="dns-result${safeSearch ? " safe-search" : ""}"><ha-icon icon="${resultIcon}" role="img" aria-label="${esc(resultLabel)}"></ha-icon><span>${esc(reason)}</span></div></td>
       <td data-label="${t("Domain / Antwort")}"><div class="dns-domain">${esc(item.domain || "–")}</div><div class="dns-answer" title="${esc(answer)}">${esc(answer)}</div></td>
       <td data-label="Typ"><span class="dns-chip">${esc(item.query_type || "–")}</span></td>
       <td data-label="${t("Client-IP")}" class="mono">${esc(item.client || "–")}</td>
-      <td data-label="Hostname">${item.client ? `<button class="dns-host-link" type="button" data-client="${esc(item.client)}" data-name="${esc(hostname)}" title="${t("DNS-Live nach {0} filtern", esc(hostname))}"><ha-icon icon="mdi:filter-variant"></ha-icon><span>${esc(hostname)}</span></button><div class="log-ip">${esc(item.client)}</div>` : esc(hostname)}</td>
-      <td data-label="${t("DNS-Server")}"><span class="dns-chip" title="Für diese Anfrage verwendete DNS-Quelle">${esc(dnsServer)}</span></td>
-      <td data-label="${t("Grund")}">${esc(reason)}</td>
+      <td data-label="Hostname">${item.client ? `<button class="dns-host-link" type="button" data-client="${esc(item.client)}" data-name="${esc(hostname)}" title="${t("DNS-Live nach {0} filtern", esc(hostname))}"><ha-icon icon="mdi:filter-variant"></ha-icon><span>${esc(hostname)}</span></button>` : esc(hostname)}</td>
+      <td data-label="${t("DNS-Server")}"><span class="dns-source dns-source-${sourceType}">${esc(dnsServer)}</span></td>
       <td data-label="${t("Dauer")}" class="mono">${elapsedFormatted ? `${esc(elapsedFormatted)} ms` : "–"}</td>
       <td data-label="${t("Aktion")}">${policyActions}</td>
     </tr>`;
@@ -299,7 +304,7 @@ export function renderDnsLive() {
     </div>
     <div class="dns-list">
       ${rows ? `<table class="dns-table">
-        <thead><tr><th>${t("Zeit")}</th><th>${t("Ergebnis")}</th><th>${t("Domain / Antwort")}</th><th>Typ</th><th>${t("Client-IP")}</th><th>Hostname</th><th>${t("DNS-Server")}</th><th>${t("Grund")}</th><th>${t("Dauer")}</th><th>${t("Aktion")}</th></tr></thead>
+        <thead><tr><th>${t("Zeit")}</th><th>${t("Ergebnis")}</th><th>${t("Domain / Antwort")}</th><th>Typ</th><th>${t("Client-IP")}</th><th>Hostname</th><th>${t("DNS-Server")}</th><th>${t("Dauer")}</th><th>${t("Aktion")}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>` : `<div class="empty"><ha-icon icon="${this._dnsLiveLoading ? "mdi:progress-clock" : "mdi:dns-outline"}"></ha-icon><strong>${this._dnsLiveLoading ? t("DNS-Anfragen werden geladen") : t("Keine passenden DNS-Anfragen")}</strong>${this._dnsLiveLoading ? "Einen kleinen Moment …" : t("Filter ändern oder auf neue Anfragen warten.")}</div>`}
     </div>

@@ -1,10 +1,10 @@
-import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.7";
-import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.7";
-import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.7";
-import { renderCards } from "./panel-devices.mjs?v=1.30.7";
-import { panelStyles } from "./panel-styles.mjs?v=1.30.7";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.7";
-import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.7";
+import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.14";
+import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.14";
+import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.14";
+import { renderCards } from "./panel-devices.mjs?v=1.30.14";
+import { panelStyles } from "./panel-styles.mjs?v=1.30.14";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.14";
+import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.14";
 
 class EngelsoftNodarionPanel extends HTMLElement {
   constructor() {
@@ -33,7 +33,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     this._dnsLiveFilters = { domain: "", status: "all" };
     this._dnsLiveLoading = false;
     this._dnsLivePaused = false;
-    this._dnsChartVisible = true;
+    this._dnsChartVisible = this._loadDnsChartVisibility();
     this._dnsControlsActive = false;
     this._dnsLiveTimer = null;
     this._dnsLiveSignature = "";
@@ -117,6 +117,14 @@ class EngelsoftNodarionPanel extends HTMLElement {
       localStorage.setItem("ha-net-mon-columns", JSON.stringify(this._columnVisibility));
     } catch (_error) {
       // Local storage can be unavailable in a locked-down browser session.
+    }
+  }
+
+  _loadDnsChartVisibility() {
+    try {
+      return localStorage.getItem("nodarion-dns-chart-visible") !== "false";
+    } catch (_error) {
+      return true;
     }
   }
 
@@ -920,6 +928,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
       }
       if (event.target.closest(".dns-chart-toggle")) {
         this._dnsChartVisible = !this._dnsChartVisible;
+        try {
+          localStorage.setItem("nodarion-dns-chart-visible", String(this._dnsChartVisible));
+        } catch (_error) {
+          // The toggle still works when browser storage is unavailable.
+        }
         this._dnsRenderedSignature = "";
         this._renderDnsLive();
         return;

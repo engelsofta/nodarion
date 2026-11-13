@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.30.4 — DNS called. It wants its extra column back. 🛡️
+
+- **DNS results:** The shield and reason now share one column, immediately after the timestamp. Safe Search gets an orange shield, distinct from red blocklist results.
+- **Client details:** The client IP appears once. Clicking the hostname still filters the live log.
+- **DNS sources:** Cache, filters, local answers, and upstream servers use subtle text colors in place of badges.
+- **Chart:** The live log remembers whether the hourly chart was shown or hidden in your browser.
+
+Integration **1.30.4** · Frontend **1.30.14**
+
 ## 1.30.3 — Less clutter. More packets. 📡
 
 - **Settings:** Five sections share consistent controls and spacing. Network and device settings are now together, with maintenance actions below. The save area shows pending changes or confirms that DNS changes apply immediately.

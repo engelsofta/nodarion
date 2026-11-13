@@ -1,4 +1,4 @@
-import { settingsStyles } from "./settings-styles.mjs?v=1.30.7";
+import { settingsStyles } from "./settings-styles.mjs?v=1.30.14";
 
 export const panelStyles = `
 :host {
@@ -376,10 +376,22 @@ tbody tr.onboarding-row:hover {
 .dns-row.blocked { --dns-color:var(--ns-red); }
 .dns-row:hover { background:color-mix(in srgb,var(--dns-color) 7%,transparent); }
 .dns-row td { padding:13px 14px; font-size:12px; }
-.dns-result { display:flex; align-items:center; gap:7px; width:max-content; color:var(--dns-color); font-weight:800; white-space:nowrap; }
-.dns-result ha-icon { --mdc-icon-size:17px; }
+.dns-result { display:flex; align-items:center; gap:7px; color:var(--ns-text); overflow-wrap:anywhere; }
+.dns-result ha-icon { flex:none; color:#fff; --mdc-icon-size:17px; }
+.dns-row.blocked .dns-result ha-icon { color:var(--dns-color); }
+.dns-row .dns-result.safe-search ha-icon { color:#f4a34e; }
+:host([data-theme="light"]) .dns-row .dns-result.safe-search ha-icon { color:#a95208; }
 .dns-domain { color:#edfff7; font:700 13px ui-monospace,SFMono-Regular,Consolas,monospace; }
 .dns-answer { max-width:260px; overflow:hidden; text-overflow:ellipsis; color:#78998f; font:500 10px ui-monospace,SFMono-Regular,Consolas,monospace; white-space:nowrap; }
+.dns-source { color:var(--ns-muted); font-size:11px; overflow-wrap:anywhere; }
+.dns-source-cache { color:#9fc7d8; }
+.dns-source-filter { color:#d4b88a; }
+.dns-source-local { color:#a2c8ae; }
+.dns-source-upstream { color:#c0addd; }
+:host([data-theme="light"]) .dns-source-cache { color:#326579; }
+:host([data-theme="light"]) .dns-source-filter { color:#79591f; }
+:host([data-theme="light"]) .dns-source-local { color:#37674b; }
+:host([data-theme="light"]) .dns-source-upstream { color:#694c8d; }
 .dns-chip { display:inline-flex; padding:3px 6px; border-radius:6px; color:#b9d8cd; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.07); font-size:10px; font-weight:700; }
 .dns-error { margin-bottom:12px; padding:11px 13px; border-radius:10px; color:#ffd5d9; background:rgba(255,107,120,.08); border:1px solid rgba(255,107,120,.23); font-size:12px; }
 .dns-chart { margin-bottom:14px; padding:14px 16px 11px; border-radius:13px; background:rgba(2,10,8,.3); border:1px solid var(--ns-line); }
@@ -1263,8 +1275,7 @@ tbody tr:hover { background:rgba(231,185,101,.055); } .entity-link, .detail-stac
 :host([data-theme="light"]) .status .dot { box-shadow:0 0 0 3px color-mix(in srgb,var(--state) 14%,transparent); }
 :host([data-theme="light"]) .dns-row.allowed { --dns-color:#287347; }
 :host([data-theme="light"]) .dns-row.blocked { --dns-color:#b33939; }
-:host([data-theme="light"]) .dns-row.allowed .dns-result { color:#287347; }
-:host([data-theme="light"]) .dns-row.blocked .dns-result { color:#b33939; }
+:host([data-theme="light"]) .dns-row.allowed .dns-result ha-icon { color:var(--ns-text); }
 :host([data-theme="light"]) .dns-row.allowed { background:#f4faf6; }
 :host([data-theme="light"]) .dns-row.blocked { background:#fff5f4; }
 :host([data-theme="light"]) .dns-row.allowed:hover { background:#eaf6ee; }
