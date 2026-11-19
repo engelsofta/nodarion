@@ -1,4 +1,4 @@
-import { activeLocale, t } from "./panel-i18n.mjs?v=1.30.14";
+import { activeLocale, t } from "./panel-i18n.mjs?v=1.31.0";
 
 export const esc = (value) =>
   String(value ?? "")

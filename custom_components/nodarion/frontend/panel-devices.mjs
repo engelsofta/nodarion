@@ -1,8 +1,12 @@
-import { esc, deviceWebControl, onboardingStatus, formatLease, formatDateTime, isPrivateMac, formatStateChanged, isNetworkInfrastructure, deviceIcon, deviceIconTitle, blockReason, topDomains, signalRating, dnsRating } from "./panel-formatters.mjs?v=1.30.14";
-import { t } from "./panel-i18n.mjs?v=1.30.14";
-import { internetStatusFor } from "./internet-status.mjs?v=1.30.14";
+import { esc, deviceWebControl, onboardingStatus, formatLease, formatDateTime, isPrivateMac, formatStateChanged, isNetworkInfrastructure, deviceIcon, deviceIconTitle, blockReason, topDomains, signalRating, dnsRating } from "./panel-formatters.mjs?v=1.31.0";
+import { t } from "./panel-i18n.mjs?v=1.31.0";
+import { internetStatusFor } from "./internet-status.mjs?v=1.31.0";
 
-export function renderCards() {
+export function renderCards(liveUpdate = false) {
+  const [signalComparison, signalLimit] = (this._columnFilters.signalDbm || "").split(" ");
+  const signalEditor = this.shadowRoot.activeElement?.closest(".signal-dbm-filter[open]");
+  const signalEditorFocus = signalEditor && this.shadowRoot.activeElement;
+  const signalEditorScope = signalEditor?.closest(".mobile-device-controls") ? ".mobile-device-controls" : "table";
   const focusedDevice = this.shadowRoot.activeElement?.closest(".mobile-details")?.dataset.device;
   for (const button of this.shadowRoot.querySelectorAll(".metrics [data-quick-filter]")) {
     const { quickFilter, quickFilterValue } = button.dataset;
@@ -65,6 +69,11 @@ export function renderCards() {
     const filters = this._columnFilters;
     const key = attr.nodarion_key || `ip_${attr.ip_address}`;
     if (!this._matchesDeviceSearch(entity, filters.search)) return false;
+    if (signalComparison) {
+      const dbm = attr.signal_strength_dbm;
+      if (attr.connection_type === "LAN" || !Number.isFinite(dbm)) return false;
+      if (!(signalComparison === "<" ? dbm < Number(signalLimit) : dbm > Number(signalLimit))) return false;
+    }
     if (filters.state === "guest" && !attr.guest_network) return false;
     if (["on", "off"].includes(filters.state) && entity.state !== filters.state) return false;
     if (
@@ -225,12 +234,18 @@ export function renderCards() {
     const connection = vpnConnection
       ? "VPN"
       : [attr.connection_type, attr.wifi_band].filter(Boolean).join(" · ") || t("Nicht verfügbar");
-    const rates = attr.link_rate_mbps !== null && attr.link_rate_mbps !== undefined
-      ? `${attr.link_rate_mbps} Mbit/s`
-      : [
-          attr.link_rate_rx_mbps !== null && attr.link_rate_rx_mbps !== undefined ? `↓ ${attr.link_rate_rx_mbps} Mbit/s` : null,
-          attr.link_rate_tx_mbps !== null && attr.link_rate_tx_mbps !== undefined ? `↑ ${attr.link_rate_tx_mbps} Mbit/s` : null,
-        ].filter(Boolean).join(" · ");
+    const { link_rate_mbps: linkRate, link_rate_rx_mbps: rxRate, link_rate_tx_mbps: txRate } = attr;
+    let rates;
+    if (linkRate != null) {
+      rates = `${linkRate} Mbit/s`;
+    } else if (rxRate != null && rxRate === txRate) {
+      rates = `↓↑ ${rxRate} Mbit/s`;
+    } else {
+      rates = [
+        rxRate != null ? `↓ ${rxRate} Mbit/s` : null,
+        txRate != null ? `↑ ${txRate} Mbit/s` : null,
+      ].filter(Boolean).join(" · ");
+    }
     const signal = attr.signal_strength_percent !== null && attr.signal_strength_percent !== undefined
       ? t("{0} % Signal", attr.signal_strength_percent)
       : attr.signal_strength_dbm !== null && attr.signal_strength_dbm !== undefined
@@ -270,7 +285,7 @@ export function renderCards() {
       lifecycle === "onboarding" ? t("Gerät im DHCP-Einrichtungsbereich") : "",
     ].filter(Boolean).join(" · ");
     const expanded = this._expandedDevices.has(key);
-    return `<tr class="${online ? "on" : "off"} ${!online && monitored ? "important-offline" : ""} ${lifecycle === "onboarding" ? "onboarding-row" : ""} ${attr.guest_network ? "guest-row" : ""} ${attr.segment_id ? "vlan-device-row" : ""} ${expanded ? "mobile-expanded" : ""}" style="--vlan-color:${esc(segmentColor)}" ${rowTitle ? `title="${esc(rowTitle)}"` : ""}>
+    return `<tr data-device-row="${esc(entity.entity_id)}" class="${online ? "on" : "off"} ${!online && monitored ? "important-offline" : ""} ${lifecycle === "onboarding" ? "onboarding-row" : ""} ${attr.guest_network ? "guest-row" : ""} ${attr.segment_id ? "vlan-device-row" : ""} ${expanded ? "mobile-expanded" : ""}" style="--vlan-color:${esc(segmentColor)}" ${rowTitle ? `title="${esc(rowTitle)}"` : ""}>
       <td data-column="state" data-label="Status"><div class="status-cell"><div class="status"><i class="dot"></i>${online ? "Online" : "Offline"}</div><span class="status-time">${esc(formatStateChanged(stateChanged))}</span></div></td>
       <td data-column="onboarding" data-label="${t("IP-Bereich")}"><span class="onboarding-state ${lifecycle}">${esc(lifecycleLabel)}</span></td>
       <td data-column="vlan" data-label="VLAN"><div class="detail-stack"><strong>${esc(segmentLabel)}</strong><small>${esc(({trusted:t("Vertrauenswürdig"),restricted:t("Eingeschränkt"),guest:t("Gast"),isolated:t("Isoliert"),infrastructure:t("Infrastruktur")})[attr.segment_role] || attr.segment_role || t("Keine Rolle"))}${attr.segment_monitoring === false ? t(" · nicht überwacht") : ""}</small></div></td>
@@ -285,9 +300,9 @@ export function renderCards() {
       <td data-column="mac" data-label="${t("MAC-Adresse")}" class="mono" title="${esc(vendorTitle)}">${esc(attr.mac_address || t("Nicht erkannt"))}${attr.mac_vendor ? `<span class="mac-vendor" title="${esc(vendorTitle)}"><ha-icon icon="mdi:factory"></ha-icon>${esc(attr.mac_vendor)}</span>` : ""}${privateMac ? `<span class="private-mac" title="${t("Lokal verwaltete bzw. randomisierte MAC-Adresse; Änderungen lösen keine Identitätswarnung aus")}"><ha-icon icon="mdi:incognito"></ha-icon>${t("Privat / randomisiert")}</span>` : ""}</td>
       <td data-column="connection" data-label="${t("Verbindung")}"><div class="detail-stack"><strong>${esc(connection)}</strong></div></td>
       <td data-column="mesh" data-label="${t("Mesh-Punkt")}"><div class="detail-stack"><strong>${esc(accessPoint)}</strong></div></td>
-      <td data-column="rate" data-label="WLAN"><div class="detail-stack"><strong>${esc(rates || t("Nicht verfügbar"))}</strong>${signal ? `<span class="rating ${signalAssessment?.level || "okay"}" title="${t("WLAN-Empfang: {0}", esc(signalAssessment?.label || t("Nicht bewertet")))}"><span class="rating-label">${esc(signal)} · ${esc(signalAssessment?.label || "")}</span></span>` : ""}</div></td>
+      <td data-column="rate" data-label="${t("Rate / Signal")}"><div class="detail-stack"><strong>${esc(rates || t("Nicht verfügbar"))}</strong>${signal ? `<span class="rating ${signalAssessment?.level || "okay"}" title="${t("WLAN-Empfang: {0}", esc(signalAssessment?.label || t("Nicht bewertet")))}"><span class="rating-label">${esc(signal)} · ${esc(signalAssessment?.label || "")}</span></span>` : ""}</div></td>
       <td data-column="address" data-label="${t("Adressvergabe")}"><div class="detail-stack"><strong>${esc(addressSource || t("Nicht verfügbar"))}</strong>${addressSource === "DHCP" && lease ? `<small>${t("Noch {0}", esc(lease))}</small>` : ""}</div></td>
-      <td data-column="dns" data-label="DNS" title="${esc(dnsTitle)}"><button class="dns-live-link" type="button" data-ip="${esc(attr.ip_address)}" data-name="${esc(name)}" title="${t("DNS-Live-Log für {0} öffnen", esc(name))}"><span class="detail-stack"><strong class="${attr.adguard_bypass_suspected ? "dns-alert" : ""}">${esc(dnsPrimary)}</strong>${dnsSecondary ? `<span class="rating ${dnsAssessment?.level || "okay"}" title="${t("Anteil blockierter DNS-Anfragen: {0}", esc(dnsAssessment?.label || t("Nicht bewertet")))}"><span class="rating-label">${esc(dnsSecondary)} · ${esc(dnsAssessment?.label || "")}</span></span>` : ""}</span></button></td>
+      <td data-column="dns" data-label="DNS" title="${esc(dnsTitle)}"><button class="dns-live-link" type="button" data-ip="${esc(attr.ip_address)}" data-name="${esc(name)}" title="${t("DNS-Live-Log für {0} öffnen", esc(name))}"><span class="detail-stack"><strong class="${attr.adguard_bypass_suspected ? "dns-alert" : ""}">${esc(dnsPrimary)}</strong>${dnsSecondary ? `<span class="rating ${dnsAssessment?.level || "okay"}" title="${t("Anteil blockierter DNS-Anfragen: {0}", esc(dnsAssessment?.label || t("Nicht bewertet")))}"><span class="rating-label">${esc(dnsSecondary)}</span></span>` : ""}</span></button></td>
       <td data-column="source" data-label="${t("Erkannt durch")}">${esc(sources)}</td>
       <td data-column="internet" data-label="${t("Internetzugang")}"><div class="internet-state"><span class="internet-label ${esc(internetClass)}">${esc(internetLabel)}</span>${internetHint ? `<small class="internet-hint">${esc(internetHint)}</small>` : ""}${(approvalRequired && attr.internet_control_available) ? `<button class="approve-internet" data-key="${esc(key)}" data-name="${esc(name)}" data-entity-id="${esc(entity.entity_id)}">${t("Freigeben")}</button>` : attr.internet_control_available ? `<button class="block-internet" data-key="${esc(key)}" data-name="${esc(name)}" title="${t("Internetzugang sperren")}"><ha-icon icon="mdi:lock-outline"></ha-icon>${t("Sperren")}</button>` : ""}</div></td>
       <td data-column="watch" data-label="${t("Überwachung")}">
@@ -298,13 +313,13 @@ export function renderCards() {
         </div>
       </td>
     </tr>`;
-  }).join("");
+  });
   const columns = [
     ["state", "Status"], ["onboarding", t("IP-Bereich")],
     ["vlan", "VLAN"],
     ["name", t("Teilnehmer")], ["ip", t("IP-Adresse")],
     ["mac", t("MAC-Adresse")], ["connection", t("Verbindung")], ["mesh", t("Mesh-Zugangspunkt")],
-    ["rate", t("WLAN-Daten")], ["address", t("Adressvergabe")], ["dns", "DNS"],
+    ["rate", t("Rate / Signal")], ["address", t("Adressvergabe")], ["dns", "DNS"],
     ["source", t("Erkannt durch")], ["internet", t("Internetzugang")], ["watch", t("Überwachung")],
   ];
   const heading = (label, key) => {
@@ -313,8 +328,20 @@ export function renderCards() {
     const direction = active ? (this._sortDirection === "asc" ? "aufsteigend" : "absteigend") : "sortieren";
     return `<th data-column="${key}" aria-sort="${active ? (this._sortDirection === "asc" ? "ascending" : "descending") : "none"}"><button class="sort-head ${active ? "active" : ""}" data-sort="${key}" title="${esc(`${label} ${direction}`)}">${esc(label)}<ha-icon icon="${icon}"></ha-icon></button></th>`;
   };
-  const filterInput = (key, placeholder) =>
-    `<th data-column="${key}"><input class="column-filter ${this._columnFilters[key] ? "has-value" : ""}" data-column-filter="${key}" value="${esc(this._columnFilters[key] || "")}" placeholder="${esc(placeholder)}" title="* und ? als Wildcards möglich"></th>`;
+  const filterInput = (key, placeholder, extra = "") =>
+    `<th data-column="${key}"><div class="${extra ? "rate-filter-controls" : ""}"><input class="column-filter ${this._columnFilters[key] ? "has-value" : ""}" data-column-filter="${key}" value="${esc(this._columnFilters[key] || "")}" placeholder="${esc(placeholder)}" title="* und ? als Wildcards möglich">${extra}</div></th>`;
+  const signalFilter = `<details class="custom-column-filter signal-dbm-filter ${signalComparison ? "has-value" : ""}" data-column-filter-key="signalDbm">
+    <summary title="${t("WLAN-Signal")}" aria-label="${t("WLAN-Signal")}"><ha-icon icon="mdi:wifi" aria-hidden="true"></ha-icon><span>${t("WLAN-Signal")}</span></summary>
+    <form class="custom-filter-menu signal-dbm-form">
+      <select name="comparison" aria-label="${t("WLAN-Signal")}">
+        <option value="">${t("Alle Geräte")}</option>
+        <option value="&lt;" ${signalComparison === "<" ? "selected" : ""}>${t("Schwächer als")}</option>
+        <option value="&gt;" ${signalComparison === ">" ? "selected" : ""}>${t("Stärker als")}</option>
+      </select>
+      <label><input name="limit" type="number" step="any" value="${esc(signalLimit ?? "-70")}"> dBm</label>
+      <button class="dns-action" type="submit">${t("Anwenden")}</button>
+    </form>
+  </details>`;
   const allEntities = this._entities();
   const countWhere = (predicate) => allEntities.filter(predicate).length;
   const customFilter = (key, options, minWidth = "") => {
@@ -411,10 +438,10 @@ export function renderCards() {
     .map(([name, count]) => `<button type="button" class="custom-filter-option ${this._columnFilters.mesh === name ? "active" : ""}" data-column-filter-key="mesh" data-column-filter-value="${esc(name)}"><ha-icon icon="${this._columnFilters.mesh === name ? "mdi:check" : "mdi:access-point"}"></ha-icon><span>${esc(name)}</span><span class="custom-filter-count">${count}</span></button>`)
     .join("");
   const selectedMesh = this._columnFilters.mesh || t("Alle Mesh-Punkte");
-  const filterNames = { search:t("Suche"), state:"Status", onboarding:t("IP-Bereich"), vlan:"VLAN", name:t("Teilnehmer"), ip:t("IP-Adresse"), mac:t("MAC-Adresse"), connection:t("Verbindung"), mesh:"Mesh", rate:"WLAN", address:t("Adressvergabe"), dns:"DNS", source:t("Erkannt durch"), internet:t("Internetzugang"), watch:t("Überwachung") };
+  const filterNames = { search:t("Suche"), state:"Status", onboarding:t("IP-Bereich"), vlan:"VLAN", name:t("Teilnehmer"), ip:t("IP-Adresse"), mac:t("MAC-Adresse"), connection:t("Verbindung"), mesh:"Mesh", rate:t("Rate / Signal"), signalDbm:t("WLAN-Signal"), address:t("Adressvergabe"), dns:"DNS", source:t("Erkannt durch"), internet:t("Internetzugang"), watch:t("Überwachung") };
   const filterValueNames = { on:"Online", off:"Offline", guest:t("Gastzugang"), onboarding:t("Einrichtungsbereich"), assigned:t("Regulärer Bereich"), unknown:t("Einrichtung deaktiviert"), monitored:t("Überwacht"), notify:t("Offline-Meldung"), presence:t("Anwesenheit"), none:t("Keine Funktion"), denied:t("Gesperrt"), pending:t("Freigabe ausstehend"), error:t("Freigabe fehlgeschlagen"), unchecked:t("Noch nicht geprüft"), unmanaged:t("Nicht verwaltet"), infrastructure:t("Netzwerkinfrastruktur"), learning:t("Lernphase"), trusted:t("Vertrauenswürdig"), allowed:t("Freigegeben"), ...sourceLabels, ...Object.fromEntries([...segmentCounts.values()].map((segment) => [segment.id, segment.vlanId ? `${segment.name} · VLAN ${segment.vlanId}` : segment.name])) };
   const activeFilters = Object.entries(this._columnFilters).filter(([, value]) => value);
-  const filterChips = activeFilters.length ? `<div class="filter-chips" role="status" aria-label="${t("Aktive Filter")}">${activeFilters.map(([key, value]) => `<button class="filter-chip" type="button" data-clear-column-filter="${esc(key)}" aria-label="${t("Filter {0} entfernen", esc(filterNames[key] || key))}"><span>${esc(filterNames[key] || key)}: ${esc(filterValueNames[value] || value)}</span><ha-icon icon="mdi:close"></ha-icon></button>`).join("")}<button class="filter-reset" type="button" data-clear-all-filters>${t("Alle Filter zurücksetzen")}</button></div>` : "";
+  const filterChips = activeFilters.length ? `<div class="filter-chips" role="status" aria-label="${t("Aktive Filter")}">${activeFilters.map(([key, value]) => `<button class="filter-chip" type="button" data-clear-column-filter="${esc(key)}" aria-label="${t("Filter {0} entfernen", esc(filterNames[key] || key))}"><span>${key === "signalDbm" ? `WLAN ${esc(value.replace("-", "−"))} dBm` : `${esc(filterNames[key] || key)}: ${esc(filterValueNames[value] || value)}`}</span><ha-icon icon="mdi:close"></ha-icon></button>`).join("")}<button class="filter-reset" type="button" data-clear-all-filters>${t("Alle Filter zurücksetzen")}</button></div>` : "";
   const emptyRow = `<tr><td colspan="14"><div class="empty" role="status">${allEntities.length
     ? `<ha-icon icon="mdi:filter-off-outline"></ha-icon><strong>${t("Keine passenden Geräte")}</strong>${t("Filter ändern oder leeren.")}`
     : this._emptyScanMessage()}</div></td></tr>`;
@@ -423,11 +450,63 @@ export function renderCards() {
   const meshFilter = customFilter("mesh", countedOptions(allEntities.map(entity => entity.attributes.access_point).filter(Boolean), t("Alle Mesh-Punkte"), "mdi:access-point"));
   const mobileControls = `<div class="mobile-device-controls"><div class="mobile-search-row"><label class="mobile-device-search"><ha-icon icon="mdi:magnify"></ha-icon><input type="search" data-column-filter="search" value="${esc(this._columnFilters.search || "")}" placeholder="${t("Geräte suchen …")}" aria-label="${t("Geräte suchen")}" autocomplete="off"></label><button class="mobile-filter-toggle ${mobileFilterCount ? "active" : ""}" type="button" aria-label="${t("Geräte filtern")}" aria-expanded="${this._mobileFiltersExpanded}" aria-controls="mobile-device-filters"><ha-icon icon="mdi:filter-variant"></ha-icon>${mobileFilterCount ? `<span>${mobileFilterCount}</span>` : ""}</button></div>
     <div class="mobile-device-filters" id="mobile-device-filters" ${this._mobileFiltersExpanded ? "" : "hidden"}>
-      ${mobileFilter("Status", stateFilter)}${mobileFilter(t("IP-Bereich"), onboardingFilter)}${mobileFilter("VLAN", vlanFilter)}${mobileFilter("Mesh", meshFilter)}${mobileFilter("Funktion", watchFilter)}${mobileFilter(t("Verbindung"), connectionFilter)}${mobileFilter(t("Internetzugang"), internetFilter)}${mobileFilter(t("Adressvergabe"), addressFilter)}${mobileFilter(t("Erkannt durch"), sourceFilter)}
+      ${mobileFilter("Status", stateFilter)}${signalFilter}${mobileFilter(t("IP-Bereich"), onboardingFilter)}${mobileFilter("VLAN", vlanFilter)}${mobileFilter("Mesh", meshFilter)}${mobileFilter("Funktion", watchFilter)}${mobileFilter(t("Verbindung"), connectionFilter)}${mobileFilter(t("Internetzugang"), internetFilter)}${mobileFilter(t("Adressvergabe"), addressFilter)}${mobileFilter(t("Erkannt durch"), sourceFilter)}
     </div></div>`;
+  if (liveUpdate && grid.querySelector("tbody")) {
+    const { scrollTop, scrollLeft } = grid;
+    const updatedMenus = new Map(Object.entries({
+      state:stateFilter, onboarding:onboardingFilter, vlan:vlanFilter, connection:connectionFilter,
+      mesh:meshFilter, address:addressFilter, source:sourceFilter, internet:internetFilter, watch:watchFilter,
+    }));
+    for (const filter of grid.querySelectorAll("details[data-column-filter-key]:not([open])")) {
+      const html = updatedMenus.get(filter.dataset.columnFilterKey);
+      if (!html || filter.dataset.menuMarkup === html) continue;
+      const template = document.createElement("template");
+      template.innerHTML = html;
+      const nextMenu = template.content.querySelector(".custom-filter-menu");
+      filter.querySelector(".custom-filter-menu")?.replaceWith(nextMenu);
+      filter.dataset.menuMarkup = html;
+    }
+    const body = grid.querySelector("tbody");
+    const nextRows = rows.length ? rows : [emptyRow];
+    const previousRows = this._deviceRowMarkup;
+    const existing = new Map([...body.rows].map(row => [row.dataset.deviceRow || "", row]));
+    const markup = new Map();
+    const ordered = nextRows.map((html, index) => {
+      const key = entities[index]?.entity_id || "";
+      let row = existing.get(key);
+      existing.delete(key);
+      if (!row || previousRows?.get(key) !== html) {
+        const template = document.createElement("template");
+        template.innerHTML = html;
+        const replacement = template.content.firstElementChild;
+        replacement.querySelectorAll("[data-column]").forEach(cell => {
+          cell.hidden = this._columnVisibility[cell.dataset.column] === false;
+        });
+        row?.replaceWith(replacement);
+        row = replacement;
+      }
+      markup.set(key, html);
+      return row;
+    });
+    existing.forEach(row => row.remove());
+    ordered.forEach((row, index) => {
+      const current = body.rows[index] || null;
+      if (row === current) return;
+      if (row.parentNode === body && body.moveBefore) body.moveBefore(row, current);
+      else body.insertBefore(row, current);
+    });
+    grid.scrollTop = scrollTop;
+    grid.scrollLeft = scrollLeft;
+    this._deviceRowMarkup = markup;
+    return;
+  }
+  this._deviceRowMarkup = new Map(rows.length
+    ? rows.map((html, index) => [entities[index].entity_id, html])
+    : [["", emptyRow]]);
   grid.innerHTML = `${mobileControls}${filterChips}<table aria-label="${t("Netzwerkgeräte")}">
     <thead>
-      <tr>${heading("Status", "state")}${heading(t("IP-Bereich"), "onboarding")}${heading("VLAN", "vlan")}${heading(t("Teilnehmer"), "name")}${heading(t("IP-Adresse"), "ip")}${heading(t("MAC-Adresse"), "mac")}${heading(t("Verbindung"), "connection")}${heading(t("Mesh-Zugangspunkt"), "mesh")}${heading(t("WLAN-Daten"), "rate")}${heading(t("Adressvergabe"), "address")}${heading("DNS", "dns")}${heading(t("Erkannt durch"), "source")}<th data-column="internet" class="no-sort">${t("Internetzugang")}</th><th data-column="watch" class="no-sort">${t("Überwachung")}</th></tr>
+      <tr>${heading("Status", "state")}${heading(t("IP-Bereich"), "onboarding")}${heading("VLAN", "vlan")}${heading(t("Teilnehmer"), "name")}${heading(t("IP-Adresse"), "ip")}${heading(t("MAC-Adresse"), "mac")}${heading(t("Verbindung"), "connection")}${heading(t("Mesh-Zugangspunkt"), "mesh")}${heading(t("Rate / Signal"), "rate")}${heading(t("Adressvergabe"), "address")}${heading("DNS", "dns")}${heading(t("Erkannt durch"), "source")}<th data-column="internet" class="no-sort">${t("Internetzugang")}</th><th data-column="watch" class="no-sort">${t("Überwachung")}</th></tr>
       <tr class="column-filters">
         <th data-column="state">${stateFilter}</th>
         <th data-column="onboarding">${onboardingFilter}</th>
@@ -437,7 +516,7 @@ export function renderCards() {
         ${filterInput("mac", "MAC oder *")}
         <th data-column="connection">${connectionFilter}</th>
         <th data-column="mesh"><details class="custom-column-filter ${this._columnFilters.mesh ? "has-value" : ""}" data-column-filter-key="mesh"><summary>${esc(selectedMesh)}</summary><div class="custom-filter-menu"><button type="button" class="custom-filter-option ${this._columnFilters.mesh ? "" : "active"}" data-column-filter-key="mesh" data-column-filter-value=""><ha-icon icon="${this._columnFilters.mesh ? "mdi:access-point-network" : "mdi:check"}"></ha-icon><span>${t("Alle Mesh-Punkte")}</span><span class="custom-filter-count">${[...meshCounts.values()].reduce((sum, count) => sum + count, 0)}</span></button>${meshOptions}</div></details></th>
-        ${filterInput("rate", "Rate / Signal")}
+        ${filterInput("rate", t("Rate / Signal"), signalFilter)}
         <th data-column="address">${addressFilter}</th>
         ${filterInput("dns", "DNS / Domain")}
         <th data-column="source">${sourceFilter}</th>
@@ -445,8 +524,12 @@ export function renderCards() {
         <th data-column="watch">${watchFilter}</th>
       </tr>
     </thead>
-    <tbody>${rows || emptyRow}</tbody>
+    <tbody>${rows.length ? rows.join("") : emptyRow}</tbody>
   </table>`;
+  if (signalEditor) {
+    grid.querySelector(`${signalEditorScope} .signal-dbm-filter`)?.replaceWith(signalEditor);
+    signalEditorFocus.focus({ preventScroll:true });
+  }
   grid.querySelectorAll("[data-column]").forEach((cell) => {
     cell.toggleAttribute("hidden", this._columnVisibility[cell.dataset.column] === false);
   });
@@ -473,6 +556,11 @@ export function renderCards() {
   }
   this.shadowRoot.querySelector(".column-picker").innerHTML = `
     <div class="column-picker-head"><span>${t("Spalten auswählen")}</span><button class="column-picker-close" type="button" title="${t("Schließen")}" aria-label="${t("Spaltenauswahl schließen")}"><ha-icon icon="mdi:close"></ha-icon></button></div>
+    <select class="column-filter" data-device-view aria-label="${t("Ansicht wählen")}">
+      <option value="" selected disabled>${t("Ansicht wählen")}</option>
+      <option value="overview">${t("Übersicht")}</option>
+      <option value="wifi">${t("WLAN-Diagnose")}</option>
+    </select>
     ${columns.map(([key, label]) =>
       `<label><input type="checkbox" data-column-toggle="${key}" ${this._columnVisibility[key] === false ? "" : "checked"}>${esc(label)}</label>`
     ).join("")}`;

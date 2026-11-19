@@ -188,33 +188,7 @@ class NodarionView(HomeAssistantView):
             alert_id = data.get("alert_id")
             if not isinstance(alert_id, str):
                 return self.json_message("Ungültige Warnung", 400)
-            alert = next(
-                (
-                    item
-                    for item in manager.alerts
-                    if item.get("id") == alert_id
-                ),
-                None,
-            )
-            if alert and alert.get("type") == "new_device" and alert.get("key"):
-                coordinator = self._coordinator(request)
-                if coordinator is None:
-                    return self.json_message("Integration ist nicht geladen", 503)
-                try:
-                    await coordinator.async_approve_internet_access(alert["key"])
-                except Exception as err:
-                    _LOGGER.exception(
-                        "Could not approve internet access while acknowledging %s",
-                        alert["key"],
-                    )
-                    return self.json_message(
-                        f"Bestätigung fehlgeschlagen, weil der Internetzugang "
-                        f"nicht freigegeben werden konnte: {err}",
-                        502,
-                    )
-                await manager.async_acknowledge_new_device_alerts(alert["key"])
-            else:
-                await manager.async_acknowledge(alert_id)
+            await manager.async_acknowledge(alert_id)
         else:
             key = data.get("key")
             if not isinstance(key, str) or not key.startswith("ip_"):

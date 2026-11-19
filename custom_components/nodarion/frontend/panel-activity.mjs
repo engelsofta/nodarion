@@ -1,5 +1,5 @@
-import { esc, blockReason } from "./panel-formatters.mjs?v=1.30.14";
-import { activeLocale, t } from "./panel-i18n.mjs?v=1.30.14";
+import { esc, blockReason } from "./panel-formatters.mjs?v=1.31.0";
+import { activeLocale, t } from "./panel-i18n.mjs?v=1.31.0";
 
 export function renderLog(resetVerticalScroll = false) {
   const list = this.shadowRoot.querySelector(".log-list");
@@ -223,13 +223,21 @@ export function renderDnsLive() {
     ["sensor.nodarion_dns_anfragen", "DNS-Anfragen"],
     ["sensor.nodarion_dns_blockiert", t("Blockiert")],
     ["sensor.nodarion_dns_blockquote", "Blockquote"],
-    ["sensor.nodarion_dns_verarbeitungszeit", "Verarbeitungszeit"],
-  ].filter(([entityId]) => this._dnsProvider().id !== "pihole" || entityId !== "sensor.nodarion_dns_verarbeitungszeit").map(([entityId, label]) => {
+    ["sensor.nodarion_dns_verarbeitungszeit", "Verarbeitungszeit", 2],
+  ].filter(([entityId]) => this._dnsProvider().id !== "pihole" || entityId !== "sensor.nodarion_dns_verarbeitungszeit").map(([entityId, label, fractionDigits]) => {
     const entity = this._hass.states[entityId];
+    const number = Number(entity?.state);
+    const state = fractionDigits !== undefined && Number.isFinite(number)
+      ? new Intl.NumberFormat(activeLocale(), {
+          minimumFractionDigits: fractionDigits,
+          maximumFractionDigits: fractionDigits,
+          useGrouping: false,
+        }).format(number)
+      : entity?.state;
     const value = entity && !["unknown", "unavailable"].includes(entity.state)
-      ? `${entity.state}${entity.attributes.unit_of_measurement ? ` ${entity.attributes.unit_of_measurement}` : ""}`
+      ? `${state}${entity.attributes.unit_of_measurement ? ` ${entity.attributes.unit_of_measurement}` : ""}`
       : "–";
-    return `<button class="adguard-stat metric-entity-link" type="button" data-entity-id="${entityId}" title="${t("Home-Assistant-Dialog öffnen")}"><span>${label}</span><strong>${esc(value)}</strong></button>`;
+    return `<button class="adguard-stat metric-entity-link" type="button" data-entity-id="${entityId}" title="${t("Home-Assistant-Dialog öffnen")}"><strong>${esc(value)}</strong><span>${label}</span></button>`;
   }).join("");
   const chartBars = series.map((bucket, index) => {
     const allowed = Number(bucket.allowed || 0);

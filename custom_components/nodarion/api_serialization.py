@@ -39,6 +39,9 @@ def serialize_frontend_state(
     response["dns_provider"] = {
         "id": scanner.provider if scanner else None,
         "name": scanner.provider_name if scanner else "DNS",
+        "web_url": (
+            f"{scanner.base_url}/admin/" if scanner.provider == "pihole" else scanner.base_url
+        ) if scanner else None,
         "capabilities": sorted(scanner.capabilities) if scanner else [],
         "features": sorted(scanner.supported_features) if scanner else [],
         "data_complete": scanner.data_complete if scanner else False,

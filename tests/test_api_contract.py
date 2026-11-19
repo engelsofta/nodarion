@@ -27,6 +27,11 @@ class ApiContractTests(unittest.TestCase):
         self.assertNotIn('attributes["connection_status"]', SERIALIZATION)
         self.assertEqual(PANEL.count("this._monitor.connection_status || {}"), 2)
 
+    def test_acknowledging_an_alert_does_not_change_internet_access(self) -> None:
+        handler = API.split('elif action == "acknowledge":', 1)[1].split("\n        else:", 1)[0]
+        self.assertIn("await manager.async_acknowledge(alert_id)", handler)
+        self.assertNotIn("approve_internet", handler)
+
 
 if __name__ == "__main__":
     unittest.main()

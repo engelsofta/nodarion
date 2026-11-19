@@ -1,10 +1,10 @@
-import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.30.14";
-import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.30.14";
-import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.30.14";
-import { renderCards } from "./panel-devices.mjs?v=1.30.14";
-import { panelStyles } from "./panel-styles.mjs?v=1.30.14";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.30.14";
-import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.30.14";
+import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.31.0";
+import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.31.0";
+import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.31.0";
+import { renderCards } from "./panel-devices.mjs?v=1.31.0";
+import { panelStyles } from "./panel-styles.mjs?v=1.31.0";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.31.0";
+import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.31.0";
 
 class EngelsoftNodarionPanel extends HTMLElement {
   constructor() {
@@ -106,10 +106,19 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   _loadColumnVisibility() {
     try {
-      return JSON.parse(localStorage.getItem("ha-net-mon-columns") || "{}");
+      return JSON.parse(localStorage.getItem("ha-net-mon-columns") || "null") ?? this._deviceViewColumns("overview");
     } catch (_error) {
-      return {};
+      return this._deviceViewColumns("overview");
     }
+  }
+
+  _deviceViewColumns(view) {
+    const columns = ["state", "name", "ip", "connection", "rate"];
+    if (view === "wifi") columns.push("mesh");
+    return Object.fromEntries(
+      ["state", "onboarding", "vlan", "name", "ip", "mac", "connection", "mesh", "rate", "address", "dns", "source", "internet", "watch"]
+        .map(key => [key, columns.includes(key)])
+    );
   }
 
   _saveColumnVisibility() {
@@ -237,8 +246,14 @@ class EngelsoftNodarionPanel extends HTMLElement {
   async _monitorAction(payload) {
     try {
       await this._stateClient.mutate(payload);
-    } catch (_error) {
-      // The next state refresh retries the request.
+    } catch (error) {
+      await this._confirm({
+        title:t("Änderung fehlgeschlagen"),
+        message:error?.body?.message || error?.message || t("Die Änderung konnte nicht gespeichert werden."),
+        confirmLabel:t("Schließen"),
+        danger:true,
+        showCancel:false,
+      });
     }
   }
 
@@ -999,6 +1014,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
       }
     });
     this.shadowRoot.querySelector(".column-picker").addEventListener("change", (event) => {
+      if (event.target.matches("[data-device-view]")) {
+        this._columnVisibility = this._deviceViewColumns(event.target.value);
+        this._saveColumnVisibility();
+        this._renderCards();
+        this.shadowRoot.querySelector("[data-device-view]")?.focus();
+        return;
+      }
       const input = event.target.closest("[data-column-toggle]");
       if (!input) return;
       this._columnVisibility[input.dataset.columnToggle] = input.checked;
@@ -1015,6 +1037,22 @@ class EngelsoftNodarionPanel extends HTMLElement {
       this.shadowRoot.querySelectorAll(".device-gui-menu:popover-open").forEach(menu => menu.hidePopover());
     }, { passive:true });
     this.shadowRoot.addEventListener("submit", event => {
+      if (event.target.matches(".signal-dbm-form")) {
+        event.preventDefault();
+        const form = new FormData(event.target);
+        const comparison = form.get("comparison");
+        const limit = event.target.elements.limit;
+        if (comparison && !Number.isFinite(limit.valueAsNumber)) {
+          limit.focus();
+          return;
+        }
+        const scope = event.target.closest(".mobile-device-controls") ? ".mobile-device-controls" : "table";
+        this._columnFilters.signalDbm = comparison ? `${comparison} ${limit.valueAsNumber}` : "";
+        event.target.closest("details").open = false;
+        this._renderCards();
+        this.shadowRoot.querySelector(`${scope} .signal-dbm-filter summary`)?.focus({ preventScroll:true });
+        return;
+      }
       if (!event.target.matches(".pihole-domain-form")) return;
       event.preventDefault();
       const form = new FormData(event.target);
@@ -1353,7 +1391,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
 
   _render(changed = null) {
     const activeElement = this.shadowRoot.activeElement;
-    const participantDropdown = activeElement?.closest?.(".device-list .custom-column-filter");
+    const participantDropdown = activeElement?.closest?.(".device-list .custom-column-filter:not(.signal-dbm-filter)");
     const logDropdown = activeElement?.closest?.(".log-list .custom-column-filter");
     const dnsDropdown = activeElement?.closest?.(".dns-live-content .dns-status-select");
     const dnsPolicyChoice = activeElement?.closest?.("[data-dns-policy-scope]");
@@ -1443,7 +1481,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
     }
     const eventCount = (this._monitor.events || []).length;
     const adguardConnection = connections.adguard || {};
-    const protection = this._hass.states[this._dnsProvider().id === "pihole" ? "switch.nodarion_pihole_gesamtschutz" : "switch.nodarion_adguard_gesamtschutz"]?.state;
+    const dnsProvider = this._dnsProvider();
+    const isPiHole = dnsProvider.id === "pihole";
+    const protection = this._hass.states[isPiHole ? "switch.nodarion_pihole_gesamtschutz" : "switch.nodarion_adguard_gesamtschutz"]?.state;
+    const adguardPanel = this._hass.panels?.a0d7b954_adguard;
+    const dnsWebUrl = !isPiHole && adguardPanel ? "/a0d7b954_adguard" : dnsProvider.web_url;
     const dnsStatus = !adguardConnection.configured
       ? t("Nicht eingerichtet")
       : adguardConnection.available ? protection === "on" ? t("Schutz aktiv") : protection === "off" ? t("Schutz aus") : t("Verbunden") : t("Nicht erreichbar");
@@ -1486,7 +1528,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
       <article class="metric dns-metric">
         <div class="metric-label-row"><div class="metric-label">${t("DNS-Schutz")}</div></div>
         <div class="metric-reading">
-          <div class="metric-status-value" title="${esc(dnsStatus)}">${esc(dnsStatus)}</div>
+          ${adguardConnection.configured && dnsWebUrl && this._hass.user?.is_admin
+            ? `<a class="metric-status-value dns-integration-link" href="${esc(dnsWebUrl)}" title="${esc(dnsProvider.name)}">${esc(dnsStatus)}</a>`
+            : `<div class="metric-status-value" title="${esc(dnsStatus)}">${esc(dnsStatus)}</div>`}
           <button class="metric-note metric-entity-link" type="button" data-entity-id="sensor.nodarion_dns_blockquote" title="${t("Home-Assistant-Dialog öffnen")}">${esc(dnsRatio)}</button>
         </div>
       </article>
@@ -1515,9 +1559,9 @@ class EngelsoftNodarionPanel extends HTMLElement {
     if (statusChanged) this._renderConnections();
     if (participantsChanged || lifecycleChanged) {
       this._renderGuest();
-      this._renderCards();
+      this._renderCards(!full);
     } else if (statusChanged && entities.length === 0) {
-      this._renderCards();
+      this._renderCards(!full);
     }
     if (eventsChanged) this._renderLog();
     if (statusChanged) this._renderDnsLive();
@@ -1528,7 +1572,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
       const key = details.querySelector(":scope > summary")?.textContent?.trim();
       if (key && this._openSettingsDetails.has(key)) details.open = true;
     });
-    if (focusState) {
+    if (focusState && this.shadowRoot.activeElement !== activeElement) {
       const selector = focusState.type === "participant-input"
         ? `${focusState.mobile ? ".mobile-device-controls " : "table "}[data-column-filter="${focusState.key}"]`
         : focusState.type === "log-input"
@@ -1844,8 +1888,8 @@ class EngelsoftNodarionPanel extends HTMLElement {
     return `<strong>${title}</strong>${hint}`;
   }
 
-  _renderCards() {
-    renderCards.call(this);
+  _renderCards(liveUpdate = false) {
+    renderCards.call(this, liveUpdate);
   }
 
   _renderLog(resetVerticalScroll = false) {

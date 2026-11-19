@@ -97,7 +97,7 @@ class GuiContractTests(unittest.TestCase):
     def test_dns_stats_are_compact_and_grouped_with_header_actions(self) -> None:
         head = PANEL[PANEL.index('<div class="dns-head">'):]
         self.assertLess(head.index("dns-quick-stats"), head.index('class="dns-actions"'))
-        self.assertIn("border-right:1px solid var(--ns-line)", PANEL)
+        self.assertIn("flex-wrap:wrap", PANEL.split(".dns-head-tools {", 1)[1].split("}", 1)[0])
 
     def test_mesh_data_is_still_available_without_the_old_topology_view(self) -> None:
         for obsolete in ("_renderMesh", "_simulateMeshHandover", ".mesh-panel"):
