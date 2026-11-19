@@ -25,7 +25,7 @@
 
 **Sieh direkt in Home Assistant, welche Geräte in deinem Netz sind, was sich geändert hat und wo du nachsehen solltest.**
 
-[Im Marketplace öffnen](https://my.home-assistant.io/redirect/marketplace_repository/?owner=engelsofta&repository=nodarion&category=integration) · [Versionshinweise und Downloads](https://github.com/engelsofta/nodarion/releases)
+[Im Marketplace öffnen](https://my.home-assistant.io/redirect/marketplace_repository/?owner=engelsofta&repository=nodarion&category=integration) · [Versionshinweise und Downloads](https://github.com/engelsofta/nodarion/releases) · [Home-Assistant-Community](https://community.home-assistant.io/t/nodarion-network-monitoring-with-fritz-box-mesh-and-adguard-home-in-one-ha-panel/1028102)
 
 ## Was Nodarion kann
 

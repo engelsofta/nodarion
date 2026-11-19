@@ -25,7 +25,7 @@
 
 **See what’s on your network, what changed, and what needs attention — right in Home Assistant.**
 
-[Install from the Marketplace](https://my.home-assistant.io/redirect/marketplace_repository/?owner=engelsofta&repository=nodarion&category=integration) · [Release notes and downloads](https://github.com/engelsofta/nodarion/releases)
+[Install from the Marketplace](https://my.home-assistant.io/redirect/marketplace_repository/?owner=engelsofta&repository=nodarion&category=integration) · [Release notes and downloads](https://github.com/engelsofta/nodarion/releases) · [Home Assistant Community](https://community.home-assistant.io/t/nodarion-network-monitoring-with-fritz-box-mesh-and-adguard-home-in-one-ha-panel/1028102)
 
 ## What you can do
 
