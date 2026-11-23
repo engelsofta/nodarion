@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.32.1 – 📡 Plot twist: the router lives here.
+
+- Recognized routers and mesh nodes no longer trigger unknown-device alerts. Existing false alerts clear on the next scan.
+- Acknowledged unknown-device alerts stay dismissed while the same device remains online.
+
 ## 1.32.0 – Live FRITZ!Mesh map
 
 *Who needs a family tree when your toaster has a mesh map?*

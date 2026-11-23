@@ -17,7 +17,12 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
-from .models import NetworkHost, canonical_hostname, normalize_network_segments
+from .models import (
+    NetworkHost,
+    canonical_hostname,
+    is_network_infrastructure,
+    normalize_network_segments,
+)
 from .monitor_storage import MonitorStoreWriter
 from .trust import is_trusted_identity, is_vpn_connection, normalize_mac, mac_identity_changed
 
@@ -1083,15 +1088,25 @@ class NetworkMonitor:
 
             if not self.rules["enabled"]:
                 continue
+            known_device = is_trusted_identity(
+                key, host.mac, self.known_hosts, self.trusted_macs
+            )
+            unknown_online = (
+                host.online
+                and not host.guest_network
+                and not is_network_infrastructure(host)
+                and not known_device
+            )
+            if (
+                learning or not unknown_online
+                or (old is not None and mac_identity_changed(old.mac, host.mac))
+            ):
+                changed = self._resolve_alert("new_device", key, now) or changed
             if learning:
                 if key not in self.known_hosts:
                     self.known_hosts.add(key)
                     changed = True
-            elif (
-                host.online
-                and not host.guest_network
-                and key not in self.known_hosts
-            ):
+            elif unknown_online:
                 first_seen = _parse(self.first_seen.get(key)) or now
                 if now - first_seen >= timedelta(
                     minutes=self.rules["new_device_minutes"]
@@ -1447,11 +1462,8 @@ class NetworkMonitor:
     ) -> bool:
         if self._active_alert(alert_type, host.key):
             return False
-        # Acknowledging a persistent offline condition must not create the
-        # same warning again on every scan.  Keep it suppressed until the
-        # participant has actually recovered; _resolve_alert records that
-        # recovery and allows a later, genuinely new outage to alert again.
-        if alert_type == "important_offline":
+        # Keep acknowledged conditions quiet until the scan resolves them.
+        if alert_type in {"important_offline", "new_device"}:
             latest = self._latest_alert(alert_type, host.key)
             if (
                 latest
