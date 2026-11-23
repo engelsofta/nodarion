@@ -40,7 +40,7 @@
 
 Sieh, mit welchem Zugangspunkt jedes WLAN-Gerät verbunden ist. Das Linienmuster zeigt das Frequenzband, die Farbe die Signalstärke. Ein Klick auf einen Knoten öffnet die Verbindungsdetails. Über die Legende kannst du die Karte filtern.
 
-![Anonymisierte Darstellung von drei Mesh-Knoten und 32 WLAN-Geräten](docs/mesh-map-anonymous.svg)
+![Anonymisierter Screenshot der FRITZ!Mesh-Karte](docs/mesh-map-anonymized.png)
 
 ## Installation und Einrichtung
 

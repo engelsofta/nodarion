@@ -40,7 +40,7 @@
 
 See which access point each Wi-Fi device uses. Line patterns identify the band and colors show signal quality. Select a node for link details, or click the legend to filter the map.
 
-![Anonymized illustration of three mesh nodes and 32 Wi-Fi clients](docs/mesh-map-anonymous.svg)
+![Anonymized screenshot of the FRITZ!Mesh map](docs/mesh-map-anonymized.png)
 
 ## Install and connect
 
