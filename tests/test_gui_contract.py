@@ -32,7 +32,7 @@ class GuiContractTests(unittest.TestCase):
         self.assertIn("mobile-details", PANEL)
 
     def test_mobile_disclosure_is_independent_of_monitoring_column(self) -> None:
-        row = PANEL[PANEL.index('return `<tr class="${online'):]
+        row = PANEL[PANEL.index('return `<tr data-device-row='):]
         name_cell = row[row.index('<td data-column="name"'):row.index('<td data-column="ip"')]
         watch_cell = row[row.index('<td data-column="watch"'):row.index('</tr>`;')]
         self.assertIn('class="watch mobile-details"', name_cell)
@@ -67,7 +67,7 @@ class GuiContractTests(unittest.TestCase):
         self.assertIn('customFilter("source"', PANEL)
         self.assertIn('data-clear-all-filters', PANEL)
         self.assertIn('class="settings-dirty"', PANEL)
-        self.assertIn('class="advanced-settings"', PANEL)
+        self.assertIn('<details class="advanced-settings dependent-settings"', PANEL)
 
     def test_dialogs_and_keyboard_navigation_are_accessible(self) -> None:
         self.assertNotIn("window.confirm", PANEL)
@@ -99,9 +99,10 @@ class GuiContractTests(unittest.TestCase):
         self.assertLess(head.index("dns-quick-stats"), head.index('class="dns-actions"'))
         self.assertIn("flex-wrap:wrap", PANEL.split(".dns-head-tools {", 1)[1].split("}", 1)[0])
 
-    def test_mesh_data_is_still_available_without_the_old_topology_view(self) -> None:
-        for obsolete in ("_renderMesh", "_simulateMeshHandover", ".mesh-panel"):
-            self.assertNotIn(obsolete, PANEL)
+    def test_mesh_map_uses_live_topology_and_keeps_the_device_column(self) -> None:
+        self.assertIn('data-view="mesh"', PANEL)
+        self.assertIn("this._monitor.mesh_topology", PANEL)
+        self.assertNotIn("_simulateMeshHandover", PANEL)
         self.assertIn('data-column="mesh"', PANEL)
 
     def test_mobile_panel_keeps_edge_swipe_without_hamburger(self) -> None:
@@ -172,10 +173,10 @@ class GuiContractTests(unittest.TestCase):
 
     def test_vlan_configuration_and_device_column_are_connected(self) -> None:
         general_panel = PANEL.index('data-settings-panel="general"')
-        devices_panel = PANEL.index('data-settings-panel="devices"')
+        rules_panel = PANEL.index('data-settings-panel="rules"')
         vlan_settings = PANEL.index('class="rule-group vlan-settings"')
         self.assertLess(general_panel, vlan_settings)
-        self.assertLess(vlan_settings, devices_panel)
+        self.assertLess(vlan_settings, rules_panel)
         for field in ("name", "vlan_id", "network", "role", "color", "monitoring"):
             self.assertIn(f'data-segment-field="{field}"', PANEL)
         self.assertIn('data-column="vlan"', PANEL)

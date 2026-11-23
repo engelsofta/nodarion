@@ -1,10 +1,11 @@
-import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.31.0";
-import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.31.0";
-import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.31.0";
-import { renderCards } from "./panel-devices.mjs?v=1.31.0";
-import { panelStyles } from "./panel-styles.mjs?v=1.31.0";
-import { NodarionStateClient } from "./nodarion-state.mjs?v=1.31.0";
-import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.31.0";
+import { esc, onboardingStatus, formatLease, formatStateChanged } from "./panel-formatters.mjs?v=1.32.0";
+import { renderWatch, renderSettings } from "./panel-settings.mjs?v=1.32.0";
+import { renderLog, renderDnsLive, renderAi } from "./panel-activity.mjs?v=1.32.0";
+import { renderCards } from "./panel-devices.mjs?v=1.32.0";
+import { panelStyles } from "./panel-styles.mjs?v=1.32.0";
+import { NodarionStateClient } from "./nodarion-state.mjs?v=1.32.0";
+import { meshMapLabel, meshStyles, NodarionMeshMap } from "./panel-mesh.mjs?v=1.32.0";
+import { activeLocale, panelLocale, setPanelLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.32.0";
 
 class EngelsoftNodarionPanel extends HTMLElement {
   constructor() {
@@ -398,6 +399,13 @@ class EngelsoftNodarionPanel extends HTMLElement {
     });
     this.shadowRoot.querySelectorAll(".tab-view").forEach((view) =>
       view.toggleAttribute("hidden", view.dataset.view !== tab));
+    if (tab === "mesh") this._renderMesh();
+  }
+
+  _renderMesh() {
+    const container = this.shadowRoot.querySelector('[data-view="mesh"]');
+    if (this._meshMap?.container !== container) this._meshMap = new NodarionMeshMap(container);
+    this._meshMap.update(this._monitor.mesh_topology, this._monitor.connection_status?.fritzbox);
   }
 
   _navigateTo(tab) {
@@ -574,10 +582,11 @@ class EngelsoftNodarionPanel extends HTMLElement {
       ["dns", "mdi:shield-check-outline", "DNS"],
       ["ai", "mdi:chart-line", t("Analyse")],
       ["watch", "mdi:eye-outline", t("Überwachung")],
+      ["mesh", "mdi:lan", meshMapLabel()],
       ["settings", "mdi:cog-outline", t("Allgemeine Einstellungen öffnen")],
     ];
     this.shadowRoot.innerHTML = `
-      <style>${panelStyles}</style>
+      <style>${panelStyles}${meshStyles}</style>
       <div class="shell">
         <nav class="panel-navigation" aria-label="${t("Nodarion-Ansichten")}">
           ${navigation.map(([tab, icon, label]) => `
@@ -614,6 +623,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
               <div class="log-list"></div>
             </section>
           </section>
+          <section class="tab-view" data-view="mesh" hidden></section>
           <section class="tab-view" data-view="dns" hidden>
             <section class="dns-panel">
               <div class="dns-live-content"></div>
@@ -1557,6 +1567,7 @@ class EngelsoftNodarionPanel extends HTMLElement {
     const eventsChanged = full || changed.has("events");
     const alertsChanged = full || changed.has("alerts");
     if (statusChanged) this._renderConnections();
+    if (statusChanged && this._activeTab === "mesh") this._renderMesh();
     if (participantsChanged || lifecycleChanged) {
       this._renderGuest();
       this._renderCards(!full);

@@ -35,6 +35,11 @@ def serialize_frontend_state(
         if coordinator is not None and coordinator.fritz_scanner is not None
         else {"available": False, "enabled": False, "clients": 0}
     )
+    response["mesh_topology"] = (
+        coordinator.fritz_scanner.mesh_topology
+        if coordinator is not None and coordinator.fritz_scanner is not None
+        else None
+    )
     scanner = getattr(coordinator, "adguard_scanner", None) if coordinator else None
     response["dns_provider"] = {
         "id": scanner.provider if scanner else None,

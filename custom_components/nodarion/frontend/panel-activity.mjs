@@ -1,5 +1,5 @@
-import { esc, blockReason } from "./panel-formatters.mjs?v=1.31.0";
-import { activeLocale, t } from "./panel-i18n.mjs?v=1.31.0";
+import { esc, blockReason } from "./panel-formatters.mjs?v=1.32.0";
+import { activeLocale, t } from "./panel-i18n.mjs?v=1.32.0";
 
 export function renderLog(resetVerticalScroll = false) {
   const list = this.shadowRoot.querySelector(".log-list");

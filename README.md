@@ -36,6 +36,12 @@
 - **Manage FRITZ!Box access.** View connected guests, toggle guest Wi-Fi and, when configured, hold internet access for new devices until you approve them.
 - **Get optional AI summaries.** Run network analysis through a Home Assistant AI Task, on demand or daily. DNS privacy controls determine which data is sent.
 
+## Live FRITZ!Mesh map
+
+See which access point each Wi-Fi device uses. Line patterns identify the band and colors show signal quality. Select a node for link details, or click the legend to filter the map.
+
+![Anonymized illustration of three mesh nodes and 32 Wi-Fi clients](docs/mesh-map-anonymous.svg)
+
 ## Install and connect
 
 1. Install **Nodarion** from the Home Assistant Marketplace (Home Assistant 2026.11+) or [download the latest release](https://github.com/engelsofta/nodarion/releases/latest). For manual installation, place the integration in `custom_components/nodarion` and restart Home Assistant.

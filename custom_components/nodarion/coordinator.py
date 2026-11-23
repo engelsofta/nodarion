@@ -133,6 +133,7 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
         )
         self.adguard_scanner = create_dns_scanner(hass, options)
         self.adguard_status_coordinator = None
+        self.startup_deferred = False
         self.connection_status: dict[str, dict[str, Any]] = {
             "scanner": {
                 "label": "Ping/TCP-Scanner",
@@ -188,6 +189,8 @@ class NetworkCoordinator(DataUpdateCoordinator[dict[str, NetworkHost]]):
 
     async def _async_update_data(self) -> dict[str, NetworkHost]:
         """Fetch scan data and apply the offline threshold."""
+        if self.startup_deferred:
+            return self.data or {}
         now_monotonic = perf_counter()
         if self.fritz_scanner is not None and not self._protected_router_ips:
             try:

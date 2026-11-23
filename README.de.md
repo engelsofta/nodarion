@@ -36,6 +36,12 @@
 - **FRITZ!Box-Zugang verwalten.** Sieh verbundene Gäste, schalte das Gast-WLAN und lasse neue Geräte bei Bedarf erst nach Freigabe ins Internet.
 - **Optionale KI-Analyse nutzen.** Lass das Netz auf Wunsch manuell oder täglich über eine Home-Assistant-KI-Aufgabe zusammenfassen. Die DNS-Datenschutzeinstellungen bestimmen, welche Daten übermittelt werden.
 
+## Live-Karte für FRITZ!Mesh
+
+Sieh, mit welchem Zugangspunkt jedes WLAN-Gerät verbunden ist. Das Linienmuster zeigt das Frequenzband, die Farbe die Signalstärke. Ein Klick auf einen Knoten öffnet die Verbindungsdetails. Über die Legende kannst du die Karte filtern.
+
+![Anonymisierte Darstellung von drei Mesh-Knoten und 32 WLAN-Geräten](docs/mesh-map-anonymous.svg)
+
 ## Installation und Einrichtung
 
 1. Installiere **Nodarion** aus dem Home Assistant Marketplace (ab Home Assistant 2026.11) oder [lade die aktuelle Version herunter](https://github.com/engelsofta/nodarion/releases/latest). Für die manuelle Installation kopiere die Integration nach `custom_components/nodarion` und starte Home Assistant neu.

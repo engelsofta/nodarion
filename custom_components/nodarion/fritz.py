@@ -21,6 +21,14 @@ from .trust import has_upnp_error_code, is_vpn_connection
 
 _LOGGER = logging.getLogger(__name__)
 
+FritzScan = tuple[
+    list[dict[str, Any]],
+    dict[str, dict[str, Any]],
+    dict[str, str],
+    dict[str, Any],
+    dict[str, Any] | None,
+]
+
 
 class FritzBoxScanner:
     """Read active network clients directly from a FRITZ!Box."""
@@ -47,14 +55,8 @@ class FritzBoxScanner:
         self.auth_failed = False
         self._router_info: dict[str, str] = {}
         self._router_info_checked = 0.0
-        self._scan_future: asyncio.Future[
-            tuple[
-                list[dict[str, Any]],
-                dict[str, dict[str, Any]],
-                dict[str, str],
-                dict[str, Any],
-            ]
-        ] | None = None
+        self._scan_future: asyncio.Future[FritzScan] | None = None
+        self.mesh_topology: dict[str, Any] = {"nodes": [], "links": [], "fresh": False}
         self.dhcp_start: str | None = None
         self.dhcp_end: str | None = None
         self.guest_info: dict[str, Any] = {
@@ -65,12 +67,7 @@ class FritzBoxScanner:
 
     async def async_scan(self) -> dict[str, NetworkHost]:
         """Return active FRITZ!Box hosts without blocking Home Assistant."""
-        completed_data: tuple[
-            list[dict[str, Any]],
-            dict[str, dict[str, Any]],
-            dict[str, str],
-            dict[str, Any],
-        ] | None = None
+        completed_data: FritzScan | None = None
         if self._scan_future is not None and self._scan_future.done():
             try:
                 completed_data = self._scan_future.result()
@@ -79,26 +76,25 @@ class FritzBoxScanner:
             self._scan_future = None
         if self._scan_future is not None:
             self.available = False
+            self.mesh_topology = {**self.mesh_topology, "fresh": False}
             _LOGGER.warning("Previous FRITZ!Box scan is still running")
             return {}
 
-        if completed_data is not None:
-            raw_hosts, topology_data, router_info, guest_info = completed_data
-        else:
+        if completed_data is None:
             self._scan_future = self.hass.async_add_executor_job(
                 self._get_fritz_data
             )
             try:
                 async with asyncio.timeout(30):
-                    raw_hosts, topology_data, router_info, guest_info = await asyncio.shield(
-                        self._scan_future
-                    )
+                    completed_data = await asyncio.shield(self._scan_future)
             except TimeoutError:
                 self.available = False
+                self.mesh_topology = {**self.mesh_topology, "fresh": False}
                 _LOGGER.warning("FRITZ!Box scan timed out after 30 seconds")
                 return {}
             except Exception as err:
                 self.available = False
+                self.mesh_topology = {**self.mesh_topology, "fresh": False}
                 error_text = f"{type(err).__name__} {err}".casefold()
                 self.auth_failed = any(
                     marker in error_text
@@ -113,6 +109,11 @@ class FritzBoxScanner:
                 if self._scan_future is not None and self._scan_future.done():
                     self._scan_future = None
 
+        raw_hosts, topology_data, router_info, guest_info, mesh_topology = completed_data
+        self.mesh_topology = (
+            mesh_topology if mesh_topology is not None
+            else {**self.mesh_topology, "fresh": False}
+        )
         self.available = True
         self.auth_failed = False
         self.dhcp_start = router_info.get("dhcp_start")
@@ -222,14 +223,7 @@ class FritzBoxScanner:
             )
         return "granted" if allowed else "denied"
 
-    def _get_fritz_data(
-        self,
-    ) -> tuple[
-        list[dict[str, Any]],
-        dict[str, dict[str, Any]],
-        dict[str, str],
-        dict[str, Any],
-    ]:
+    def _get_fritz_data(self) -> FritzScan:
         hosts = FritzHosts(
             address=self.address,
             user=self.user,
@@ -246,10 +240,12 @@ class FritzBoxScanner:
             self._router_info_checked = monotonic()
         router_info = self._router_info
         topology_data: dict[str, dict[str, Any]] = {}
+        mesh_topology = None
         try:
             topology = FritzMeshTopology(fc=hosts.fc)
             topology.load_topology()
-            for device in topology.devices:
+            devices = topology.devices
+            for device in devices:
                 infrastructure = self._is_infrastructure(device)
                 for mac in self._device_macs(device):
                     formatted = self._format_mac(mac)
@@ -311,9 +307,92 @@ class FritzBoxScanner:
                             self._merge_max(
                                 current, "signal_strength_dbm", signal
                             )
+            mesh_topology = self._mesh_snapshot(devices, active_hosts)
         except Exception as err:
             _LOGGER.debug("FRITZ!Box mesh topology unavailable: %s", err)
-        return active_hosts, topology_data, router_info, guest_info
+        return active_hosts, topology_data, router_info, guest_info, mesh_topology
+
+    @classmethod
+    def _mesh_snapshot(
+        cls, devices: list[Any], active_hosts: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
+        """Build a graph of mesh infrastructure and its connected WLAN clients."""
+        if not devices:
+            return None
+        active_macs = {cls._format_mac(host.get("mac")) for host in active_hosts}
+        active_macs.discard(None)
+        nodes: dict[str, dict[str, Any]] = {}
+        device_ids: dict[int, str] = {}
+        clients: dict[str, dict[str, Any]] = {}
+        for device in devices:
+            role = cls._mesh_role(device)
+            mesh_node = any(
+                marker in role
+                for marker in ("master", "slave", "repeater", "agent", "controller")
+            )
+            macs = {cls._format_mac(mac) for mac in cls._device_macs(device)}
+            macs = {mac for mac in macs if mac and mac.replace(":", "").strip("0")}
+            master = "master" in role or "controller" in role
+            device_mac = cls._format_mac(getattr(device, "mac", None))
+            node_id = device_mac if device_mac in macs else min(macs, default=None)
+            if node_id is None and master:
+                node_id = "mesh-master"
+            if node_id is None:
+                continue
+            device_ids[id(device)] = node_id
+            node = {
+                "id": node_id,
+                "name": cls._device_name(device) or node_id,
+                "master": master,
+                "online": master or bool(macs & active_macs),
+            }
+            if mesh_node:
+                nodes[node_id] = node
+            else:
+                clients[node_id] = {**node, "client": True}
+
+        mesh_ids = set(nodes)
+        links: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for device in devices:
+            source = device_ids.get(id(device))
+            if source is None:
+                continue
+            for connection in device.get_connections():
+                target = device_ids.get(id(connection.target))
+                if not target or source == target or str(connection.state).upper() != "CONNECTED":
+                    continue
+                start, end = sorted((source, target))
+                medium = cls._normalize_connection_type(connection.type) or ""
+                if source not in mesh_ids or target not in mesh_ids:
+                    if medium != "WLAN" or (source in mesh_ids) == (target in mesh_ids):
+                        continue
+                    client = target if source in mesh_ids else source
+                    nodes[client] = clients[client]
+                link = links.setdefault((start, end, medium), {
+                    "source": start, "target": end, "medium": medium, "signal": None,
+                })
+                if medium == "WLAN":
+                    band = (
+                        cls._wifi_band(cls._connection_interface(connection, device))
+                        or cls._wifi_band(cls._connection_interface(connection, connection.target))
+                        or ""
+                    )
+                    radio = link.setdefault("radios", {}).setdefault(band, {})
+                    for direction, endpoint in (("cur_tx", source), ("cur_rx", target)):
+                        rate = cls._rate_mbps(getattr(connection, direction, None))
+                        cls._merge_max(radio, endpoint, rate)
+                    interface_link = getattr(connection, "interface_link", None)
+                    for field in ("rx_rcpi", "tx_rcpi", "signal_strength"):
+                        signal = getattr(interface_link, field, None)
+                        if isinstance(signal, int) and -120 <= signal < 0:
+                            cls._merge_max(link, "signal", signal)
+                nodes[source]["online"] = nodes[target]["online"] = True
+
+        return {
+            "nodes": [nodes[key] for key in sorted(nodes)],
+            "links": [links[key] for key in sorted(links)],
+            "fresh": True,
+        }
 
     async def async_set_guest_enabled(self, enabled: bool) -> dict[str, Any]:
         """Switch only a positively identified guest WLAN outside HA's loop."""

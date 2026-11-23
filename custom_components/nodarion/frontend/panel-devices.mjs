@@ -1,6 +1,6 @@
-import { esc, deviceWebControl, onboardingStatus, formatLease, formatDateTime, isPrivateMac, formatStateChanged, isNetworkInfrastructure, deviceIcon, deviceIconTitle, blockReason, topDomains, signalRating, dnsRating } from "./panel-formatters.mjs?v=1.31.0";
-import { t } from "./panel-i18n.mjs?v=1.31.0";
-import { internetStatusFor } from "./internet-status.mjs?v=1.31.0";
+import { esc, deviceWebControl, onboardingStatus, formatLease, formatDateTime, isPrivateMac, formatStateChanged, isNetworkInfrastructure, deviceIcon, deviceIconTitle, blockReason, topDomains, signalRating, dnsRating } from "./panel-formatters.mjs?v=1.32.0";
+import { t } from "./panel-i18n.mjs?v=1.32.0";
+import { internetStatusFor } from "./internet-status.mjs?v=1.32.0";
 
 export function renderCards(liveUpdate = false) {
   const [signalComparison, signalLimit] = (this._columnFilters.signalDbm || "").split(" ");

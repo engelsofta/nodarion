@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 import logging
 from typing import Any
 
-from aiohttp import ClientResponseError
+from aiohttp import ClientConnectionError, ClientResponseError
 from homeassistant.config_entries import ConfigEntry
 
 from homeassistant.core import HomeAssistant
@@ -33,9 +34,24 @@ class AdGuardStatusCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.scanner = scanner
         self.entry = entry
         self._reauth_started = False
+        self.startup_deferred = False
+        self.retry_first_status = False
 
     async def _async_update_data(self) -> dict[str, Any]:
+        if self.startup_deferred:
+            return self.data or {}
+        retry = self.retry_first_status
+        self.retry_first_status = False
         try:
+            if retry:
+                try:
+                    return await self.scanner.async_status()
+                except ClientResponseError as err:
+                    if err.status not in {502, 503, 504}:
+                        raise
+                except (TimeoutError, ClientConnectionError):
+                    pass
+                await asyncio.sleep(15)
             return await self.scanner.async_status()
         except ClientResponseError as err:
             if err.status in {401, 403} and not self._reauth_started:

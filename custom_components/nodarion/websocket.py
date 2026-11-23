@@ -33,6 +33,7 @@ def _sections(state: dict[str, Any]) -> dict[str, Any]:
         key: state[key]
         for key in (
             "summary", "ai_analysis", "connection_status", "guest_access",
+            "mesh_topology",
         )
     }
     return {

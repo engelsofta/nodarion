@@ -1,4 +1,4 @@
-import { settingsStyles } from "./settings-styles.mjs?v=1.31.0";
+import { settingsStyles } from "./settings-styles.mjs?v=1.32.0";
 
 export const panelStyles = `
 :host {

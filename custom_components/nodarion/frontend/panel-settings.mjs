@@ -1,5 +1,5 @@
-import { esc, formatRemainingDuration } from "./panel-formatters.mjs?v=1.31.0";
-import { activeLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.31.0";
+import { esc, formatRemainingDuration } from "./panel-formatters.mjs?v=1.32.0";
+import { activeLocale, t, unsavedChanges } from "./panel-i18n.mjs?v=1.32.0";
 
 export function renderWatch() {
   const panel = this.shadowRoot.querySelector(".watch-view");

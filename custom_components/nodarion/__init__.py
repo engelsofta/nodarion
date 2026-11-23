@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from homeassistant.components import frontend
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
+from homeassistant.core import CoreState, Event, HomeAssistant, callback
 
 from .const import (
     CONF_FRITZ_ENABLED,
@@ -33,6 +34,7 @@ from .websocket import async_register_websocket_api
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 type HANetMonConfigEntry = ConfigEntry[NetworkCoordinator]
 _STATIC_URL = "/engelsoft_nodarion"
+_STARTUP_DELAY_SECONDS = 45
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) -> bool:
@@ -58,6 +60,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) -> 
     if options.get(CONF_FRITZ_ENABLED):
         await monitor.async_initialize_internet_guard()
     coordinator = NetworkCoordinator(hass, entry, monitor)
+    starting = hass.state is not CoreState.running
+    coordinator.startup_deferred = starting
     # Make the persisted inventory available immediately.  An active network
     # scan may take tens of seconds and must not hold up integration setup.
     # The background refresh below replaces this snapshot as soon as fresh
@@ -72,9 +76,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) -> 
         coordinator.adguard_status_coordinator = AdGuardStatusCoordinator(
             hass, coordinator.adguard_scanner, entry
         )
-        # AdGuard is an optional data source. A short outage must not prevent
-        # the network monitor itself from loading.
-        await coordinator.adguard_status_coordinator.async_refresh()
+        coordinator.adguard_status_coordinator.startup_deferred = starting
+        coordinator.adguard_status_coordinator.retry_first_status = starting
     entry.runtime_data = coordinator
 
     if not domain_data.get("api_registered"):
@@ -85,11 +88,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: HANetMonConfigEntry) -> 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await _async_register_panel(hass)
 
-    initial_refresh = hass.async_create_background_task(
-        coordinator.async_refresh(),
-        "Nodarion initial network scan",
-    )
-    entry.async_on_unload(initial_refresh.cancel)
+    async def refresh_initial_data() -> None:
+        if starting:
+            await asyncio.sleep(_STARTUP_DELAY_SECONDS)
+        status = coordinator.adguard_status_coordinator
+        if status is not None:
+            status.startup_deferred = False
+            await status.async_refresh()
+        coordinator.startup_deferred = False
+        await coordinator.async_refresh()
+
+    @callback
+    def schedule_initial_refresh(_event: Event | None = None) -> None:
+        initial_refresh = hass.async_create_background_task(
+            refresh_initial_data(),
+            "Nodarion initial network scan",
+        )
+        entry.async_on_unload(initial_refresh.cancel)
+
+    if hass.state is CoreState.running:
+        schedule_initial_refresh()
+    else:
+        entry.async_on_unload(
+            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, schedule_initial_refresh)
+        )
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
 
